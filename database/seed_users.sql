@@ -12,7 +12,7 @@ VALUES (
     'Dono da Empresa',
     'admin@flowzap.com',
     -- Hash para 'FlowZap@2026' gerado pelo bcrypt
-    '$2a$12$NqR5c483hB2fRrqdF0gZt.85k41Z336xU0G9TsmU84s/yHh1N5b.e',
+    '$2a$10$.KJlfn0b506DEAYMdhNbjuRaVwTAosb096SPS606mzFO0IlJyCDAm',
     true
 )
 ON CONFLICT (email) DO NOTHING;
@@ -23,7 +23,7 @@ VALUES (
     'Sócio / Parceiro',
     'socio@flowzap.com',
     -- Hash para 'FlowZap@2026' gerado pelo bcrypt
-    '$2a$12$NqR5c483hB2fRrqdF0gZt.85k41Z336xU0G9TsmU84s/yHh1N5b.e',
+    '$2a$10$.KJlfn0b506DEAYMdhNbjuRaVwTAosb096SPS606mzFO0IlJyCDAm',
     true
 )
 ON CONFLICT (email) DO NOTHING;

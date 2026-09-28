@@ -1,4 +1,9 @@
 import dotenv from 'dotenv';
+import path from 'path';
+
+// Carrega .env da raiz do projeto ou da pasta backend
+dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 dotenv.config();
 
 import { createApp } from './app.js';
