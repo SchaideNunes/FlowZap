@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------------------
+  # Evolution API v2 - Gateway WhatsApp Multi-Device (QR Code)
+  # ----------------------------------------------------------------------------
+  evolution-api:
+    image: atendai/evolution-api:v2.2.3
+    container_name: flowzap_evolution_api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_URL=http://localhost:8080
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY:-flowzap_super_secret_evolution_key_2026}
+      - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
+      - LOG_LEVEL=ERROR,WARN,INFO
+      - DEL_INSTANCE=false
+      - CONFIG_SESSION_PHONE_CLIENT=FlowZap
+      - CONFIG_SESSION_PHONE_NAME=Chrome
+      - QRCODE_LIMIT=30
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_store:/evolution/store
+
+  # ----------------------------------------------------------------------------
+  # FlowZap Backend (Node.js + Express API + Scheduler)
+  # ----------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: flowzap_backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - HOST=0.0.0.0
+      - NODE_ENV=production
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - EVOLUTION_API_URL=http://evolution-api:8080
+      - EVOLUTION_API_KEY=${EVOLUTION_API_KEY:-flowzap_super_secret_evolution_key_2026}
+      - EVOLUTION_INSTANCE_NAME=${EVOLUTION_INSTANCE_NAME:-flowzap_cobranca}
+      - MIN_DELAY_SECONDS=${MIN_DELAY_SECONDS:-8}
+      - MAX_DELAY_SECONDS=${MAX_DELAY_SECONDS:-20}
+      - SIMULATE_TYPING=${SIMULATE_TYPING:-true}
+      - CRON_SCHEDULE=${CRON_SCHEDULE:-0 9 * * *}
+    depends_on:
+      - evolution-api
+
+volumes:
+  evolution_instances:
+    driver: local
+  evolution_store:
+    driver: local
