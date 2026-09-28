@@ -14,7 +14,9 @@ export function getSupabaseClient(): SupabaseClient {
     throw new Error('SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY precisam estar configurados no .env');
   }
 
-  supabaseInstance = createClient(supabaseUrl, supabaseKey, {
+  const cleanUrl = supabaseUrl.trim().replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+
+  supabaseInstance = createClient(cleanUrl, supabaseKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
