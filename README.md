@@ -1,74 +1,129 @@
 # Flow-Zap: Sistema de Cobrança Recorrente via WhatsApp
 
-Sistema autônomo para pequenos empresários gerenciarem cobranças mensais recorrentes de clientes, com envio de lembretes automáticos e seguros via WhatsApp (Evolution API).
+Sistema web autônomo para gerenciamento de cobranças mensais recorrentes de clientes com lembretes automáticos e seguros enviados via WhatsApp (Evolution API).
 
-## 🚀 Arquitetura Geral
-
-- **Banco de Dados**: Supabase (PostgreSQL Gerenciado na Nuvem - Plano Gratuito).
-  - Permite que ambas as máquinas (desktop e notebook) acessem e modifiquem os mesmos dados com consistência total.
-- **Motor de Automação (Backend + WhatsApp + Cron)**:
-  - Roda continuamente na **máquina-sede**.
-  - Node.js + Express + TypeScript com arquitetura limpa (Controllers, Services, Repositories, DTOs).
-  - Testes automatizados (TDD com Vitest).
-- **Gateway WhatsApp**:
-  - Evolution API v2 em container Docker com volume persistente para a sessão multi-device.
-  - Mecanismos anti-ban: jitter/delay randômico entre mensagens (8 a 20s), simulação de presença humana ("digitando..."), fila sequencial e templates dinâmicos.
-- **Frontend**:
-  - React + TypeScript + Vite.
-  - Acessível localmente (`localhost:5173`) na máquina-sede e via rede local (`http://<IP_DA_SEDE>:5173`) na segunda máquina.
-- **Autenticação**:
-  - Sistema com suporte aos 2 logins (dono e sócio/parceiro), senhas com hash Bcrypt e tokens JWT.
+Projetado com arquitetura distribuída para permitir acesso simultâneo a partir de duas máquinas (computador de mesa e notebook) através de banco em nuvem gerenciado (Supabase - Plano Gratuito) e motor de envio executado na máquina designada como sede.
 
 ---
 
-## 📂 Estrutura de Diretórios
+## 🌟 Principais Recursos
 
-```
-Flow-Zap/
-├── backend/                  # API REST, agendador, serviços de cobrança e WhatsApp
-│   ├── src/
-│   │   ├── controllers/      # Controladores HTTP
-│   │   ├── services/         # Regras de negócio, filas e anti-ban
-│   │   ├── repositories/     # Acesso a dados (Supabase/Postgres)
-│   │   ├── schemas/          # Validações Zod (DTOs)
-│   │   ├── middleware/       # Autenticação JWT e tratamento de erros
-│   │   └── config/           # Variáveis de ambiente e clientes
-│   ├── Dockerfile
-│   └── package.json
-├── frontend/                 # Painel Web responsivo
-│   ├── src/
-│   ├── index.html
-│   └── package.json
-├── database/                 # Modelagem e migrações SQL
-│   ├── schema.sql            # Script DDL completo para o Supabase
-│   └── seed_users.sql        # Criação inicial dos dois usuários
-├── docker-compose.yml        # Orquestração do Evolution API e serviços
-├── .env.example              # Modelo de variáveis de ambiente
-└── README.md
-```
+1. **Gestão de Clientes e Vendas Independentes**:
+   - Cada cliente pode ter múltiplos planos/cobranças simultâneas, cada uma com seu próprio valor mensal e dia de vencimento (1 a 31).
+   - Encerramento ou pausa de cobranças individuais sem desativar o cadastro do cliente.
+2. **Ciclos Mensais Automáticos & Confirmação de Pagamento**:
+   - Botão **"Marcar como Pago"** individual por cobrança: avança automaticamente a data de vencimento em +1 mês (tratando meses com 28, 29, 30 ou 31 dias) e reseta o status para pendente.
+   - Histórico completo de eventos auditado (`historico_mensagens`).
+3. **Disparos Automáticos & Botão de Disparo Manual**:
+   - **Rotina Automática (node-cron)**: Roda diariamente às 09:00 na máquina-sede.
+   - **Disparo Manual de Hoje**: Permite disparar sob demanda (ex: se o computador esteve desligado no horário agendado) com tela de confirmação e pré-visualização de todos os destinatários antes de enviar.
+   - **Momentos dos Lembretes**:
+     - 3 dias antes do vencimento (`lembrete_3d`)
+     - 1 dia antes do vencimento (`lembrete_1d`)
+     - No dia do vencimento (`vencido`)
+   - **Prevenção de Duplicidade**: Nunca envia a mesma notificação duas vezes no mesmo ciclo.
+4. **Proteções Anti-Ban WhatsApp de Última Geração**:
+   - **Fila Sequencial (FIFO)**: Mensagens nunca são enviadas simultaneamente.
+   - **Jitter Aleatório**: Intervalo dinâmico de 8 a 20 segundos entre cada envio.
+   - **Simulação de Digitação (`composing`)**: O WhatsApp mostra "digitando..." por 3 segundos antes do envio, emulando ação humana.
+   - **Saudações Dinâmicas**: Rotação de palavras de abertura para evitar assinaturas estáticas de bot.
+5. **Acesso em Rede Local (Host & Notebook)**:
+   - Acesso local via `http://localhost:5173` na máquina-sede.
+   - Acesso em qualquer dispositivo na mesma rede local via `http://<IP_DA_SEDE>:5173`.
+6. **Autenticação Dupla (Dono & Sócio)**:
+   - Dois logins individuais protegidos por senhas com hash Bcrypt e tokens JWT.
+7. **Inicialização Automática com o Windows**:
+   - Tarefa configurada no Agendador de Tarefas do Windows para ligar os serviços silenciosamente ao fazer logon.
 
 ---
 
-## 🛠️ Passo a Passo para Configuração Inicial (Etapa 1)
+## 🏗️ Stack Tecnológica & Arquitetura
 
-### 1. Criar o Projeto no Supabase
-1. Acesse [supabase.com](https://supabase.com) e crie um novo projeto gratuito.
+- **Backend**: Node.js + Express + TypeScript (Clean Architecture: Controllers, Services, Repositories, DTOs com Zod)
+- **Frontend**: React 19 + TypeScript + Vite + Design System sob medida (Google Fonts Outfit & Inter, paleta refinada slate/emerald, micro-interações 150-250ms)
+- **Banco de Dados**: Supabase (PostgreSQL em Nuvem - Gratuito)
+- **WhatsApp Gateway**: Evolution API v2 (Docker com persistência de sessão)
+- **Testes**: Vitest (100% TDD - 63 testes unitários e de integração passando)
+
+---
+
+## 📋 Guia de Instalação e Configuração
+
+### Passo 1: Configuração do Supabase (Banco de Dados)
+1. Acesse [supabase.com](https://supabase.com) e crie um projeto gratuito.
 2. No menu lateral esquerdo, vá em **SQL Editor**.
-3. Copie todo o conteúdo do arquivo [`database/schema.sql`](file:///d:/Trabalho/Flow-Zap/database/schema.sql) e clique em **Run**.
-4. Em seguida, copie o conteúdo de [`database/seed_users.sql`](file:///d:/Trabalho/Flow-Zap/database/seed_users.sql) e clique em **Run**.
-5. No Supabase, vá em **Project Settings** -> **API**:
-   - Copie a **Project URL** (ex: `https://xyz.supabase.co`).
-   - Copie a chave **service_role** (Secret Key).
+3. Abra e copie todo o conteúdo de [`database/schema.sql`](file:///d:/Trabalho/Flow-Zap/database/schema.sql) e clique em **Run**.
+4. Em seguida, copie o conteúdo de [`database/seed_users.sql`](file:///d:/Trabalho/Flow-Zap/database/seed_users.sql) e clique em **Run** para criar os logins do Dono e do Sócio.
+5. Em **Project Settings** > **API**, copie a **Project URL** e a chave **service_role**.
 
-### 2. Configurar o `.env`
-Crie um arquivo `.env` na raiz do projeto (e/ou em `backend/.env`) copiando de `.env.example` e inserindo suas credenciais:
+### Passo 2: Configuração das Variáveis de Ambiente
+Crie o arquivo `.env` na raiz do projeto copiando o modelo:
 ```bash
 cp .env.example .env
 ```
-
-### 3. Subir a Evolution API via Docker
-Na máquina-sede:
-```bash
-docker compose up -d evolution-api
+Preencha com suas chaves:
+```env
+SUPABASE_URL=https://seu-projeto.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=sua-chave-service-role
+JWT_SECRET=uma_chave_jwt_muito_segura_com_mais_de_32_caracteres_aleatorios_12345
 ```
-A Evolution API estará pronta na porta `8080`.
+
+### Passo 3: Iniciar o Sistema na Máquina Sede
+Basta dar dois cliques no script:
+```bash
+scripts\iniciar_sede.bat
+```
+Ou manualmente via terminal:
+```bash
+# Iniciar o container do WhatsApp (Evolution API)
+docker compose up -d evolution-api
+
+# Em um terminal: Backend
+cd backend && npm run dev
+
+# Em outro terminal: Frontend
+cd frontend && npm run dev
+```
+
+### Passo 4: Conectar o WhatsApp
+1. Abra o painel no navegador: `http://localhost:5173`.
+2. Entre com um dos logins padrão:
+   - **Dono**: `admin@flowzap.com` / Senha: `FlowZap@2026`
+   - **Sócio**: `socio@flowzap.com` / Senha: `FlowZap@2026`
+3. Clique no botão de QR Code no topo da tela.
+4. Abra o WhatsApp no celular: **Aparelhos conectados** > **Conectar aparelho** e leia o QR Code.
+5. Pronto! A sessão fica salva localmente na pasta da Evolution API e se reconecta sozinha entre reinicializações.
+
+---
+
+## 💻 Acesso a Partir do Notebook (Segunda Máquina)
+
+1. Na **máquina-sede**, execute `scripts\obter_ip_local.bat` para descobrir o IP local (ex: `192.168.1.50`).
+2. No **notebook/segunda máquina**, abra o navegador e acesse:
+   ```
+   http://192.168.1.50:5173
+   ```
+3. Ambos podem usar o sistema simultaneamente, cadastrar clientes e confirmar pagamentos em tempo real!
+
+---
+
+## ⚡ Atalhos na Área de Trabalho & Inicialização com o Windows
+
+- **Criar Atalho na Área de Trabalho**:
+  Execute `scripts\criar_atalho_desktop.bat` (funciona tanto na sede quanto no notebook).
+- **Iniciar Sozinho ao Ligar a Máquina Sede**:
+  Execute `scripts\instalar_agendador_windows.bat` como Administrador para cadastrar a tarefa no Agendador de Tarefas do Windows.
+
+---
+
+## 🧪 Suíte de Testes Automatizados (TDD)
+
+Para rodar todos os testes unitários e de integração:
+```bash
+cd backend
+npm test
+```
+Para ver o relatório de cobertura de código:
+```bash
+npm run test:coverage
+```
