@@ -1,0 +1,169 @@
+import React, { useState, useEffect } from 'react';
+import { X, UserPlus, Save } from 'lucide-react';
+import { Cliente } from '../types/index.js';
+import { api } from '../services/api.js';
+
+interface ClienteModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  clienteToEdit?: Cliente | null;
+  onSuccess: () => void;
+}
+
+export const ClienteModal: React.FC<ClienteModalProps> = ({
+  isOpen,
+  onClose,
+  clienteToEdit,
+  onSuccess,
+}) => {
+  const [nome, setNome] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [observacoes, setObservacoes] = useState('');
+  const [ativo, setAtivo] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (clienteToEdit) {
+      setNome(clienteToEdit.nome);
+      setWhatsapp(clienteToEdit.whatsapp);
+      setObservacoes(clienteToEdit.observacoes || '');
+      setAtivo(clienteToEdit.ativo);
+    } else {
+      setNome('');
+      setWhatsapp('');
+      setObservacoes('');
+      setAtivo(true);
+    }
+    setError(null);
+  }, [clienteToEdit, isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+
+    const cleanWhatsapp = whatsapp.replace(/\D/g, '');
+    if (cleanWhatsapp.length < 10) {
+      setError('WhatsApp deve conter DDD e número completo (ex: 5511999999999)');
+      setSaving(false);
+      return;
+    }
+
+    try {
+      if (clienteToEdit) {
+        await api.put(`/clientes/${clienteToEdit.id}`, {
+          nome,
+          whatsapp: cleanWhatsapp,
+          observacoes: observacoes || null,
+          ativo,
+        });
+      } else {
+        await api.post('/clientes', {
+          nome,
+          whatsapp: cleanWhatsapp,
+          observacoes: observacoes || null,
+          ativo,
+        });
+      }
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Erro ao salvar cliente.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <div className="modal-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <UserPlus size={20} color="var(--primary)" />
+            <h3 className="modal-title">
+              {clienteToEdit ? 'Editar Dados do Cliente' : 'Cadastrar Novo Cliente'}
+            </h3>
+          </div>
+          <button className="modal-close" onClick={onClose} disabled={saving}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+            {error && (
+              <div style={{ color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '1rem', background: 'var(--danger-light)', padding: '8px 12px', borderRadius: '8px' }}>
+                {error}
+              </div>
+            )}
+
+            <div className="form-group">
+              <label className="form-label">Nome Completo *</label>
+              <input
+                type="text"
+                className="form-input"
+                required
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                placeholder="Ex: João da Silva"
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">WhatsApp (com DDD e código do país) *</label>
+              <input
+                type="text"
+                className="form-input"
+                required
+                value={whatsapp}
+                onChange={(e) => setWhatsapp(e.target.value)}
+                placeholder="Ex: 5511999998888"
+              />
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '2px' }}>
+                Formato com código do Brasil (55) + DDD (ex: 5511999999999)
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Observações Livres (Opcional)</label>
+              <textarea
+                className="form-textarea"
+                rows={3}
+                value={observacoes}
+                onChange={(e) => setObservacoes(e.target.value)}
+                placeholder="Ex: Prefere contato após as 14h, cliente desde 2024..."
+              />
+            </div>
+
+            {clienteToEdit && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  id="cliente-ativo"
+                  checked={ativo}
+                  onChange={(e) => setAtivo(e.target.checked)}
+                />
+                <label htmlFor="cliente-ativo" style={{ fontSize: '0.875rem', color: '#fff', cursor: 'pointer' }}>
+                  Cliente Ativo na Base
+                </label>
+              </div>
+            )}
+          </div>
+
+          <div className="modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onClose} disabled={saving}>
+              Cancelar
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              <Save size={16} />
+              {saving ? 'Salvando...' : 'Salvar Cliente'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
