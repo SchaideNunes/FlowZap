@@ -16,7 +16,7 @@ docker compose up -d evolution-api
 if %errorlevel% neq 0 (
     echo [AVISO] Falha ao iniciar Evolution API no Docker. Certifique-se de que o Docker Desktop esta aberto.
 ) else (
-    echo [OK] Evolution API ativa na porta 8080.
+    echo [OK] Evolution API ativa na porta 8085.
 )
 echo.
 
