@@ -1,29 +1,19 @@
 -- ==============================================================================
--- FLOW-ZAP: Seed de Usuários Iniciais (Dono e Sócio)
--- Execute este script no SQL Editor do Supabase após rodar o schema.sql
--- Senha padrão temporária para ambos: FlowZap@2026 (trocar no primeiro acesso)
--- Hash bcrypt gerado com 10 salt rounds: $2b$10$wE0vA9XjW9BvK9T3C2X3q.8kU21sJd1WkPZ0x7a8qf2W6V9QyK.iK (exemplo)
--- Também há um script interativo de seed no backend (npm run seed:users)
+-- FLOW-ZAP: Seed de Usuários (AEV Celulares)
+-- Execute este script no SQL Editor do Supabase se precisar recriar os usuários
+-- Email: aevcelulares@outlook.com
+-- Senha: AEVStore@123
 -- ==============================================================================
 
--- Inserir usuário 1 (Dono)
+-- Inserir usuário principal (AEV Celulares)
 INSERT INTO usuarios (nome, email, senha_hash, ativo)
 VALUES (
-    'Dono da Empresa',
-    'admin@flowzap.com',
-    -- Hash para 'FlowZap@2026' gerado pelo bcrypt
-    '$2a$10$.KJlfn0b506DEAYMdhNbjuRaVwTAosb096SPS606mzFO0IlJyCDAm',
+    'AEV Celulares',
+    'aevcelulares@outlook.com',
+    -- Hash real para 'AEVStore@123' gerado pelo bcrypt
+    '$2a$10$n1VF8FhsWGEkCMdF0UK4bOBYLRUdpH43QwRy.dMCX3n08j.1jDPjO',
     true
 )
-ON CONFLICT (email) DO NOTHING;
-
--- Inserir usuário 2 (Sócio / Amigo)
-INSERT INTO usuarios (nome, email, senha_hash, ativo)
-VALUES (
-    'Sócio / Parceiro',
-    'socio@flowzap.com',
-    -- Hash para 'FlowZap@2026' gerado pelo bcrypt
-    '$2a$10$.KJlfn0b506DEAYMdhNbjuRaVwTAosb096SPS606mzFO0IlJyCDAm',
-    true
-)
-ON CONFLICT (email) DO NOTHING;
+ON CONFLICT (email) DO UPDATE
+SET senha_hash = EXCLUDED.senha_hash,
+    nome = EXCLUDED.nome;

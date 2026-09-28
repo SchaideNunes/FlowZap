@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import { api } from '../services/api.js';
-import { MessageSquare, Lock, Mail, ArrowRight, UserCheck } from 'lucide-react';
+import { MessageSquare, Lock, Mail, ArrowRight } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const { login } = useAuth();
-  const [email, setEmail] = useState('admin@flowzap.com');
-  const [senha, setSenha] = useState('FlowZap@2026');
+  const [email, setEmail] = useState('aevcelulares@outlook.com');
+  const [senha, setSenha] = useState('AEVStore@123');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,12 +23,6 @@ export const Login: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSelectQuickUser = (userEmail: string) => {
-    setEmail(userEmail);
-    setSenha('FlowZap@2026');
-    setError(null);
   };
 
   return (
@@ -59,43 +53,10 @@ export const Login: React.FC = () => {
           >
             <MessageSquare size={26} />
           </div>
-          <h1 style={{ fontSize: '1.65rem', marginBottom: '0.35rem' }}>FlowZap</h1>
+          <h1 style={{ fontSize: '1.65rem', marginBottom: '0.35rem' }}>AEV Celulares</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-            Acesso ao Sistema de Cobrança Recorrente
+            FlowZap • Cobranças Recorrentes via WhatsApp
           </p>
-        </div>
-
-        {/* Seletor rápido dos dois logins da empresa */}
-        <div
-          style={{
-            background: 'var(--bg-main)',
-            border: '1px solid var(--border-subtle)',
-            borderRadius: 'var(--radius-md)',
-            padding: '8px',
-            marginBottom: '1.5rem',
-          }}
-        >
-          <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', textAlign: 'center', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Selecione o Usuário (2 Logins Configurados)
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-            <button
-              type="button"
-              className={`btn btn-sm ${email === 'admin@flowzap.com' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => handleSelectQuickUser('admin@flowzap.com')}
-              style={{ fontSize: '0.8rem' }}
-            >
-              <UserCheck size={14} /> Dono
-            </button>
-            <button
-              type="button"
-              className={`btn btn-sm ${email === 'socio@flowzap.com' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => handleSelectQuickUser('socio@flowzap.com')}
-              style={{ fontSize: '0.8rem' }}
-            >
-              <UserCheck size={14} /> Sócio
-            </button>
-          </div>
         </div>
 
         {error && (
