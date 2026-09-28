@@ -1,0 +1,105 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Request, Response } from 'express';
+import { VendaController } from './venda.controller.js';
+import { IVendaRepository } from '../repositories/venda.repository.interface.js';
+import { IHistoricoRepository } from '../repositories/historico.repository.interface.js';
+import { BillingService } from '../services/billing.service.js';
+
+describe('VendaController (TDD)', () => {
+  let mockVendaRepo: IVendaRepository;
+  let mockHistoricoRepo: IHistoricoRepository;
+  let mockBillingService: BillingService;
+  let controller: VendaController;
+  let mockReq: Partial<Request>;
+  let mockRes: Partial<Response>;
+
+  beforeEach(() => {
+    mockVendaRepo = {
+      findByClienteId: vi.fn(),
+      findById: vi.fn(),
+      findActiveVendas: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      updateStatus: vi.fn(),
+      getDashboardMetrics: vi.fn(),
+    };
+    mockHistoricoRepo = {
+      findByVendaId: vi.fn(),
+      create: vi.fn(),
+      hasMessageBeenSentForCycle: vi.fn(),
+    };
+    mockBillingService = {
+      createVenda: vi.fn(),
+      markAsPaid: vi.fn(),
+      evaluateReminderState: vi.fn(),
+    } as unknown as BillingService;
+
+    controller = new VendaController(mockVendaRepo, mockHistoricoRepo, mockBillingService);
+
+    mockReq = {
+      params: {},
+      query: {},
+      body: {},
+    };
+    mockRes = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+    };
+  });
+
+  describe('markAsPaid endpoint', () => {
+    it('should call billingService.markAsPaid and return 200 with updated venda', async () => {
+      mockReq.params = { id: '10' };
+      const updatedVenda = {
+        id: 10,
+        cliente_id: 1,
+        descricao: 'Plano',
+        valor: 100,
+        dia_vencimento: 10,
+        status_mes_atual: 'pendente' as const,
+        data_vencimento_atual: '2026-10-10',
+        ativo: true,
+      };
+      vi.mocked(mockBillingService.markAsPaid).mockResolvedValue(updatedVenda);
+
+      await controller.markAsPaid(mockReq as Request, mockRes as Response);
+
+      expect(mockBillingService.markAsPaid).toHaveBeenCalledWith(10);
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.any(String),
+          venda: updatedVenda,
+        })
+      );
+    });
+
+    it('should return 400 if id is not a number', async () => {
+      mockReq.params = { id: 'abc' };
+
+      await controller.markAsPaid(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(400);
+      expect(mockRes.json).toHaveBeenCalledWith({ error: 'ID inválido' });
+    });
+  });
+
+  describe('getMetrics endpoint', () => {
+    it('should return dashboard metrics from repository', async () => {
+      const mockMetrics = {
+        totalPendentes: 3,
+        totalAvisados: 2,
+        totalVencidos: 1,
+        totalPagos: 4,
+        valorTotalMensal: 1500,
+        valorTotalRecebido: 600,
+      };
+      vi.mocked(mockVendaRepo.getDashboardMetrics).mockResolvedValue(mockMetrics);
+
+      await controller.getMetrics(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(mockMetrics);
+    });
+  });
+});
