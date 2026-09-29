@@ -14,10 +14,21 @@ services:
       - evolution_postgres_data:/var/lib/postgresql/data
 
   # ----------------------------------------------------------------------------
+  # Redis para Cache de Sessão e Baileys da Evolution API (~5MB RAM)
+  # ----------------------------------------------------------------------------
+  evolution-redis:
+    image: redis:7-alpine
+    container_name: flowzap_evolution_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - evolution_redis_data:/data
+
+  # ----------------------------------------------------------------------------
   # Evolution API v2 - Gateway WhatsApp Multi-Device (QR Code)
   # ----------------------------------------------------------------------------
   evolution-api:
-    image: evoapicloud/evolution-api:v2.2.3
+    image: evoapicloud/evolution-api:latest
     container_name: flowzap_evolution_api
     restart: unless-stopped
     ports:
@@ -29,17 +40,18 @@ services:
       - AUTHENTICATION_EXPOSE_IN_FETCH_INSTANCES=true
       - LOG_LEVEL=ERROR,WARN,INFO
       - DEL_INSTANCE=false
-      - CONFIG_SESSION_PHONE_CLIENT=FlowZap
-      - CONFIG_SESSION_PHONE_NAME=Chrome
-      - QRCODE_LIMIT=30
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
       - DATABASE_CONNECTION_URI=postgresql://evolution:evolution_secret_2026@evolution-postgres:5432/evolution
       - DATABASE_CONNECTION_CLIENT_NAME=evolution_flowzap
-      - CACHE_REDIS_ENABLED=false
-      - CACHE_LOCAL_ENABLED=true
+      - CACHE_REDIS_ENABLED=true
+      - CACHE_REDIS_URI=redis://evolution-redis:6379/1
+      - CACHE_REDIS_PREFIX_KEY=evolution
+      - CACHE_REDIS_SAVE_INSTANCES=false
+      - CACHE_LOCAL_ENABLED=false
     depends_on:
       - evolution-postgres
+      - evolution-redis
     volumes:
       - evolution_instances:/evolution/instances
       - evolution_store:/evolution/store
@@ -78,4 +90,6 @@ volumes:
   evolution_store:
     driver: local
   evolution_postgres_data:
+    driver: local
+  evolution_redis_data:
     driver: local
