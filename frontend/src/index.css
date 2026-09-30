@@ -453,6 +453,127 @@ h1, h2, h3, h4, h5, h6 {
   letter-spacing: 0.03em;
 }
 
+/* Campos com prefixo / sufixo elegantes (R$, %) */
+.input-with-affix {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+
+.input-affix {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #1e293b;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 0 0.85rem;
+  user-select: none;
+}
+
+.input-affix-left {
+  border-right: none;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  color: #34d399;
+}
+
+.input-with-affix .form-input-left {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.input-affix-right {
+  border-left: none;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  color: #94a3b8;
+}
+
+.input-with-affix .form-input-right {
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+/* Card de Resumo de Venda Redesenhado (Estilo Fintech/Moderno) */
+.venda-resumo-card {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.09) 0%, rgba(15, 23, 42, 0.85) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 12px;
+  padding: 1.15rem 1.35rem;
+  margin-top: 1rem;
+  margin-bottom: 0.75rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+.venda-resumo-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--primary);
+  border-radius: 4px 0 0 4px;
+}
+
+/* Atalhos rápidos para quantidade de parcelas */
+.installment-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.installment-pill {
+  background-color: var(--bg-main);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  border-radius: 6px;
+  padding: 4px 9px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease-out;
+}
+
+.installment-pill:hover {
+  border-color: var(--primary);
+  color: #fff;
+  background-color: rgba(16, 185, 129, 0.08);
+}
+
+.installment-pill.active {
+  background-color: rgba(16, 185, 129, 0.18);
+  border-color: var(--primary);
+  color: #34d399;
+  font-weight: 600;
+}
+
+/* Chips de sugestão para descrição */
+.desc-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.desc-chip {
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-dim);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 150ms ease-out;
+}
+
+.desc-chip:hover {
+  border-color: var(--text-muted);
+  color: #fff;
+}
+
 /* Modals */
 .modal-overlay {
   position: fixed;
