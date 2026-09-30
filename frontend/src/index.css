@@ -425,6 +425,34 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
 }
 
+/* Grupo de Input com DDI +55 cravado */
+.input-phone-group {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+}
+
+.input-phone-prefix {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #1e293b;
+  border: 1px solid var(--border-subtle);
+  border-right: none;
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  padding: 0.65rem 0.85rem;
+  color: #34d399;
+  font-weight: 600;
+  font-size: 0.9rem;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.input-phone-group .form-input {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  letter-spacing: 0.03em;
+}
+
 /* Modals */
 .modal-overlay {
   position: fixed;

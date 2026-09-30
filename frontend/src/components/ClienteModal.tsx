@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, UserPlus, Save } from 'lucide-react';
 import { Cliente } from '../types/index.js';
 import { api } from '../services/api.js';
+import { maskPhone } from '../utils/phone.js';
 
 interface ClienteModalProps {
   isOpen: boolean;
@@ -17,7 +18,8 @@ export const ClienteModal: React.FC<ClienteModalProps> = ({
   onSuccess,
 }) => {
   const [nome, setNome] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
+  const [phoneDisplay, setPhoneDisplay] = useState('');
+  const [phoneDigits, setPhoneDigits] = useState('');
   const [observacoes, setObservacoes] = useState('');
   const [ativo, setAtivo] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -26,12 +28,15 @@ export const ClienteModal: React.FC<ClienteModalProps> = ({
   useEffect(() => {
     if (clienteToEdit) {
       setNome(clienteToEdit.nome);
-      setWhatsapp(clienteToEdit.whatsapp);
+      const { display, digits } = maskPhone(clienteToEdit.whatsapp);
+      setPhoneDisplay(display);
+      setPhoneDigits(digits);
       setObservacoes(clienteToEdit.observacoes || '');
       setAtivo(clienteToEdit.ativo);
     } else {
       setNome('');
-      setWhatsapp('');
+      setPhoneDisplay('');
+      setPhoneDigits('');
       setObservacoes('');
       setAtivo(true);
     }
@@ -40,17 +45,24 @@ export const ClienteModal: React.FC<ClienteModalProps> = ({
 
   if (!isOpen) return null;
 
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { display, digits } = maskPhone(e.target.value);
+    setPhoneDisplay(display);
+    setPhoneDigits(digits);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
 
-    const cleanWhatsapp = whatsapp.replace(/\D/g, '');
-    if (cleanWhatsapp.length < 10) {
-      setError('WhatsApp deve conter DDD e número completo (ex: 5511999999999)');
+    if (phoneDigits.length < 10) {
+      setError('Informe o DDD e o número completo (ex: 75 99150-3949)');
       setSaving(false);
       return;
     }
+
+    const cleanWhatsapp = '55' + phoneDigits;
 
     try {
       if (clienteToEdit) {
@@ -113,17 +125,23 @@ export const ClienteModal: React.FC<ClienteModalProps> = ({
             </div>
 
             <div className="form-group">
-              <label className="form-label">WhatsApp (com DDD e código do país) *</label>
-              <input
-                type="text"
-                className="form-input"
-                required
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-                placeholder="Ex: 5511999998888"
-              />
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '2px' }}>
-                Formato com código do Brasil (55) + DDD (ex: 5511999999999)
+              <label className="form-label">WhatsApp *</label>
+              <div className="input-phone-group">
+                <span className="input-phone-prefix" title="Código do Brasil (+55) fixo">
+                  +55 🇧🇷
+                </span>
+                <input
+                  type="tel"
+                  className="form-input"
+                  required
+                  value={phoneDisplay}
+                  onChange={handlePhoneChange}
+                  placeholder="(75) 99150-3949"
+                  maxLength={15}
+                />
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
+                Digite o DDD e o número (ex: 75991503949). O código +55 do Brasil já fica cravado automaticamente.
               </div>
             </div>
 

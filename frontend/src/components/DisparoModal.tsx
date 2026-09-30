@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Send, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { ReminderPreviewItem } from '../types/index.js';
 import { api } from '../services/api.js';
+import { formatFullWhatsApp } from '../utils/phone.js';
 
 interface DisparoModalProps {
   isOpen: boolean;
@@ -143,7 +144,7 @@ export const DisparoModal: React.FC<DisparoModalProps> = ({ isOpen, onClose, onS
                       {items.map((item, idx) => (
                         <tr key={idx}>
                           <td style={{ fontWeight: 600 }}>{item.clienteNome}</td>
-                          <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{item.whatsapp}</td>
+                          <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{formatFullWhatsApp(item.whatsapp)}</td>
                           <td>{item.descricao || 'Cobrança'}</td>
                           <td style={{ color: 'var(--primary)', fontWeight: 600 }}>
                             R$ {Number(item.valor).toFixed(2).replace('.', ',')}

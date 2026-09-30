@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Cliente, Venda } from '../types/index.js';
 import { api } from '../services/api.js';
+import { formatFullWhatsApp } from '../utils/phone.js';
 
 interface ClientesViewProps {
   onOpenNovoClienteModal: () => void;
@@ -242,7 +243,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                     <Phone size={12} />
-                    <span>{c.whatsapp}</span>
+                    <span>{formatFullWhatsApp(c.whatsapp)}</span>
                   </div>
                 </div>
               ))
@@ -268,7 +269,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '6px' }}>
                       <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Phone size={14} /> {selectedCliente.whatsapp}
+                        <Phone size={14} /> {formatFullWhatsApp(selectedCliente.whatsapp)}
                       </span>
                       <a
                         href={`https://wa.me/${selectedCliente.whatsapp}`}
