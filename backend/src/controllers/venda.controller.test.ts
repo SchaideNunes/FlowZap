@@ -18,6 +18,7 @@ describe('VendaController (TDD)', () => {
       findByClienteId: vi.fn(),
       findById: vi.fn(),
       findActiveVendas: vi.fn(),
+      findAllVendas: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       updateStatus: vi.fn(),
@@ -45,6 +46,31 @@ describe('VendaController (TDD)', () => {
       status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
     };
+  });
+
+  describe('getAll endpoint', () => {
+    it('should return 200 with all vendas and their clientes', async () => {
+      const mockList = [
+        {
+          id: 1,
+          cliente_id: 1,
+          descricao: 'Samsung A57',
+          valor: 200,
+          dia_vencimento: 5,
+          status_mes_atual: 'pendente' as const,
+          data_vencimento_atual: '2026-10-05',
+          ativo: true,
+          cliente: { id: 1, nome: 'Schaide', whatsapp: '5575991503949', ativo: true },
+        },
+      ];
+      vi.mocked(mockVendaRepo.findAllVendas).mockResolvedValue(mockList);
+
+      await controller.getAll(mockReq as Request, mockRes as Response);
+
+      expect(mockVendaRepo.findAllVendas).toHaveBeenCalled();
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(mockList);
+    });
   });
 
   describe('markAsPaid endpoint', () => {

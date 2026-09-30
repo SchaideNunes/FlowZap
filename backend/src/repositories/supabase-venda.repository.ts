@@ -56,6 +56,19 @@ export class SupabaseVendaRepository implements IVendaRepository {
     return (data || []) as VendaWithCliente[];
   }
 
+  async findAllVendas(): Promise<VendaWithCliente[]> {
+    const { data, error } = await this.client
+      .from('vendas')
+      .select('*, cliente:clientes(id, nome, whatsapp, ativo)')
+      .order('data_vencimento_atual', { ascending: true });
+
+    if (error) {
+      throw new Error(`Erro ao buscar todas as vendas: ${error.message}`);
+    }
+
+    return (data || []) as VendaWithCliente[];
+  }
+
   async create(data: CreateVendaDTO): Promise<VendaDTO> {
     const payload: any = {
       cliente_id: data.cliente_id,

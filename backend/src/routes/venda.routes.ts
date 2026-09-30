@@ -12,6 +12,7 @@ export function createVendaRouter(
 
   router.use(authMiddleware);
 
+  router.get('/', vendaController.getAll);
   router.get('/metrics', vendaController.getMetrics);
   router.get('/cliente/:clienteId', vendaController.getByCliente);
   router.get('/:id', vendaController.getById);

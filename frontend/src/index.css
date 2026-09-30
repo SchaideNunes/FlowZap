@@ -393,6 +393,98 @@ h1, h2, h3, h4, h5, h6 {
   background-color: rgba(255, 255, 255, 0.02);
 }
 
+/* Planilha Estilo Excel */
+.excel-wrapper {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.excel-toolbar {
+  padding: 0.85rem 1.15rem;
+  background-color: #0b0f17;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.excel-filters {
+  display: flex;
+  gap: 4px;
+  background-color: var(--bg-main);
+  padding: 3px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+}
+
+.excel-filter-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease-out;
+}
+
+.excel-filter-btn:hover {
+  color: #fff;
+}
+
+.excel-filter-btn.active {
+  background-color: var(--bg-card);
+  color: #34d399;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.excel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+  text-align: left;
+}
+
+.excel-table th {
+  padding: 0.75rem 0.9rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  background-color: #0f172a;
+  border-bottom: 1px solid var(--border-subtle);
+  border-right: 1px solid rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+
+.excel-table td {
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid var(--border-subtle);
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+  color: var(--text-main);
+  vertical-align: middle;
+}
+
+.excel-table tbody tr:hover {
+  background-color: rgba(16, 185, 129, 0.04);
+}
+
+.excel-table tfoot td {
+  padding: 0.85rem 1rem;
+  background-color: #0b0f17;
+  border-top: 2px solid var(--border-subtle);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
 /* Forms & Inputs */
 .form-group {
   margin-bottom: 1.15rem;

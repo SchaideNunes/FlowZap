@@ -19,6 +19,16 @@ export class VendaController {
     this.billingService = billingService;
   }
 
+  getAll = async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const vendas = await this.vendaRepo.findAllVendas();
+      res.status(200).json(vendas);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao buscar todas as vendas';
+      res.status(500).json({ error: msg });
+    }
+  };
+
   getByCliente = async (req: Request, res: Response): Promise<void> => {
     const clienteId = Number(req.params.clienteId);
     if (isNaN(clienteId)) {

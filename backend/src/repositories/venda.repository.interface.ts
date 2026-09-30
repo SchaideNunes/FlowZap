@@ -22,6 +22,7 @@ export interface IVendaRepository {
   findByClienteId(clienteId: number): Promise<VendaDTO[]>;
   findById(id: number): Promise<VendaWithCliente | null>;
   findActiveVendas(): Promise<VendaWithCliente[]>;
+  findAllVendas(): Promise<VendaWithCliente[]>;
   create(data: CreateVendaDTO): Promise<VendaDTO>;
   update(id: number, data: UpdateVendaDTO): Promise<VendaDTO>;
   updateStatus(id: number, status: VendaStatus, nextDueDate?: string): Promise<VendaDTO>;
