@@ -217,12 +217,6 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
     return `${d}/${m}/${y}`;
   };
 
-  const getInitials = (name?: string) => {
-    if (!name) return '??';
-    const parts = name.trim().split(' ').filter(Boolean);
-    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  };
 
   return (
     <div>
@@ -540,30 +534,31 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                         {idx + 1}
                       </td>
 
-                      {/* Nome do Cliente com Avatar Initial */}
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '9px' }}>
-                          <div className="client-avatar-badge">
-                            {getInitials(v.cliente?.nome)}
-                          </div>
-                          <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                              <span style={{ fontWeight: 600, color: '#fff', fontSize: '0.86rem' }}>
-                                {v.cliente?.nome || 'Cliente Desconhecido'}
-                              </span>
-                              {v.cliente && (
-                                <button
-                                  type="button"
-                                  onClick={() => onEditCliente(v.cliente!)}
-                                  title="Editar dados cadastrais do cliente"
-                                  className="table-action-btn"
-                                  style={{ padding: '2px 4px', border: 'none', background: 'transparent' }}
-                                >
-                                  <Edit2 size={11} color="var(--text-dim)" />
-                                </button>
-                              )}
-                            </div>
-                          </div>
+                      {/* Nome do Cliente */}
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontWeight: 600, color: '#fff', fontSize: '0.88rem' }}>
+                            {v.cliente?.nome || 'Cliente Desconhecido'}
+                          </span>
+                          {v.cliente && (
+                            <button
+                              type="button"
+                              onClick={() => onEditCliente(v.cliente!)}
+                              title="Editar dados cadastrais do cliente"
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--text-dim)',
+                                cursor: 'pointer',
+                                padding: '2px 4px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                borderRadius: '4px',
+                              }}
+                            >
+                              <Edit2 size={12} />
+                            </button>
+                          )}
                         </div>
                       </td>
 
