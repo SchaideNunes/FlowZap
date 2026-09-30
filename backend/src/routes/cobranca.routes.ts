@@ -13,6 +13,7 @@ export function createCobrancaRouter(
   router.use(authMiddleware);
 
   router.get('/preview', cobrancaController.preview);
+  router.get('/central', cobrancaController.getCentral);
   router.post('/disparar', cobrancaController.disparar);
   router.get('/queue-status', cobrancaController.getQueueStatus);
   router.get('/whatsapp-status', cobrancaController.getWhatsAppStatus);

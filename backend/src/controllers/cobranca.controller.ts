@@ -28,6 +28,16 @@ export class CobrancaController {
     }
   };
 
+  getCentral = async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const data = await this.reminderService.getCentralNotificacoes();
+      res.status(200).json(data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao carregar central de notificações';
+      res.status(500).json({ error: msg });
+    }
+  };
+
   disparar = async (_req: Request, res: Response): Promise<void> => {
     try {
       const result = await this.reminderService.dispatchReminders();

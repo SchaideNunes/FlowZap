@@ -66,6 +66,27 @@ describe('CobrancaController (TDD)', () => {
     });
   });
 
+  describe('getCentral endpoint', () => {
+    it('should return 200 with consolidated notifications data', async () => {
+      const mockCentralData = {
+        agendadosHoje: [],
+        emAtraso: [],
+        resumo: {
+          totalHoje: 0,
+          valorHoje: 0,
+          totalAtrasados: 0,
+          valorAtrasado: 0,
+        },
+      };
+      (mockReminderService as any).getCentralNotificacoes = vi.fn().mockResolvedValue(mockCentralData);
+
+      await controller.getCentral(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(mockCentralData);
+    });
+  });
+
   describe('disparar endpoint', () => {
     it('should trigger dispatch and return 200 with dispatched count', async () => {
       vi.mocked(mockReminderService.dispatchReminders).mockResolvedValue({

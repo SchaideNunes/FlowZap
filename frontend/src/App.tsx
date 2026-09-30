@@ -4,6 +4,7 @@ import { Navbar } from './components/Navbar.js';
 import { Login } from './views/Login.js';
 import { Dashboard } from './views/Dashboard.js';
 import { ClientesView } from './views/ClientesView.js';
+import { NotificacoesView } from './views/NotificacoesView.js';
 import { WhatsAppModal } from './components/WhatsAppModal.js';
 import { DisparoModal } from './components/DisparoModal.js';
 import { ClienteModal } from './components/ClienteModal.js';
@@ -14,7 +15,7 @@ import { api } from './services/api.js';
 
 export const App: React.FC = () => {
   const { user, loading } = useAuth();
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'clientes'>('dashboard');
+  const [currentTab, setCurrentTab] = useState<'dashboard' | 'clientes' | 'notificacoes'>('dashboard');
 
   // WhatsApp connection state
   const [whatsAppStatus, setWhatsAppStatus] = useState<WhatsAppStatus['state']>('unknown');
@@ -123,7 +124,7 @@ export const App: React.FC = () => {
             onOpenNovaVendaModal={() => handleOpenNovaVenda()}
             onNavigateToClientes={() => setCurrentTab('clientes')}
           />
-        ) : (
+        ) : currentTab === 'clientes' ? (
           <ClientesView
             onOpenNovoClienteModal={() => {
               setClienteToEdit(null);
@@ -132,6 +133,12 @@ export const App: React.FC = () => {
             onEditCliente={handleEditCliente}
             onOpenNovaVendaModal={handleOpenNovaVenda}
             onEditVenda={handleEditVenda}
+            onOpenHistoricoModal={handleOpenHistorico}
+          />
+        ) : (
+          <NotificacoesView
+            whatsAppStatus={whatsAppStatus}
+            onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
             onOpenHistoricoModal={handleOpenHistorico}
           />
         )}

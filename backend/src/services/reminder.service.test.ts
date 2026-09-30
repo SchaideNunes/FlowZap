@@ -128,4 +128,82 @@ describe('ReminderService (TDD)', () => {
       expect(mockQueueService.enqueue).toHaveBeenCalledTimes(2);
     });
   });
+
+  describe('getOverdueReminders', () => {
+    it('should return overdue sales with delay calculation and message template', async () => {
+      const mockOverdueVendas = [
+        ...mockActiveVendas,
+        {
+          id: 103,
+          cliente_id: 3,
+          descricao: 'iPhone 13',
+          valor: 350,
+          dia_vencimento: 5,
+          status_mes_atual: 'vencido' as const,
+          data_vencimento_atual: '2026-09-05',
+          ativo: true,
+          cliente: {
+            id: 3,
+            nome: 'Carlos Souza',
+            whatsapp: '5575999999999',
+            ativo: true,
+          },
+        },
+      ];
+      vi.mocked(mockVendaRepo.findActiveVendas).mockResolvedValue(mockOverdueVendas);
+      vi.mocked(mockHistoricoRepo.findByVendaId).mockResolvedValue([
+        {
+          id: 1,
+          venda_id: 103,
+          tipo: 'vencido',
+          data_envio: '2026-09-06T10:00:00Z',
+          status_envio: 'enviado',
+          mensagem: 'Aviso de vencido enviado',
+        },
+      ]);
+
+      const overdue = await reminderService.getOverdueReminders('2026-09-15');
+
+      expect(overdue).toHaveLength(1);
+      expect(overdue[0].vendaId).toBe(103);
+      expect(overdue[0].clienteNome).toBe('Carlos Souza');
+      expect(overdue[0].diasAtraso).toBe(10);
+      expect(overdue[0].dataVencimento).toBe('05/09/2026');
+      expect(overdue[0].ultimoEnvio?.tipo).toBe('vencido');
+    });
+  });
+
+  describe('getCentralNotificacoes', () => {
+    it('should return consolidated today preview, overdue items, and summary counters', async () => {
+      const mockMixedVendas = [
+        ...mockActiveVendas,
+        {
+          id: 103,
+          cliente_id: 3,
+          descricao: 'Samsung Galaxy',
+          valor: 300,
+          dia_vencimento: 10,
+          status_mes_atual: 'vencido' as const,
+          data_vencimento_atual: '2026-09-10',
+          ativo: true,
+          cliente: {
+            id: 3,
+            nome: 'Ana Lima',
+            whatsapp: '5575888888888',
+            ativo: true,
+          },
+        },
+      ];
+      vi.mocked(mockVendaRepo.findActiveVendas).mockResolvedValue(mockMixedVendas);
+
+      const central = await reminderService.getCentralNotificacoes('2026-09-15');
+
+      expect(central.agendadosHoje).toHaveLength(2);
+      expect(central.emAtraso).toHaveLength(1);
+      expect(central.resumo.totalHoje).toBe(2);
+      expect(central.resumo.valorHoje).toBe(300); // 100 + 200
+      expect(central.resumo.totalAtrasados).toBe(1);
+      expect(central.resumo.valorAtrasado).toBe(300);
+    });
+  });
 });

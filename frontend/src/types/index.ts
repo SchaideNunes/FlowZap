@@ -64,3 +64,37 @@ export interface ReminderPreviewItem {
 export interface WhatsAppStatus {
   state: 'open' | 'connecting' | 'close' | 'refused' | 'unknown';
 }
+
+export interface OverdueReminderItem {
+  vendaId: number;
+  clienteId: number;
+  clienteNome: string;
+  whatsapp: string;
+  descricao?: string | null;
+  valor: number;
+  valorTotal?: number | null;
+  parcelaAtual?: number | null;
+  totalParcelas?: number | null;
+  dataVencimento: string;
+  dataVencimentoISO: string;
+  diasAtraso: number;
+  statusMesAtual: string;
+  mensagemCobranca: string;
+  ultimoEnvio?: {
+    tipo: string;
+    dataEnvio: string;
+    statusEnvio: string;
+  } | null;
+}
+
+export interface CentralNotificacoesData {
+  agendadosHoje: ReminderPreviewItem[];
+  emAtraso: OverdueReminderItem[];
+  resumo: {
+    totalHoje: number;
+    valorHoje: number;
+    totalAtrasados: number;
+    valorAtrasado: number;
+  };
+}
+
