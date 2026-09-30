@@ -95,10 +95,10 @@ h1, h2, h3, h4, h5, h6 {
 
 .main-content {
   flex: 1;
-  max-width: 1200px;
+  max-width: 1600px;
   width: 100%;
   margin: 0 auto;
-  padding: 1.75rem 1.25rem 3rem 1.25rem;
+  padding: 1.75rem 2rem 3rem 2rem;
 }
 
 /* Header & Navbar */
@@ -112,9 +112,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .navbar-inner {
-  max-width: 1200px;
+  max-width: 1600px;
   margin: 0 auto;
-  padding: 0.875rem 1.25rem;
+  padding: 0.875rem 2rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -393,32 +393,42 @@ h1, h2, h3, h4, h5, h6 {
   background-color: rgba(255, 255, 255, 0.02);
 }
 
-/* Planilha Estilo Excel */
+/* ==============================================================================
+   Planilha Estilo Excel / Unified Spreadsheet Table
+   ============================================================================== */
 .excel-wrapper {
   background-color: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
 }
 
 .excel-toolbar {
-  padding: 0.85rem 1.15rem;
-  background-color: #0b0f17;
+  padding: 1rem 1.35rem;
+  background: linear-gradient(180deg, #131d2e 0%, #0d1522 100%);
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 1rem;
+}
+
+.excel-search-box {
+  position: relative;
+  min-width: 320px;
+  flex: 1 1 320px;
+  max-width: 480px;
 }
 
 .excel-filters {
   display: flex;
+  align-items: center;
   gap: 4px;
-  background-color: var(--bg-main);
-  padding: 3px;
-  border-radius: 6px;
+  background-color: #090e17;
+  padding: 4px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
 }
 
@@ -426,63 +436,172 @@ h1, h2, h3, h4, h5, h6 {
   background: transparent;
   border: none;
   color: var(--text-muted);
-  padding: 5px 12px;
-  border-radius: 4px;
-  font-size: 0.78rem;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 150ms ease-out;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all var(--transition-fast);
 }
 
 .excel-filter-btn:hover {
   color: #fff;
+  background-color: rgba(255, 255, 255, 0.05);
 }
 
 .excel-filter-btn.active {
   background-color: var(--bg-card);
   color: #34d399;
   font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.excel-filter-count {
+  font-size: 0.7rem;
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.excel-filter-btn.active .excel-filter-count {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+
+.excel-table-container {
+  width: 100%;
+  overflow-x: auto;
+  position: relative;
 }
 
 .excel-table {
   width: 100%;
-  border-collapse: collapse;
+  min-width: 1420px;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 0.84rem;
   text-align: left;
 }
 
 .excel-table th {
-  padding: 0.75rem 0.9rem;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  padding: 0.85rem 1rem;
   font-size: 0.72rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   color: var(--text-dim);
-  background-color: #0f172a;
-  border-bottom: 1px solid var(--border-subtle);
+  background-color: #0f1826;
+  border-bottom: 2px solid var(--border-subtle);
   border-right: 1px solid rgba(255, 255, 255, 0.04);
-  white-space: nowrap;
+  white-space: nowrap !important;
+  user-select: none;
+}
+
+.excel-table th:last-child {
+  border-right: none;
 }
 
 .excel-table td {
-  padding: 0.75rem 0.9rem;
+  padding: 0.85rem 1rem;
   border-bottom: 1px solid var(--border-subtle);
   border-right: 1px solid rgba(255, 255, 255, 0.03);
   color: var(--text-main);
   vertical-align: middle;
+  background-color: var(--bg-card);
+  transition: background-color var(--transition-fast);
 }
 
-.excel-table tbody tr:hover {
-  background-color: rgba(16, 185, 129, 0.04);
+.excel-table td:last-child {
+  border-right: none;
+}
+
+.excel-table tbody tr:hover td {
+  background-color: rgba(255, 255, 255, 0.035);
+}
+
+.excel-table tbody tr.row-vencido td {
+  background-color: rgba(239, 68, 68, 0.04);
+}
+
+.excel-table tbody tr.row-pago td {
+  background-color: rgba(16, 185, 129, 0.03);
 }
 
 .excel-table tfoot td {
-  padding: 0.85rem 1rem;
-  background-color: #0b0f17;
-  border-top: 2px solid var(--border-subtle);
-  font-weight: 600;
-  font-size: 0.85rem;
+  padding: 1rem 1.15rem;
+  background-color: #0b111b;
+  border-top: 2px solid #2d3748;
+  font-weight: 700;
+  font-size: 0.86rem;
+  white-space: nowrap !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* WhatsApp Direct Pill Badge */
+.whatsapp-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.09);
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  text-decoration: none;
+  font-size: 0.8rem;
+  font-family: monospace;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+  white-space: nowrap !important;
+  transition: all var(--transition-fast);
+}
+.whatsapp-pill-btn:hover {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: #34d399;
+  color: #6ee7b7;
+  transform: translateY(-1px);
+}
+
+/* Client Avatar Initial Circle */
+.client-avatar-badge {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(59, 130, 246, 0.2));
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #6ee7b7;
+  flex-shrink: 0;
+}
+
+/* Table Quick Action Buttons */
+.table-action-btn {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.table-action-btn:hover {
+  background-color: var(--bg-card-hover);
+  border-color: var(--text-dim);
+  color: #fff;
 }
 
 /* Forms & Inputs */
