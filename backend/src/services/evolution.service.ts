@@ -48,12 +48,19 @@ export class EvolutionService {
    */
   async getQrCode(): Promise<{ pairingCode?: string; qrcode?: string; state: string }> {
     try {
+      // Se já estiver conectado, retorna diretamente
+      const status = await this.checkInstanceStatus();
+      if (status.state === 'open') {
+        return { state: 'open' };
+      }
+
       const response = await this.http.get(`/instance/connect/${this.instanceName}`);
       const data = response.data;
+      const state = data?.instance?.state || data?.state || (data?.base64 ? 'connecting' : 'close');
       return {
         qrcode: data?.base64 || data?.qrcode?.base64 || null,
         pairingCode: data?.pairingCode || null,
-        state: data?.state || 'connecting',
+        state,
       };
     } catch {
       // Se a instância não existir, cria a instância primeiro
