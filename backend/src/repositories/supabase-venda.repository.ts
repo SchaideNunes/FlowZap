@@ -57,21 +57,45 @@ export class SupabaseVendaRepository implements IVendaRepository {
   }
 
   async create(data: CreateVendaDTO): Promise<VendaDTO> {
+    const payload: any = {
+      cliente_id: data.cliente_id,
+      descricao: data.descricao,
+      valor: data.valor,
+      dia_vencimento: data.dia_vencimento,
+      status_mes_atual: 'pendente',
+      data_vencimento_atual: data.data_vencimento_atual,
+      ativo: data.ativo ?? true,
+    };
+
+    if (data.valor_total !== undefined) payload.valor_total = data.valor_total;
+    if (data.taxa_juros !== undefined) payload.taxa_juros = data.taxa_juros;
+    if (data.total_parcelas !== undefined) payload.total_parcelas = data.total_parcelas;
+    if (data.parcela_atual !== undefined) payload.parcela_atual = data.parcela_atual;
+
     const { data: created, error } = await this.client
       .from('vendas')
-      .insert({
-        cliente_id: data.cliente_id,
-        descricao: data.descricao,
-        valor: data.valor,
-        dia_vencimento: data.dia_vencimento,
-        status_mes_atual: 'pendente',
-        data_vencimento_atual: data.data_vencimento_atual,
-        ativo: data.ativo ?? true,
-      })
+      .insert(payload)
       .select()
       .single();
 
     if (error) {
+      if (error.message.includes('does not exist')) {
+        delete payload.valor_total;
+        delete payload.taxa_juros;
+        delete payload.total_parcelas;
+        delete payload.parcela_atual;
+
+        const { data: fallbackCreated, error: fallbackError } = await this.client
+          .from('vendas')
+          .insert(payload)
+          .select()
+          .single();
+
+        if (fallbackError) {
+          throw new Error(`Erro ao criar venda: ${fallbackError.message}`);
+        }
+        return fallbackCreated as VendaDTO;
+      }
       throw new Error(`Erro ao criar venda: ${error.message}`);
     }
 
@@ -87,6 +111,25 @@ export class SupabaseVendaRepository implements IVendaRepository {
       .single();
 
     if (error) {
+      if (error.message.includes('does not exist')) {
+        const fallback = { ...data };
+        delete fallback.valor_total;
+        delete fallback.taxa_juros;
+        delete fallback.total_parcelas;
+        delete fallback.parcela_atual;
+
+        const { data: fallbackUpdated, error: fallbackError } = await this.client
+          .from('vendas')
+          .update(fallback)
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (fallbackError) {
+          throw new Error(`Erro ao atualizar venda: ${fallbackError.message}`);
+        }
+        return fallbackUpdated as VendaDTO;
+      }
       throw new Error(`Erro ao atualizar venda: ${error.message}`);
     }
 

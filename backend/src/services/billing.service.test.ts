@@ -133,6 +133,68 @@ describe('BillingService (TDD)', () => {
 
       await expect(billingService.markAsPaid(999)).rejects.toThrow('Venda não encontrada');
     });
+
+    it('should increment parcela_atual and advance month when paying an intermediate installment', async () => {
+      const vendaParcelada: VendaWithCliente = {
+        id: 20,
+        cliente_id: 1,
+        descricao: 'iPhone 13',
+        valor: 150.0,
+        dia_vencimento: 10,
+        total_parcelas: 5,
+        parcela_atual: 2,
+        status_mes_atual: 'vencido',
+        data_vencimento_atual: '2026-09-10',
+        ativo: true,
+      };
+
+      vi.mocked(mockVendaRepo.findById).mockResolvedValue(vendaParcelada);
+      vi.mocked(mockVendaRepo.update).mockResolvedValue({
+        ...vendaParcelada,
+        parcela_atual: 3,
+        status_mes_atual: 'pendente',
+        data_vencimento_atual: '2026-10-10',
+      });
+
+      const updated = await billingService.markAsPaid(20);
+
+      expect(mockVendaRepo.update).toHaveBeenCalledWith(20, expect.objectContaining({
+        status_mes_atual: 'pendente',
+        parcela_atual: 3,
+      }));
+      expect(updated.parcela_atual).toBe(3);
+    });
+
+    it('should complete sale (ativo: false) when paying the final installment', async () => {
+      const ultimaParcelaVenda: VendaWithCliente = {
+        id: 21,
+        cliente_id: 1,
+        descricao: 'iPhone 13',
+        valor: 150.0,
+        dia_vencimento: 10,
+        total_parcelas: 5,
+        parcela_atual: 5,
+        status_mes_atual: 'pendente',
+        data_vencimento_atual: '2026-09-10',
+        ativo: true,
+      };
+
+      vi.mocked(mockVendaRepo.findById).mockResolvedValue(ultimaParcelaVenda);
+      vi.mocked(mockVendaRepo.update).mockResolvedValue({
+        ...ultimaParcelaVenda,
+        status_mes_atual: 'pago',
+        ativo: false,
+      });
+
+      const updated = await billingService.markAsPaid(21);
+
+      expect(mockVendaRepo.update).toHaveBeenCalledWith(21, expect.objectContaining({
+        status_mes_atual: 'pago',
+        ativo: false,
+        parcela_atual: 5,
+      }));
+      expect(updated.ativo).toBe(false);
+    });
   });
 
   describe('evaluateReminderState', () => {

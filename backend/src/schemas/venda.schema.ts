@@ -20,6 +20,10 @@ export const VendaSchema = z.object({
     .int()
     .min(1, { message: 'Dia do vencimento deve ser entre 1 e 31' })
     .max(31, { message: 'Dia do vencimento deve ser entre 1 e 31' }),
+  valor_total: z.number().positive().nullable().optional(),
+  taxa_juros: z.number().min(0).nullable().optional(),
+  total_parcelas: z.number().int().min(1).nullable().optional(),
+  parcela_atual: z.number().int().min(1).default(1).optional(),
   status_mes_atual: VendaStatusEnum.default('pendente'),
   data_vencimento_atual: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   ativo: z.boolean().default(true),
@@ -34,6 +38,10 @@ export const CreateVendaSchema = z.object({
     .int()
     .min(1, { message: 'Dia do vencimento deve ser entre 1 e 31' })
     .max(31, { message: 'Dia do vencimento deve ser entre 1 e 31' }),
+  valor_total: z.number().positive().nullable().optional(),
+  taxa_juros: z.number().min(0).nullable().optional(),
+  total_parcelas: z.number().int().min(1).nullable().optional(),
+  parcela_atual: z.number().int().min(1).default(1).optional(),
   data_vencimento_atual: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   ativo: z.boolean().default(true),
 });
@@ -42,6 +50,10 @@ export const UpdateVendaSchema = z.object({
   descricao: z.string().trim().min(1).optional(),
   valor: z.number().positive().optional(),
   dia_vencimento: z.number().int().min(1).max(31).optional(),
+  valor_total: z.number().positive().nullable().optional(),
+  taxa_juros: z.number().min(0).nullable().optional(),
+  total_parcelas: z.number().int().min(1).nullable().optional(),
+  parcela_atual: z.number().int().min(1).optional(),
   status_mes_atual: VendaStatusEnum.optional(),
   data_vencimento_atual: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   ativo: z.boolean().optional(),

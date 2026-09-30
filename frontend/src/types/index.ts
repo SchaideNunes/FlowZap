@@ -21,6 +21,10 @@ export interface Venda {
   descricao: string;
   valor: number;
   dia_vencimento: number;
+  valor_total?: number | null;
+  taxa_juros?: number | null;
+  total_parcelas?: number | null;
+  parcela_atual?: number | null;
   status_mes_atual: VendaStatus;
   data_vencimento_atual: string;
   ativo: boolean;

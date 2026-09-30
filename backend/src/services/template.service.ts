@@ -5,6 +5,8 @@ export interface TemplateData {
   descricao?: string | null;
   valor: number;
   dataVencimento: string; // formato formatado DD/MM/AAAA ou YYYY-MM-DD
+  parcelaAtual?: number | null;
+  totalParcelas?: number | null;
 }
 
 export class TemplateService {
@@ -25,7 +27,17 @@ export class TemplateService {
   generateMessage(tipo: TipoMensagem, data: TemplateData): string {
     const greeting = this.getDynamicGreeting();
     const formattedValor = this.formatCurrency(data.valor);
-    const descText = data.descricao ? ` referente a *${data.descricao}*` : '';
+
+    let descText = '';
+    if (data.descricao) {
+      if (data.parcelaAtual && data.totalParcelas && data.totalParcelas > 1) {
+        descText = ` referente a *${data.descricao} (Parcela ${data.parcelaAtual} de ${data.totalParcelas})*`;
+      } else {
+        descText = ` referente a *${data.descricao}*`;
+      }
+    } else if (data.parcelaAtual && data.totalParcelas && data.totalParcelas > 1) {
+      descText = ` referente à *Parcela ${data.parcelaAtual} de ${data.totalParcelas}*`;
+    }
 
     switch (tipo) {
       case 'lembrete_3d':

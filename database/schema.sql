@@ -36,6 +36,10 @@ CREATE TABLE IF NOT EXISTS vendas (
     descricao TEXT,
     valor NUMERIC(10, 2) NOT NULL CHECK (valor >= 0),
     dia_vencimento INTEGER NOT NULL CHECK (dia_vencimento >= 1 AND dia_vencimento <= 31),
+    valor_total NUMERIC(10, 2),
+    taxa_juros NUMERIC(5, 2) DEFAULT 0,
+    total_parcelas INTEGER DEFAULT 1,
+    parcela_atual INTEGER DEFAULT 1,
     status_mes_atual TEXT NOT NULL DEFAULT 'pendente' CHECK (
         status_mes_atual IN ('pendente', 'avisado_3d', 'avisado_1d', 'vencido', 'pago')
     ),

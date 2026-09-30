@@ -58,6 +58,50 @@ export class BillingService {
       throw new Error('Venda não encontrada');
     }
 
+    // Se a venda possui parcelas definidas (> 1)
+    if (venda.total_parcelas && venda.total_parcelas > 1) {
+      const proximaParcela = (venda.parcela_atual || 1) + 1;
+
+      // Se todas as parcelas foram pagas, finaliza e inativa a cobrança
+      if (proximaParcela > venda.total_parcelas) {
+        const updated = await this.vendaRepo.update(vendaId, {
+          status_mes_atual: 'pago',
+          ativo: false,
+          parcela_atual: venda.total_parcelas,
+        });
+
+        await this.historicoRepo.create({
+          venda_id: vendaId,
+          tipo: 'confirmacao_manual',
+          status_envio: 'enviado',
+          mensagem: `Venda totalmente quitada! Todas as ${venda.total_parcelas} parcelas foram pagas.`,
+        });
+
+        return updated;
+      }
+
+      // Avança para a próxima parcela e próximo vencimento mensal
+      const nextDueDate = calculateNextMonthDueDate(
+        venda.dia_vencimento,
+        venda.data_vencimento_atual || calculateInitialDueDate(venda.dia_vencimento)
+      );
+
+      const updated = await this.vendaRepo.update(vendaId, {
+        status_mes_atual: 'pendente',
+        data_vencimento_atual: nextDueDate,
+        parcela_atual: proximaParcela,
+      });
+
+      await this.historicoRepo.create({
+        venda_id: vendaId,
+        tipo: 'confirmacao_manual',
+        status_envio: 'enviado',
+        mensagem: `Pagamento da parcela ${venda.parcela_atual || 1}/${venda.total_parcelas} confirmado. Próxima parcela: ${proximaParcela}/${venda.total_parcelas}`,
+      });
+
+      return updated;
+    }
+
     const nextDueDate = calculateNextMonthDueDate(
       venda.dia_vencimento,
       venda.data_vencimento_atual || calculateInitialDueDate(venda.dia_vencimento)

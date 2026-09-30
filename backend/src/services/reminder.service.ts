@@ -76,6 +76,8 @@ export class ReminderService {
         descricao: venda.descricao,
         valor: venda.valor,
         dataVencimento: formattedDate,
+        parcelaAtual: venda.parcela_atual,
+        totalParcelas: venda.total_parcelas,
       });
 
       previews.push({

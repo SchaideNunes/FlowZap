@@ -366,15 +366,29 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                         {vendas.map((v) => (
                           <tr key={v.id} style={{ opacity: v.ativo ? 1 : 0.55 }}>
                             <td>
-                              <div style={{ fontWeight: 600 }}>{v.descricao}</div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                <span style={{ fontWeight: 600 }}>{v.descricao}</span>
+                                {v.total_parcelas && v.total_parcelas > 1 && (
+                                  <span className="badge badge-avisado" style={{ fontSize: '0.7rem', padding: '2px 6px' }}>
+                                    Parcela {v.parcela_atual || 1}/{v.total_parcelas}
+                                  </span>
+                                )}
+                              </div>
                               {!v.ativo && (
                                 <span style={{ fontSize: '0.7rem', color: 'var(--danger)' }}>
-                                  (Cobrança Encerrada / Pausada)
+                                  {v.total_parcelas && v.parcela_atual && v.parcela_atual >= v.total_parcelas
+                                    ? '(Totalmente Quitado)'
+                                    : '(Cobrança Encerrada / Pausada)'}
                                 </span>
                               )}
                             </td>
                             <td style={{ fontWeight: 600, color: 'var(--primary)' }}>
-                              R$ {Number(v.valor).toFixed(2).replace('.', ',')}
+                              <div>R$ {Number(v.valor).toFixed(2).replace('.', ',')}</div>
+                              {v.valor_total && v.total_parcelas && v.total_parcelas > 1 && (
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontWeight: 400 }}>
+                                  Total: R$ {Number(v.valor_total).toFixed(2).replace('.', ',')}
+                                </div>
+                              )}
                             </td>
                             <td>Todo dia {v.dia_vencimento}</td>
                             <td style={{ fontWeight: 500 }}>{formatDate(v.data_vencimento_atual)}</td>

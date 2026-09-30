@@ -43,4 +43,15 @@ describe('TemplateService (TDD)', () => {
     const greeting = templateService.getDynamicGreeting();
     expect(['Olá', 'Oi', 'Tudo bem?', 'Como vai?']).toContain(greeting);
   });
+
+  it('should format installment details in message when parcelas are provided', () => {
+    const message = templateService.generateMessage('lembrete_1d', {
+      ...mockData,
+      descricao: 'iPhone 13 128GB',
+      parcelaAtual: 2,
+      totalParcelas: 10,
+    });
+
+    expect(message).toContain('iPhone 13 128GB (Parcela 2 de 10)');
+  });
 });
