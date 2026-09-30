@@ -319,13 +319,13 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
               <div className="card">
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
                   <div>
-                    <h4 style={{ fontSize: '1.1rem' }}>Cobranças & Planos Recorrentes</h4>
+                    <h4 style={{ fontSize: '1.1rem' }}>Cobranças & Vendas</h4>
                     <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      Vencimentos mensais calculados individualmente para este cliente
+                      Vencimentos e parcelas vinculadas a este cliente
                     </p>
                   </div>
                   <span className="badge badge-pendente">
-                    {vendas.length} {vendas.length === 1 ? 'cobrança cadastrada' : 'cobranças cadastradas'}
+                    {vendas.length} {vendas.length === 1 ? 'venda cadastrada' : 'vendas cadastradas'}
                   </span>
                 </div>
 
@@ -337,16 +337,16 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                   <div style={{ padding: '3rem', textAlign: 'center', background: 'var(--bg-main)', borderRadius: '8px' }}>
                     <DollarSign size={36} color="var(--primary)" style={{ margin: '0 auto 0.5rem auto' }} />
                     <div style={{ fontWeight: 600, color: '#fff', marginBottom: '4px' }}>
-                      Nenhuma cobrança ativa para este cliente
+                      Nenhuma venda ativa para este cliente
                     </div>
                     <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                      Adicione um plano mensal, produto ou serviço para iniciar o monitoramento e lembretes de WhatsApp.
+                      Adicione uma venda de aparelho, acessório ou serviço para iniciar o envio de lembretes no WhatsApp.
                     </div>
                     <button
                       className="btn btn-primary btn-sm"
                       onClick={() => onOpenNovaVendaModal(selectedCliente.id)}
                     >
-                      <PlusCircle size={14} /> Adicionar Primeira Cobrança
+                      <PlusCircle size={14} /> Adicionar Nova Venda
                     </button>
                   </div>
                 ) : (
