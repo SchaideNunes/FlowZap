@@ -2,6 +2,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import {
   IHistoricoRepository,
   HistoricoMensagem,
+  HistoricoWithVendaCliente,
   TipoMensagem,
 } from './historico.repository.interface.js';
 
@@ -24,6 +25,21 @@ export class SupabaseHistoricoRepository implements IHistoricoRepository {
     }
 
     return (data || []) as HistoricoMensagem[];
+  }
+
+  async findRecentEnviados(limit: number = 50): Promise<HistoricoWithVendaCliente[]> {
+    const { data, error } = await this.client
+      .from('historico_mensagens')
+      .select('id, venda_id, tipo, data_envio, status_envio, mensagem, venda:vendas(id, descricao, valor, valor_total, parcela_atual, total_parcelas, status_mes_atual, data_vencimento_atual, cliente:clientes(id, nome, whatsapp))')
+      .eq('status_envio', 'enviado')
+      .order('data_envio', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      throw new Error(`Erro ao buscar mensagens enviadas recentemente: ${error.message}`);
+    }
+
+    return (data || []) as unknown as HistoricoWithVendaCliente[];
   }
 
   async create(entry: HistoricoMensagem): Promise<HistoricoMensagem> {

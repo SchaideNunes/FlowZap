@@ -39,14 +39,32 @@ export interface OverdueReminderItem {
   } | null;
 }
 
+export interface EnviadoItem {
+  id: number;
+  vendaId: number;
+  clienteId: number;
+  clienteNome: string;
+  whatsapp: string;
+  descricao?: string | null;
+  valor: number;
+  dataVencimento: string;
+  dataEnvio: string;
+  tipo: TipoMensagem;
+  mensagem: string;
+  statusMesAtual: string;
+}
+
 export interface CentralNotificacoesResult {
   agendadosHoje: ReminderPreviewItem[];
   emAtraso: OverdueReminderItem[];
+  enviadosRecentes: EnviadoItem[];
   resumo: {
     totalHoje: number;
     valorHoje: number;
     totalAtrasados: number;
     valorAtrasado: number;
+    totalEnviados: number;
+    totalPagosAposEnvio: number;
   };
 }
 
@@ -266,22 +284,50 @@ export class ReminderService {
   async getCentralNotificacoes(
     referenceDateStr: string = formatDateToISO(new Date())
   ): Promise<CentralNotificacoesResult> {
-    const [agendadosHoje, emAtraso] = await Promise.all([
+    const [agendadosHoje, emAtraso, rawEnviados] = await Promise.all([
       this.previewReminders(referenceDateStr),
       this.getOverdueReminders(referenceDateStr),
+      this.historicoRepo.findRecentEnviados ? this.historicoRepo.findRecentEnviados(50) : Promise.resolve([]),
     ]);
+
+    const enviadosRecentes: EnviadoItem[] = (rawEnviados || []).map((h) => {
+      const v = h.venda;
+      const c = v?.cliente;
+
+      const [ano, mes, dia] = (v?.data_vencimento_atual || '').split('-');
+      const formattedDate = dia && mes && ano ? `${dia}/${mes}/${ano}` : '-';
+
+      return {
+        id: h.id!,
+        vendaId: h.venda_id,
+        clienteId: c?.id || 0,
+        clienteNome: c?.nome || 'Cliente',
+        whatsapp: c?.whatsapp || '',
+        descricao: v?.descricao || null,
+        valor: Number(v?.valor || 0),
+        dataVencimento: formattedDate,
+        dataEnvio: h.data_envio || '',
+        tipo: h.tipo,
+        mensagem: h.mensagem || '',
+        statusMesAtual: v?.status_mes_atual || 'pendente',
+      };
+    });
 
     const valorHoje = agendadosHoje.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
     const valorAtrasado = emAtraso.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+    const totalPagosAposEnvio = enviadosRecentes.filter((e) => e.statusMesAtual === 'pago').length;
 
     return {
       agendadosHoje,
       emAtraso,
+      enviadosRecentes,
       resumo: {
         totalHoje: agendadosHoje.length,
         valorHoje,
         totalAtrasados: emAtraso.length,
         valorAtrasado,
+        totalEnviados: enviadosRecentes.length,
+        totalPagosAposEnvio,
       },
     };
   }

@@ -87,14 +87,32 @@ export interface OverdueReminderItem {
   } | null;
 }
 
+export interface EnviadoItem {
+  id: number;
+  vendaId: number;
+  clienteId: number;
+  clienteNome: string;
+  whatsapp: string;
+  descricao?: string | null;
+  valor: number;
+  dataVencimento: string;
+  dataEnvio: string;
+  tipo: string;
+  mensagem: string;
+  statusMesAtual: string;
+}
+
 export interface CentralNotificacoesData {
   agendadosHoje: ReminderPreviewItem[];
   emAtraso: OverdueReminderItem[];
+  enviadosRecentes: EnviadoItem[];
   resumo: {
     totalHoje: number;
     valorHoje: number;
     totalAtrasados: number;
     valorAtrasado: number;
+    totalEnviados: number;
+    totalPagosAposEnvio: number;
   };
 }
 

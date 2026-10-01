@@ -205,5 +205,39 @@ describe('ReminderService (TDD)', () => {
       expect(central.resumo.totalAtrasados).toBe(1);
       expect(central.resumo.valorAtrasado).toBe(300);
     });
+
+    it('should include enviadosRecentes with current payment status and totalPagosAposEnvio counter', async () => {
+      vi.mocked(mockVendaRepo.findActiveVendas).mockResolvedValue(mockActiveVendas);
+      (mockHistoricoRepo as any).findRecentEnviados = vi.fn().mockResolvedValue([
+        {
+          id: 50,
+          venda_id: 101,
+          tipo: 'lembrete_1d',
+          data_envio: '2026-09-14T20:00:00Z',
+          status_envio: 'enviado',
+          mensagem: 'Lembrete enviado',
+          venda: {
+            id: 101,
+            descricao: 'Plano 1',
+            valor: 100,
+            status_mes_atual: 'pago',
+            data_vencimento_atual: '2026-09-15',
+            cliente: {
+              id: 1,
+              nome: 'Maria Silva',
+              whatsapp: '5511999999999',
+            },
+          },
+        },
+      ]);
+
+      const central = await reminderService.getCentralNotificacoes('2026-09-15');
+
+      expect(central.enviadosRecentes).toHaveLength(1);
+      expect(central.enviadosRecentes[0].clienteNome).toBe('Maria Silva');
+      expect(central.enviadosRecentes[0].statusMesAtual).toBe('pago');
+      expect(central.resumo.totalEnviados).toBe(1);
+      expect(central.resumo.totalPagosAposEnvio).toBe(1);
+    });
   });
 });
