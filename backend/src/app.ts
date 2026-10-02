@@ -16,6 +16,9 @@ import { AuthController } from './controllers/auth.controller.js';
 import { ClienteController } from './controllers/cliente.controller.js';
 import { VendaController } from './controllers/venda.controller.js';
 import { CobrancaController } from './controllers/cobranca.controller.js';
+import { SupabaseContaPagarRepository } from './repositories/supabase-conta-pagar.repository.js';
+import { ContaPagarController } from './controllers/conta-pagar.controller.js';
+import { createContaPagarRouter } from './routes/conta-pagar.routes.js';
 import { createAuthRouter } from './routes/auth.routes.js';
 import { createClienteRouter } from './routes/cliente.routes.js';
 import { createVendaRouter } from './routes/venda.routes.js';
@@ -44,6 +47,7 @@ export function createApp(): { app: Express; scheduler: SchedulerService } {
   const clienteRepo = new SupabaseClienteRepository(supabase);
   const vendaRepo = new SupabaseVendaRepository(supabase);
   const historicoRepo = new SupabaseHistoricoRepository(supabase);
+  const contaPagarRepo = new SupabaseContaPagarRepository(supabase);
 
   const jwtSecret = process.env.JWT_SECRET || 'flowzap_jwt_secret_change_me_in_env_file';
   const authService = new AuthService(userRepo, jwtSecret);
@@ -91,12 +95,14 @@ export function createApp(): { app: Express; scheduler: SchedulerService } {
     evolutionService,
     queueService
   );
+  const contaPagarController = new ContaPagarController(contaPagarRepo);
 
   // Registro das Rotas
   app.use('/api/auth', createAuthRouter(authService, authController));
   app.use('/api/clientes', createClienteRouter(clienteController, authService));
   app.use('/api/vendas', createVendaRouter(vendaController, authService));
   app.use('/api/cobrancas', createCobrancaRouter(cobrancaController, authService));
+  app.use('/api/contas-pagar', createContaPagarRouter(contaPagarController, authService));
 
   // Middleware de erro global
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
