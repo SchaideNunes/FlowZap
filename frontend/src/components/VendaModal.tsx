@@ -236,7 +236,7 @@ export const VendaModal: React.FC<VendaModalProps> = ({
             </div>
 
             {/* Linha: Valor Total + Juros */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '0.85rem', marginBottom: '1rem' }}>
+            <div className="modal-form-row-2">
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Valor Total da Venda *</label>
                 <div className="input-with-affix">
@@ -268,7 +268,7 @@ export const VendaModal: React.FC<VendaModalProps> = ({
             </div>
 
             {/* Linha: Quantidade de Parcelas (até 12x) + Dia do Vencimento */}
-            <div style={{ display: 'grid', gridTemplateColumns: numParcelas > 1 ? '1.4fr 0.9fr 1fr' : '1.5fr 1fr', gap: '0.85rem', marginBottom: '0.5rem' }}>
+            <div className={numParcelas > 1 ? 'modal-form-row-3' : 'modal-form-row-2'}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Parcelamento (até 12x) *</label>
                 <select

@@ -97,16 +97,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div>
       {/* Header com Saudações e Ações */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          marginBottom: '1.75rem',
-        }}
-      >
+      <div className="view-header" style={{ marginBottom: '1.75rem' }}>
         <div>
           <h2 style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>Visão Geral de Cobranças & Finanças</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
@@ -114,7 +105,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div className="view-header-actions">
           <button className="btn btn-secondary btn-sm" onClick={fetchData} disabled={loading}>
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             Atualizar
@@ -161,7 +152,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </p>
         </div>
 
-        <div>
+        <div className="dashboard-banner-action">
           <button
             className="btn btn-primary btn-lg"
             onClick={onOpenDisparoModal}
@@ -240,7 +231,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* SEÇÃO FINANCEIRA: FATURAMENTO + QUEM DEVEMOS + BALANÇO LÍQUIDO */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem', marginBottom: '1.75rem' }}>
+      <div className="dashboard-finance-grid">
         {/* CARD 1: Faturamento Mensal a Receber */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
           <div>
@@ -252,7 +243,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <span className="badge badge-pago">A Receber</span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', marginBottom: '1rem' }}>
+            <div className="stat-split-row">
               <div style={{ background: 'var(--bg-main)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Total Previsto</div>
                 <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#fff' }}>
@@ -319,7 +310,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <span className="badge badge-vencido">A Pagar</span>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', marginBottom: '1rem' }}>
+            <div className="stat-split-row">
               <div style={{ background: 'var(--bg-main)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Total a Pagar</div>
                 <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#fb7185' }}>
@@ -414,7 +405,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* LINHA INFERIOR: RESUMO DE QUEM DEVEMOS & STATUS WHATSAPP */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
+      <div className="dashboard-bottom-grid">
         {/* Widget: Próximos Pagamentos de Quem Devemos */}
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>

@@ -220,16 +220,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
   return (
     <div>
       {/* Top Header */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: '1.5rem',
-          flexWrap: 'wrap',
-          gap: '1rem',
-        }}
-      >
+      <div className="view-header">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div
@@ -255,7 +246,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        <div className="view-header-actions">
           <button className="btn btn-secondary btn-sm" onClick={fetchData} disabled={loading}>
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             Atualizar
