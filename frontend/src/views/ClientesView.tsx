@@ -322,50 +322,85 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
           <div
             className="stat-icon"
             style={{
-              background: 'rgba(0, 176, 80, 0.15)',
-              border: '1px solid rgba(0, 176, 80, 0.3)',
+              background: 'rgba(16, 185, 129, 0.15)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
             }}
           >
-            <DollarSign size={22} color="#00b050" />
+            <DollarSign size={22} color="#10b981" />
           </div>
         </div>
 
         {/* Vencidos */}
-        <div className="card stat-card" style={{ padding: '1.25rem', borderLeft: `3px solid ${totals.countVencidos > 0 ? '#ef4444' : 'var(--border-subtle)'}` }}>
+        <div
+          className="card stat-card"
+          style={{
+            padding: '1.25rem',
+            borderLeft: totals.countVencidos > 0 ? '3px solid #f43f5e' : '3px solid var(--border-subtle)',
+          }}
+        >
           <div className="stat-info">
-            <span className="stat-label">VENCIDOS (ATENÇÃO)</span>
-            <span className="stat-value" style={{ color: totals.countVencidos > 0 ? '#f87171' : '#fff', fontSize: '1.65rem' }}>
+            <span
+              className="stat-label"
+              style={{ color: totals.countVencidos > 0 ? '#fb7185' : 'var(--text-muted)' }}
+            >
+              VENCIDOS (ATENÇÃO)
+            </span>
+            <span
+              className="stat-value"
+              style={{ color: totals.countVencidos > 0 ? '#fb7185' : '#fff', fontSize: '1.65rem' }}
+            >
               {totals.countVencidos} {totals.countVencidos === 1 ? 'venda' : 'vendas'}
             </span>
-            <span style={{ fontSize: '0.75rem', color: totals.countVencidos > 0 ? '#f87171' : 'var(--text-dim)', marginTop: '4px' }}>
+            <span
+              style={{
+                fontSize: '0.75rem',
+                color: totals.countVencidos > 0 ? '#fb7185' : 'var(--text-dim)',
+                marginTop: '4px',
+              }}
+            >
               {totals.countVencidos > 0 ? 'Requer cobrança imediata' : 'Nenhuma parcela atrasada'}
             </span>
           </div>
-          <div className="stat-icon" style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
-            <AlertCircle size={22} color={totals.countVencidos > 0 ? '#ef4444' : 'var(--text-dim)'} />
+          <div
+            className="stat-icon"
+            style={{
+              background: 'rgba(244, 63, 94, 0.15)',
+              border: '1px solid rgba(244, 63, 94, 0.3)',
+            }}
+          >
+            <AlertCircle size={22} color={totals.countVencidos > 0 ? '#f43f5e' : 'var(--text-dim)'} />
           </div>
         </div>
 
         {/* Recebidos */}
-        <div className="card stat-card" style={{ padding: '1.25rem', borderLeft: '3px solid #3b82f6' }}>
+        <div className="card stat-card" style={{ padding: '1.25rem', borderLeft: '3px solid #38bdf8' }}>
           <div className="stat-info">
-            <span className="stat-label">RECEBIDOS NO CICLO</span>
-            <span className="stat-value" style={{ color: '#60a5fa', fontSize: '1.65rem', fontVariantNumeric: 'tabular-nums' }}>
+            <span className="stat-label" style={{ color: '#38bdf8' }}>RECEBIDOS NO CICLO</span>
+            <span
+              className="stat-value"
+              style={{ color: '#38bdf8', fontSize: '1.65rem', fontVariantNumeric: 'tabular-nums' }}
+            >
               R$ {totals.valorRecebido.toFixed(2).replace('.', ',')}
             </span>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
               {totals.countPagos} parcelas confirmadas
             </span>
           </div>
-          <div className="stat-icon" style={{ background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
-            <CheckCircle2 size={22} color="#3b82f6" />
+          <div
+            className="stat-icon"
+            style={{
+              background: 'rgba(56, 189, 248, 0.15)',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
+            }}
+          >
+            <CheckCircle2 size={22} color="#38bdf8" />
           </div>
         </div>
 
         {/* Base de Clientes */}
-        <div className="card stat-card" style={{ padding: '1.25rem', borderLeft: '3px solid #8b5cf6' }}>
+        <div className="card stat-card" style={{ padding: '1.25rem', borderLeft: '3px solid #a855f7' }}>
           <div className="stat-info">
-            <span className="stat-label">BASE DE CLIENTES</span>
+            <span className="stat-label" style={{ color: '#c084fc' }}>BASE DE CLIENTES</span>
             <span className="stat-value" style={{ fontSize: '1.65rem' }}>
               {clientes.length}
             </span>
@@ -373,8 +408,14 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
               {totals.totalRegistros} vendas registradas
             </span>
           </div>
-          <div className="stat-icon" style={{ background: 'rgba(139, 92, 246, 0.12)', border: '1px solid rgba(139, 92, 246, 0.25)' }}>
-            <Table size={22} color="#a78bfa" />
+          <div
+            className="stat-icon"
+            style={{
+              background: 'rgba(168, 85, 247, 0.15)',
+              border: '1px solid rgba(168, 85, 247, 0.3)',
+            }}
+          >
+            <Table size={22} color="#a855f7" />
           </div>
         </div>
       </div>

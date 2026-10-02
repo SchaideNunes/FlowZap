@@ -304,7 +304,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <div
           className="card"
           style={{
-            borderLeft: '3px solid #c00000',
+            borderLeft: '3px solid #f43f5e',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
@@ -313,7 +313,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Building2 size={20} color="#f87171" />
+                <Building2 size={20} color="#f43f5e" />
                 <h4 style={{ fontSize: '1.05rem' }}>Quem Devemos (Contas a Pagar)</h4>
               </div>
               <span className="badge badge-vencido">A Pagar</span>
@@ -322,7 +322,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', marginBottom: '1rem' }}>
               <div style={{ background: 'var(--bg-main)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Total a Pagar</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f87171' }}>
+                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#fb7185' }}>
                   {formatBRL(totalQueDevemosPendente)}
                 </div>
               </div>
@@ -354,8 +354,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 width: '100%',
                 justifyContent: 'center',
                 marginTop: '0.5rem',
-                borderColor: 'rgba(239, 68, 68, 0.35)',
-                color: '#f87171',
+                borderColor: 'rgba(244, 63, 94, 0.35)',
+                color: '#fb7185',
               }}
             >
               <Building2 size={14} /> Acessar Tela Quem Devemos <ArrowRight size={14} />

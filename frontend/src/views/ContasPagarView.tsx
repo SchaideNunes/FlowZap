@@ -178,16 +178,14 @@ export const ContasPagarView: React.FC = () => {
             Atualizar
           </button>
           <button
-            className="btn btn-primary btn-sm"
+            className="btn btn-danger btn-sm"
             onClick={() => {
               setContaToEdit(null);
               setIsModalOpen(true);
             }}
             style={{
-              padding: '0.5rem 1.15rem',
+              padding: '0.55rem 1.25rem',
               fontWeight: 600,
-              background: '#c00000',
-              borderColor: '#990000',
             }}
           >
             <PlusCircle size={16} /> + Novo Credor / Dívida
@@ -223,17 +221,17 @@ export const ContasPagarView: React.FC = () => {
           className="card stat-card"
           style={{
             padding: '1.25rem',
-            borderLeft: '3px solid #c00000',
+            borderLeft: '3px solid #f43f5e',
           }}
         >
           <div className="stat-info">
-            <span className="stat-label" style={{ color: '#fca5a5', fontWeight: 700 }}>
+            <span className="stat-label" style={{ color: '#fb7185', fontWeight: 700 }}>
               VALOR TOTAL QUE DEVEMOS
             </span>
             <span
               className="stat-value"
               style={{
-                color: '#f87171',
+                color: '#fb7185',
                 fontSize: '1.65rem',
                 fontVariantNumeric: 'tabular-nums',
                 whiteSpace: 'nowrap',
@@ -248,11 +246,11 @@ export const ContasPagarView: React.FC = () => {
           <div
             className="stat-icon"
             style={{
-              background: 'rgba(192, 0, 0, 0.15)',
-              border: '1px solid rgba(192, 0, 0, 0.3)',
+              background: 'rgba(244, 63, 94, 0.15)',
+              border: '1px solid rgba(244, 63, 94, 0.35)',
             }}
           >
-            <Building2 size={22} color="#c00000" />
+            <Building2 size={22} color="#f43f5e" />
           </div>
         </div>
 
@@ -435,14 +433,12 @@ export const ContasPagarView: React.FC = () => {
                       Nenhum débito encontrado para os filtros selecionados.
                     </div>
                     <button
-                      className="btn btn-sm"
+                      className="btn btn-danger btn-sm"
                       onClick={() => {
                         setContaToEdit(null);
                         setIsModalOpen(true);
                       }}
                       style={{
-                        background: '#c00000',
-                        color: '#fff',
                         fontWeight: 600,
                         marginTop: '0.5rem',
                       }}
@@ -543,8 +539,6 @@ export const ContasPagarView: React.FC = () => {
                               fontSize: '0.76rem',
                               gap: '4px',
                               fontWeight: 600,
-                              background: c.pago ? undefined : '#10b981',
-                              borderColor: c.pago ? undefined : '#059669',
                             }}
                             onClick={() => handleTogglePaga(c)}
                             disabled={payingContaId === c.id}

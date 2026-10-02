@@ -8,36 +8,43 @@
   --font-heading: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 
-  /* Color Palette - Refined Slate & Emerald */
-  --bg-main: #0b0f17;
-  --bg-card: #111827;
-  --bg-card-hover: #162032;
-  --bg-input: #1f2937;
-  --border-subtle: #243042;
+  /* Color Palette - Luminous Obsidian & Vivid Accents */
+  --bg-main: #080c14;
+  --bg-card: #0f172a;
+  --bg-card-hover: #172338;
+  --bg-input: #131c2e;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.18);
   --border-focus: #10b981;
 
-  --text-main: #f3f4f6;
-  --text-muted: #94a3b8;
-  --text-dim: #64748b;
+  --text-main: #f8fafc;
+  --text-muted: #cbd5e1;
+  --text-dim: #94a3b8;
 
+  /* Vibrant Accents */
   --primary: #10b981;
   --primary-hover: #059669;
-  --primary-light: rgba(16, 185, 129, 0.12);
+  --primary-light: rgba(16, 185, 129, 0.16);
+  --primary-glow: 0 4px 16px rgba(16, 185, 129, 0.35);
 
-  --accent-blue: #3b82f6;
-  --accent-blue-light: rgba(59, 130, 246, 0.12);
+  --accent-blue: #38bdf8;
+  --accent-blue-light: rgba(56, 189, 248, 0.16);
 
-  --warning: #f59e0b;
-  --warning-light: rgba(245, 158, 11, 0.12);
+  --warning: #fbbf24;
+  --warning-light: rgba(251, 191, 36, 0.16);
 
-  --danger: #ef4444;
-  --danger-light: rgba(239, 68, 68, 0.12);
+  --danger: #f43f5e;
+  --danger-light: rgba(244, 63, 94, 0.16);
+  --danger-glow: 0 4px 16px rgba(244, 63, 94, 0.35);
+
+  --purple: #a855f7;
+  --purple-light: rgba(168, 85, 247, 0.16);
 
   --success: #10b981;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.45);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 12px 32px -4px rgba(0, 0, 0, 0.6);
 
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -218,12 +225,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .btn-primary {
-  background-color: var(--primary);
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   color: #fff;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 3px 12px rgba(16, 185, 129, 0.35);
 }
 .btn-primary:hover {
-  background-color: var(--primary-hover);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.5);
+  transform: translateY(-1px);
 }
 
 .btn-secondary {
@@ -233,15 +243,21 @@ h1, h2, h3, h4, h5, h6 {
 }
 .btn-secondary:hover {
   background-color: var(--bg-card-hover);
-  border-color: var(--text-dim);
+  border-color: var(--border-hover);
+  color: #fff;
+  transform: translateY(-1px);
 }
 
 .btn-danger {
-  background-color: var(--danger);
+  background: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
   color: #fff;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 3px 12px rgba(244, 63, 94, 0.35);
 }
 .btn-danger:hover {
-  background-color: #dc2626;
+  background: linear-gradient(135deg, #fb7185 0%, #f43f5e 100%);
+  box-shadow: 0 6px 18px rgba(244, 63, 94, 0.5);
+  transform: translateY(-1px);
 }
 
 .btn-sm {
@@ -332,27 +348,31 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .badge-pago {
-  background-color: var(--primary-light);
+  background-color: rgba(16, 185, 129, 0.16);
   color: #34d399;
-  border: 1px solid rgba(52, 211, 153, 0.2);
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.15);
 }
 
 .badge-pendente {
-  background-color: var(--accent-blue-light);
-  color: #60a5fa;
-  border: 1px solid rgba(96, 165, 250, 0.2);
+  background-color: rgba(56, 189, 248, 0.16);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.15);
 }
 
 .badge-avisado {
-  background-color: var(--warning-light);
+  background-color: rgba(251, 191, 36, 0.16);
   color: #fbbf24;
-  border: 1px solid rgba(251, 191, 36, 0.2);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.15);
 }
 
 .badge-vencido {
-  background-color: var(--danger-light);
-  color: #f87171;
-  border: 1px solid rgba(248, 113, 113, 0.2);
+  background-color: rgba(244, 63, 94, 0.16);
+  color: #fb7185;
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  box-shadow: 0 0 8px rgba(244, 63, 94, 0.15);
 }
 
 /* Tables */
