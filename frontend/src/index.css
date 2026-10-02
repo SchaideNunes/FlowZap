@@ -95,10 +95,10 @@ h1, h2, h3, h4, h5, h6 {
 
 .main-content {
   flex: 1;
-  max-width: 1600px;
-  width: 100%;
+  width: 90vw;
+  max-width: 90vw;
   margin: 0 auto;
-  padding: 1.75rem 2rem 3rem 2rem;
+  padding: 1.5rem 0 3rem 0;
 }
 
 /* Header & Navbar */
@@ -109,12 +109,14 @@ h1, h2, h3, h4, h5, h6 {
   position: sticky;
   top: 0;
   z-index: 40;
+  width: 100%;
 }
 
 .navbar-inner {
-  max-width: 1600px;
+  width: 90vw;
+  max-width: 90vw;
   margin: 0 auto;
-  padding: 0.875rem 2rem;
+  padding: 0.875rem 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -481,7 +483,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .excel-table {
   width: 100%;
-  min-width: 1420px;
+  min-width: 1000px;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 0.84rem;

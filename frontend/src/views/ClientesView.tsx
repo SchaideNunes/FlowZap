@@ -297,32 +297,37 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
           className="card stat-card"
           style={{
             padding: '1.25rem',
-            border: '1px solid rgba(0, 176, 80, 0.4)',
-            background: 'linear-gradient(135deg, rgba(0, 176, 80, 0.08) 0%, rgba(17, 24, 39, 0.95) 100%)',
+            borderLeft: '3px solid #00b050',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.74rem', fontWeight: 700, letterSpacing: '0.06em', color: '#6ee7b7' }}>
-              VALOR TOTAL DAS DÍVIDAS (A RECEBER)
+          <div className="stat-info">
+            <span className="stat-label" style={{ color: '#34d399', fontWeight: 700 }}>
+              VALOR TOTAL DAS DÍVIDAS
             </span>
-            <DollarSign size={18} color="#00b050" />
+            <span
+              className="stat-value"
+              style={{
+                color: '#34d399',
+                fontSize: '1.65rem',
+                fontVariantNumeric: 'tabular-nums',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              R$ {totals.valorEmAberto.toFixed(2).replace('.', ',')}
+            </span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
+              {totals.countPendentes + totals.countAvisados} parcelas em aberto no ciclo
+            </span>
           </div>
           <div
-            className="excel-box-green"
+            className="stat-icon"
             style={{
-              padding: '8px 14px',
-              borderRadius: '8px',
-              fontSize: '1.65rem',
-              letterSpacing: '-0.02em',
-              textAlign: 'center',
-              fontVariantNumeric: 'tabular-nums',
+              background: 'rgba(0, 176, 80, 0.15)',
+              border: '1px solid rgba(0, 176, 80, 0.3)',
             }}
           >
-            R$ {totals.valorEmAberto.toFixed(2).replace('.', ',')}
+            <DollarSign size={22} color="#00b050" />
           </div>
-          <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)', marginTop: '8px', textAlign: 'center' }}>
-            {totals.countPendentes + totals.countAvisados} parcelas em aberto no ciclo
-          </span>
         </div>
 
         {/* Vencidos */}
@@ -506,16 +511,16 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
           <table className="excel-table">
             <thead>
               <tr>
-                <th style={{ width: '48px', textAlign: 'center' }}>#</th>
-                <th style={{ minWidth: '220px' }}>NOME CLIENTE DEVEDOR</th>
-                <th style={{ minWidth: '180px' }}>WHATSAPP</th>
-                <th style={{ minWidth: '220px' }}>DESCRIÇÃO DA VENDA / APARELHO</th>
-                <th style={{ minWidth: '110px', textAlign: 'center' }}>PARCELAS</th>
-                <th style={{ minWidth: '130px', textAlign: 'right' }}>VALOR DA DÍVIDA</th>
-                <th style={{ minWidth: '130px', textAlign: 'right' }}>VALOR TOTAL</th>
-                <th style={{ minWidth: '140px', textAlign: 'center' }}>DATA DE PAGAMENTO</th>
-                <th style={{ minWidth: '120px', textAlign: 'center' }}>STATUS</th>
-                <th style={{ minWidth: '200px', textAlign: 'center' }}>AÇÕES RÁPIDAS</th>
+                <th style={{ width: '40px', textAlign: 'center' }}>#</th>
+                <th style={{ minWidth: '180px' }}>NOME CLIENTE DEVEDOR</th>
+                <th style={{ minWidth: '150px' }}>WHATSAPP</th>
+                <th style={{ minWidth: '180px' }}>DESCRIÇÃO DA VENDA / APARELHO</th>
+                <th style={{ minWidth: '95px', textAlign: 'center' }}>PARCELAS</th>
+                <th style={{ minWidth: '120px', textAlign: 'right' }}>VALOR DA DÍVIDA</th>
+                <th style={{ minWidth: '120px', textAlign: 'right' }}>VALOR TOTAL</th>
+                <th style={{ minWidth: '130px', textAlign: 'center' }}>DATA DE PAGAMENTO</th>
+                <th style={{ minWidth: '105px', textAlign: 'center' }}>STATUS</th>
+                <th style={{ minWidth: '180px', textAlign: 'center' }}>AÇÕES RÁPIDAS</th>
               </tr>
             </thead>
 

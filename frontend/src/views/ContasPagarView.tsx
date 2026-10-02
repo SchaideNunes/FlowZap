@@ -216,127 +216,109 @@ export const ContasPagarView: React.FC = () => {
         </div>
       )}
 
-      {/* Cards de Métricas (com o Vermelho #c00000 da Planilha) */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: '1.15rem',
-          marginBottom: '1.5rem',
-        }}
-      >
-        {/* CARD VERMELHO: VALOR TOTAL QUE DEVEMOS */}
+      {/* Cards de Métricas */}
+      <div className="grid-cards" style={{ marginBottom: '1.5rem' }}>
+        {/* CARD 1: VALOR TOTAL QUE DEVEMOS */}
         <div
-          className="card"
+          className="card stat-card"
           style={{
             padding: '1.25rem',
-            border: '1px solid rgba(192, 0, 0, 0.4)',
-            background: 'linear-gradient(135deg, rgba(192, 0, 0, 0.09) 0%, rgba(17, 24, 39, 0.95) 100%)',
-            borderRadius: '12px',
+            borderLeft: '3px solid #c00000',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.74rem', fontWeight: 700, letterSpacing: '0.06em', color: '#fca5a5' }}>
-              VALOR TOTAL QUE DEVEMOS (A PAGAR)
+          <div className="stat-info">
+            <span className="stat-label" style={{ color: '#fca5a5', fontWeight: 700 }}>
+              VALOR TOTAL QUE DEVEMOS
             </span>
-            <Building2 size={18} color="#c00000" />
+            <span
+              className="stat-value"
+              style={{
+                color: '#f87171',
+                fontSize: '1.65rem',
+                fontVariantNumeric: 'tabular-nums',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              R$ {totals.totalPendente.toFixed(2).replace('.', ',')}
+            </span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
+              {totals.countPendentes} dívidas / parcelas em aberto
+            </span>
           </div>
-
           <div
-            className="excel-box-red"
+            className="stat-icon"
             style={{
-              padding: '10px 16px',
-              borderRadius: '8px',
-              fontSize: '1.75rem',
-              letterSpacing: '-0.02em',
-              textAlign: 'center',
-              fontVariantNumeric: 'tabular-nums',
+              background: 'rgba(192, 0, 0, 0.15)',
+              border: '1px solid rgba(192, 0, 0, 0.3)',
             }}
           >
-            R$ {totals.totalPendente.toFixed(2).replace('.', ',')}
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            <span>{totals.countPendentes} dívidas / parcelas em aberto</span>
-            <span style={{ color: '#fca5a5' }}>Exige quitação</span>
+            <Building2 size={22} color="#c00000" />
           </div>
         </div>
 
-        {/* CARD: TOTAL JÁ QUITADO */}
+        {/* CARD 2: TOTAL JÁ QUITADO */}
         <div
-          className="card"
+          className="card stat-card"
           style={{
             padding: '1.25rem',
-            border: '1px solid var(--border-subtle)',
-            background: 'rgba(17, 24, 39, 0.85)',
-            borderRadius: '12px',
+            borderLeft: '3px solid #10b981',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.74rem', fontWeight: 700, letterSpacing: '0.06em', color: '#6ee7b7' }}>
+          <div className="stat-info">
+            <span className="stat-label" style={{ color: '#6ee7b7' }}>
               TOTAL JÁ QUITADO (PAGO)
             </span>
-            <CheckCircle2 size={18} color="#10b981" />
+            <span
+              className="stat-value"
+              style={{
+                color: '#34d399',
+                fontSize: '1.65rem',
+                fontVariantNumeric: 'tabular-nums',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              R$ {totals.totalPago.toFixed(2).replace('.', ',')}
+            </span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
+              {totals.countPagos} registros liquidados
+            </span>
           </div>
-
           <div
+            className="stat-icon"
             style={{
               background: 'rgba(16, 185, 129, 0.12)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              color: '#34d399',
-              padding: '10px 16px',
-              borderRadius: '8px',
-              fontSize: '1.75rem',
-              fontWeight: 800,
-              textAlign: 'center',
-              letterSpacing: '-0.02em',
-              fontVariantNumeric: 'tabular-nums',
+              border: '1px solid rgba(16, 185, 129, 0.25)',
             }}
           >
-            R$ {totals.totalPago.toFixed(2).replace('.', ',')}
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-            <span>{totals.countPagos} registros liquidados</span>
-            <span style={{ color: '#34d399' }}>Contas em dia</span>
+            <CheckCircle2 size={22} color="#10b981" />
           </div>
         </div>
 
-        {/* CARD: TOTAL DE REGISTROS */}
+        {/* CARD 3: TOTAL DE REGISTROS */}
         <div
-          className="card"
+          className="card stat-card"
           style={{
             padding: '1.25rem',
-            border: '1px solid var(--border-subtle)',
-            background: 'rgba(17, 24, 39, 0.85)',
-            borderRadius: '12px',
+            borderLeft: '3px solid #8b5cf6',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.74rem', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-dim)' }}>
-              BASE DE CREDORES & FORNECEDORES
+          <div className="stat-info">
+            <span className="stat-label">BASE DE CREDORES</span>
+            <span className="stat-value" style={{ fontSize: '1.65rem' }}>
+              {totals.totalRegistros}
             </span>
-            <Table size={18} color="var(--text-dim)" />
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
+              Total de lançamentos cadastrados
+            </span>
           </div>
-
           <div
+            className="stat-icon"
             style={{
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid var(--border-subtle)',
-              color: '#fff',
-              padding: '10px 16px',
-              borderRadius: '8px',
-              fontSize: '1.75rem',
-              fontWeight: 800,
-              textAlign: 'center',
-              letterSpacing: '-0.02em',
+              background: 'rgba(139, 92, 246, 0.12)',
+              border: '1px solid rgba(139, 92, 246, 0.25)',
             }}
           >
-            {totals.totalRegistros}
-          </div>
-
-          <div style={{ textAlign: 'center', marginTop: '10px', fontSize: '0.78rem', color: 'var(--text-dim)' }}>
-            Total de lançamentos cadastrados no sistema
+            <Table size={22} color="#a78bfa" />
           </div>
         </div>
       </div>
