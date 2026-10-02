@@ -538,8 +538,8 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
           </div>
         </div>
 
-        {/* Tabela Excel */}
-        <div className="excel-table-container">
+        {/* Tabela Excel (Desktop e Tablet) */}
+        <div className="excel-table-container desktop-table-view">
           <table className="excel-table">
             <thead>
               <tr>
@@ -825,6 +825,298 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
               </tfoot>
             )}
           </table>
+        </div>
+
+        {/* Visualização em Cartões Inteligentes para Celular / Mobile View */}
+        <div className="mobile-cards-view">
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-dim)' }}>
+              Carregando clientes devedores...
+            </div>
+          ) : filteredVendas.length === 0 ? (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '2.5rem 1rem',
+                background: 'var(--bg-card)',
+                borderRadius: '12px',
+                border: '1px solid var(--border-subtle)',
+              }}
+            >
+              <div style={{ color: 'var(--text-muted)', marginBottom: '10px', fontSize: '0.9rem' }}>
+                Nenhuma venda encontrada para os filtros atuais.
+              </div>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => onOpenNovaVendaModal()}
+              >
+                <PlusCircle size={14} /> Cadastrar Nova Venda
+              </button>
+            </div>
+          ) : (
+            <>
+              {filteredVendas.map((v, idx) => {
+                const isParcelado = v.total_parcelas && v.total_parcelas > 1;
+                const valorTotalCalc = v.valor_total || Number(v.valor) * (v.total_parcelas || 1);
+                const isVencido = v.status_mes_atual === 'vencido';
+                const isPago = v.status_mes_atual === 'pago';
+                const isAvisado = v.status_mes_atual === 'avisado_3d' || v.status_mes_atual === 'avisado_1d';
+
+                return (
+                  <div
+                    key={v.id}
+                    className={`mobile-record-card ${
+                      isVencido
+                        ? 'card-vencido'
+                        : isPago
+                        ? 'card-pago'
+                        : isAvisado
+                        ? 'card-avisado'
+                        : 'card-pendente'
+                    }`}
+                    style={{ opacity: v.ativo ? 1 : 0.65 }}
+                  >
+                    {/* Header do Card Mobile: Nome do Cliente + Status */}
+                    <div className="mobile-card-header">
+                      <div className="mobile-card-title-group">
+                        <div className="client-avatar-badge">
+                          {v.cliente?.nome ? v.cliente.nome.slice(0, 2).toUpperCase() : `#${idx + 1}`}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span className="mobile-card-name">
+                              {v.cliente?.nome || 'Cliente Desconhecido'}
+                            </span>
+                            {v.cliente && (
+                              <button
+                                type="button"
+                                onClick={() => onEditCliente(v.cliente!)}
+                                className="mobile-icon-btn"
+                                title="Editar dados do cliente"
+                              >
+                                <Edit2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: '#f3f4f6', fontWeight: 500, marginTop: '2px' }}>
+                            {v.descricao}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>{getStatusBadge(v.status_mes_atual)}</div>
+                    </div>
+
+                    {/* Linha de Contato e Parcelamento */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                      {v.cliente?.whatsapp ? (
+                        <a
+                          href={`https://wa.me/${v.cliente.whatsapp}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="whatsapp-pill-btn"
+                          style={{ fontSize: '0.76rem', padding: '3px 8px' }}
+                        >
+                          <Phone size={11} />
+                          <span>{formatFullWhatsApp(v.cliente.whatsapp)}</span>
+                          <ExternalLink size={10} style={{ opacity: 0.7 }} />
+                        </a>
+                      ) : (
+                        <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)' }}>Sem WhatsApp</span>
+                      )}
+
+                      {isParcelado ? (
+                        <span className="badge badge-avisado" style={{ fontSize: '0.72rem', padding: '2px 8px' }}>
+                          Parcela {v.parcela_atual || 1} de {v.total_parcelas}x
+                        </span>
+                      ) : (
+                        <span
+                          className="badge"
+                          style={{
+                            fontSize: '0.72rem',
+                            padding: '2px 8px',
+                            background: 'rgba(255,255,255,0.06)',
+                            color: 'var(--text-muted)',
+                            border: '1px solid var(--border-subtle)',
+                          }}
+                        >
+                          1x (À vista)
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Caixa Financeira Destacada */}
+                    <div className="mobile-card-body">
+                      <div className="mobile-card-finance-row">
+                        <div>
+                          <div className="mobile-card-val-label">
+                            {isParcelado ? 'Valor da Parcela' : 'Valor da Dívida'}
+                          </div>
+                          <div
+                            className="mobile-card-val-main"
+                            style={{ color: isVencido ? '#f87171' : isPago ? '#34d399' : '#38bdf8' }}
+                          >
+                            R$ {Number(v.valor).toFixed(2).replace('.', ',')}
+                          </div>
+                        </div>
+
+                        <div style={{ textAlign: 'right' }}>
+                          <div className="mobile-card-val-label">Valor Total</div>
+                          <div
+                            style={{
+                              fontSize: '0.92rem',
+                              fontWeight: 600,
+                              color: '#fff',
+                              fontVariantNumeric: 'tabular-nums',
+                            }}
+                          >
+                            R$ {Number(valorTotalCalc).toFixed(2).replace('.', ',')}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mobile-card-meta-grid">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Calendar size={13} color={isVencido ? '#ef4444' : 'var(--text-dim)'} />
+                          <span
+                            style={{
+                              color: isVencido ? '#f87171' : 'var(--text-main)',
+                              fontWeight: isVencido ? 600 : 400,
+                            }}
+                          >
+                            Vence: {formatDate(v.data_vencimento_atual)}
+                          </span>
+                        </div>
+
+                        <div style={{ textAlign: 'right' }}>
+                          {!v.ativo ? (
+                            <span style={{ color: 'var(--danger)', fontSize: '0.72rem', fontWeight: 600 }}>
+                              ● Pausada
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--primary)', fontSize: '0.72rem' }}>
+                              ● Cobrança Ativa
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Barra de Ações Rápidas */}
+                    <div className="mobile-card-actions">
+                      {v.ativo && v.status_mes_atual !== 'pago' ? (
+                        <button
+                          className="btn btn-primary btn-sm"
+                          style={{ flex: 1, padding: '7px 12px', fontSize: '0.8rem', fontWeight: 600 }}
+                          onClick={() => handleMarkAsPaid(v)}
+                          disabled={payingVendaId === v.id}
+                        >
+                          <Check size={14} />
+                          {payingVendaId === v.id ? 'Salvando...' : 'Marcar Pago'}
+                        </button>
+                      ) : (
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            color: '#34d399',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                          }}
+                        >
+                          <CheckCircle2 size={16} /> Pagamento Confirmado
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          type="button"
+                          className="table-action-btn"
+                          onClick={() => onOpenHistoricoModal(v)}
+                          title="Ver histórico de mensagens WhatsApp"
+                          style={{ padding: '6px 9px' }}
+                        >
+                          <History size={14} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="table-action-btn"
+                          onClick={() => onEditVenda(v)}
+                          title="Editar dados da venda"
+                          style={{ padding: '6px 9px' }}
+                        >
+                          <Edit2 size={14} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="table-action-btn"
+                          onClick={() => handleToggleVendaAtivo(v)}
+                          title={v.ativo ? 'Pausar cobrança' : 'Reativar cobrança'}
+                          style={{ padding: '6px 9px' }}
+                        >
+                          {v.ativo ? (
+                            <ToggleRight size={16} color="var(--primary)" />
+                          ) : (
+                            <ToggleLeft size={16} color="var(--text-dim)" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Rodapé Resumo Mobile */}
+              <div className="mobile-summary-footer">
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
+                    Total em Aberto ({filteredVendas.length} cobranças):
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '1.25rem',
+                      fontWeight: 800,
+                      color: '#34d399',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    R${' '}
+                    {filteredVendas
+                      .reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0)
+                      .toFixed(2)
+                      .replace('.', ',')}
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Valor Consolidado:</div>
+                  <div
+                    style={{
+                      fontSize: '0.95rem',
+                      fontWeight: 700,
+                      color: '#fff',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    R${' '}
+                    {filteredVendas
+                      .reduce(
+                        (acc, curr) =>
+                          acc +
+                          (Number(curr.valor_total) ||
+                            Number(curr.valor) * (curr.total_parcelas || 1)),
+                        0
+                      )
+                      .toFixed(2)
+                      .replace('.', ',')}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

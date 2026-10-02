@@ -396,8 +396,8 @@ export const ContasPagarView: React.FC = () => {
           </div>
         </div>
 
-        {/* Tabela Excel Completa */}
-        <div className="excel-table-container">
+        {/* Tabela Excel Completa (Desktop e Tablet) */}
+        <div className="excel-table-container desktop-table-view">
           <table className="excel-table" style={{ minWidth: '950px' }}>
             <thead>
               <tr>
@@ -595,6 +595,239 @@ export const ContasPagarView: React.FC = () => {
               </tfoot>
             )}
           </table>
+        </div>
+
+        {/* Visualização em Cartões Inteligentes para Celular / Mobile View */}
+        <div className="mobile-cards-view">
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-dim)' }}>
+              Carregando quem devemos...
+            </div>
+          ) : filteredContas.length === 0 ? (
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '2.5rem 1rem',
+                background: 'var(--bg-card)',
+                borderRadius: '12px',
+                border: '1px solid var(--border-subtle)',
+              }}
+            >
+              <div style={{ color: 'var(--text-muted)', marginBottom: '10px', fontSize: '0.9rem' }}>
+                Nenhum débito encontrado para os filtros selecionados.
+              </div>
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={() => {
+                  setContaToEdit(null);
+                  setIsModalOpen(true);
+                }}
+                style={{ fontWeight: 600 }}
+              >
+                <PlusCircle size={14} /> Cadastrar Quem Devemos
+              </button>
+            </div>
+          ) : (
+            <>
+              {filteredContas.map((c, idx) => {
+                const isVencido =
+                  !c.pago &&
+                  c.data_vencimento &&
+                  c.data_vencimento < new Date().toISOString().split('T')[0];
+
+                return (
+                  <div
+                    key={c.id}
+                    className={`mobile-record-card ${
+                      c.pago ? 'card-pago' : isVencido ? 'card-vencido' : 'card-pendente'
+                    }`}
+                    style={{ opacity: c.pago ? 0.75 : 1 }}
+                  >
+                    {/* Header do Card: Nome do Credor + Status */}
+                    <div className="mobile-card-header">
+                      <div className="mobile-card-title-group">
+                        <div
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '8px',
+                            background: c.pago ? 'rgba(16, 185, 129, 0.15)' : 'rgba(244, 63, 94, 0.15)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: c.pago ? '#34d399' : '#f43f5e',
+                            fontWeight: 700,
+                            fontSize: '0.8rem',
+                            flexShrink: 0,
+                          }}
+                        >
+                          #{idx + 1}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <span className="mobile-card-name">{c.nome_credor}</span>
+                          <div style={{ fontSize: '0.75rem', color: '#f3f4f6', fontWeight: 500, marginTop: '2px' }}>
+                            {c.descricao || 'Sem descrição'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        {c.pago ? (
+                          <span className="badge badge-pago" style={{ padding: '3px 8px' }}>
+                            <Check size={11} /> Pago
+                          </span>
+                        ) : isVencido ? (
+                          <span className="badge badge-vencido" style={{ padding: '3px 8px' }}>
+                            ● Vencido
+                          </span>
+                        ) : (
+                          <span className="badge badge-avisado" style={{ padding: '3px 8px' }}>
+                            ● A Pagar
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Observações se houver */}
+                    {c.observacoes && (
+                      <div
+                        style={{
+                          fontSize: '0.74rem',
+                          color: 'var(--text-dim)',
+                          background: 'rgba(255, 255, 255, 0.03)',
+                          padding: '4px 8px',
+                          borderRadius: '4px',
+                        }}
+                      >
+                        Obs: {c.observacoes}
+                      </div>
+                    )}
+
+                    {/* Caixa Financeira Destacada */}
+                    <div className="mobile-card-body">
+                      <div className="mobile-card-finance-row">
+                        <div>
+                          <div className="mobile-card-val-label">Valor do Débito</div>
+                          <div
+                            className="mobile-card-val-main"
+                            style={{ color: c.pago ? '#34d399' : '#f87171' }}
+                          >
+                            R$ {Number(c.valor).toFixed(2).replace('.', ',')}
+                          </div>
+                        </div>
+
+                        <div style={{ textAlign: 'right' }}>
+                          <div className="mobile-card-val-label">Status da Dívida</div>
+                          <div style={{ fontSize: '0.82rem', fontWeight: 600, color: c.pago ? '#34d399' : '#fb7185' }}>
+                            {c.pago ? 'Quitado' : isVencido ? 'Vencida' : 'Pendente'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mobile-card-meta-grid">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <Calendar size={13} color={isVencido ? '#ef4444' : 'var(--text-dim)'} />
+                          <span
+                            style={{
+                              color: isVencido ? '#f87171' : 'var(--text-main)',
+                              fontWeight: isVencido ? 600 : 400,
+                            }}
+                          >
+                            {c.data_vencimento ? `Vencimento: ${formatDate(c.data_vencimento)}` : 'Sem data fixa'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Barra de Ações Rápidas */}
+                    <div className="mobile-card-actions">
+                      <button
+                        className={`btn btn-sm ${c.pago ? 'btn-secondary' : 'btn-primary'}`}
+                        style={{ flex: 1, padding: '7px 12px', fontSize: '0.8rem', fontWeight: 600 }}
+                        onClick={() => handleTogglePaga(c)}
+                        disabled={payingContaId === c.id}
+                      >
+                        <Check size={14} />
+                        {payingContaId === c.id
+                          ? 'Salvando...'
+                          : c.pago
+                          ? 'Desmarcar Pago'
+                          : 'Confirmar Pagamento'}
+                      </button>
+
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button
+                          type="button"
+                          className="table-action-btn"
+                          onClick={() => {
+                            setContaToEdit(c);
+                            setIsModalOpen(true);
+                          }}
+                          title="Editar lançamento"
+                          style={{ padding: '6px 10px' }}
+                        >
+                          <Edit2 size={14} />
+                        </button>
+
+                        <button
+                          type="button"
+                          className="table-action-btn"
+                          onClick={() => handleDelete(c)}
+                          title="Excluir lançamento"
+                          style={{ padding: '6px 10px', color: 'var(--danger)' }}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Rodapé Resumo Mobile */}
+              <div className="mobile-summary-footer">
+                <div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
+                    Total a Pagar ({filteredContas.filter((c) => !c.pago).length} pendentes):
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '1.25rem',
+                      fontWeight: 800,
+                      color: '#f87171',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    R${' '}
+                    {filteredContas
+                      .filter((c) => !c.pago)
+                      .reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0)
+                      .toFixed(2)
+                      .replace('.', ',')}
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Total Quitado:</div>
+                  <div
+                    style={{
+                      fontSize: '0.95rem',
+                      fontWeight: 700,
+                      color: '#34d399',
+                      fontVariantNumeric: 'tabular-nums',
+                    }}
+                  >
+                    R${' '}
+                    {filteredContas
+                      .filter((c) => c.pago)
+                      .reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0)
+                      .toFixed(2)
+                      .replace('.', ',')}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
