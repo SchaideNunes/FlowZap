@@ -10,8 +10,10 @@ import {
   Smartphone,
   PlusCircle,
   RefreshCw,
+  Building2,
+  ArrowRight,
 } from 'lucide-react';
-import { DashboardMetrics, WhatsAppStatus } from '../types/index.js';
+import { DashboardMetrics, WhatsAppStatus, ContaPagar } from '../types/index.js';
 import { api } from '../services/api.js';
 
 interface DashboardProps {
@@ -21,6 +23,7 @@ interface DashboardProps {
   onOpenNovoClienteModal: () => void;
   onOpenNovaVendaModal: () => void;
   onNavigateToClientes: () => void;
+  onNavigateToContasPagar?: () => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -30,6 +33,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onOpenNovoClienteModal,
   onOpenNovaVendaModal,
   onNavigateToClientes,
+  onNavigateToContasPagar,
 }) => {
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalPendentes: 0,
@@ -39,12 +43,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
     valorTotalMensal: 0,
     valorTotalRecebido: 0,
   });
+  const [contasPagar, setContasPagar] = useState<ContaPagar[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchMetrics = async () => {
+  const fetchData = async () => {
     try {
-      const res = await api.get('/vendas/metrics');
-      setMetrics(res.data);
+      const [metricsRes, contasRes] = await Promise.all([
+        api.get('/vendas/metrics'),
+        api.get('/contas-pagar'),
+      ]);
+      setMetrics(metricsRes.data);
+      setContasPagar(contasRes.data || []);
     } catch {
       // Ignora erro passageiro
     } finally {
@@ -53,8 +62,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   };
 
   useEffect(() => {
-    fetchMetrics();
-    const interval = setInterval(fetchMetrics, 15000);
+    fetchData();
+    const interval = setInterval(fetchData, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -63,6 +72,26 @@ export const Dashboard: React.FC<DashboardProps> = ({
       style: 'currency',
       currency: 'BRL',
     });
+  };
+
+  // Cálculos de Quem Devemos
+  const totalQueDevemosPendente = contasPagar
+    .filter((c) => !c.pago)
+    .reduce((sum, c) => sum + (Number(c.valor) || 0), 0);
+
+  const totalQueDevemosPago = contasPagar
+    .filter((c) => c.pago)
+    .reduce((sum, c) => sum + (Number(c.valor) || 0), 0);
+
+  const countCredoresPendentes = contasPagar.filter((c) => !c.pago).length;
+
+  // Balanço Líquido Projetado: Total Previsto a Receber - Total a Pagar para Credores
+  const saldoLiquidoPrevisto = metrics.valorTotalMensal - totalQueDevemosPendente;
+
+  const formatDate = (dateStr?: string | null) => {
+    if (!dateStr) return '-';
+    const [y, m, d] = dateStr.split('T')[0].split('-');
+    return `${d}/${m}/${y}`;
   };
 
   return (
@@ -79,14 +108,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
         }}
       >
         <div>
-          <h2 style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>Visão Geral de Cobranças</h2>
+          <h2 style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>Visão Geral de Cobranças & Finanças</h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-            Acompanhe o faturamento mensal recorrente e status dos disparos de WhatsApp.
+            Acompanhe o faturamento recorrente, contas a pagar a fornecedores e status dos disparos de WhatsApp.
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary btn-sm" onClick={fetchMetrics} disabled={loading}>
+          <button className="btn btn-secondary btn-sm" onClick={fetchData} disabled={loading}>
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             Atualizar
           </button>
@@ -147,8 +176,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Grid de Cards de Estatísticas */}
-      <div className="grid-cards">
+      {/* Grid de Cards de Estatísticas das Cobranças */}
+      <div className="grid-cards" style={{ marginBottom: '1.75rem' }}>
         {/* Total Pendentes */}
         <div className="card stat-card">
           <div className="stat-info">
@@ -210,54 +239,242 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Cards Financeiros & WhatsApp */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem', marginBottom: '1.75rem' }}>
-        {/* Card Financeiro */}
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <TrendingUp size={20} color="var(--primary)" />
-              <h4 style={{ fontSize: '1.05rem' }}>Faturamento Mensal Recorrente</h4>
+      {/* SEÇÃO FINANCEIRA: FATURAMENTO + QUEM DEVEMOS + BALANÇO LÍQUIDO */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem', marginBottom: '1.75rem' }}>
+        {/* CARD 1: Faturamento Mensal a Receber */}
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <TrendingUp size={20} color="var(--primary)" />
+                <h4 style={{ fontSize: '1.05rem' }}>Faturamento Recorrente</h4>
+              </div>
+              <span className="badge badge-pago">A Receber</span>
             </div>
-            <span className="badge badge-pago">Ciclo Atual</span>
-          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-            <div style={{ background: 'var(--bg-main)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Total Previsto</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: 700, color: '#fff' }}>
-                {formatBRL(metrics.valorTotalMensal)}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', marginBottom: '1rem' }}>
+              <div style={{ background: 'var(--bg-main)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Total Previsto</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#fff' }}>
+                  {formatBRL(metrics.valorTotalMensal)}
+                </div>
+              </div>
+
+              <div style={{ background: 'var(--bg-main)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Já Recebido</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#34d399' }}>
+                  {formatBRL(metrics.valorTotalRecebido)}
+                </div>
               </div>
             </div>
 
-            <div style={{ background: 'var(--bg-main)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Já Recebido</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: 700, color: '#34d399' }}>
-                {formatBRL(metrics.valorTotalRecebido)}
+            {/* Barra de Progresso */}
+            {metrics.valorTotalMensal > 0 && (
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                  <span>Progresso recebimento</span>
+                  <span>
+                    {Math.round((metrics.valorTotalRecebido / metrics.valorTotalMensal) * 100)}%
+                  </span>
+                </div>
+                <div style={{ height: '7px', background: 'var(--bg-input)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      height: '100%',
+                      width: `${Math.min(100, Math.round((metrics.valorTotalRecebido / metrics.valorTotalMensal) * 100))}%`,
+                      background: 'var(--primary)',
+                      borderRadius: '4px',
+                    }}
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Barra de Progresso de Recebimento */}
-          {metrics.valorTotalMensal > 0 && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
-                <span>Percentual recebido</span>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={onNavigateToClientes}
+            style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}
+          >
+            <Users size={14} /> Ver Clientes Devedores
+          </button>
+        </div>
+
+        {/* CARD 2: Quem Devemos (Contas a Pagar / Fornecedores) */}
+        <div
+          className="card"
+          style={{
+            borderLeft: '3px solid #c00000',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Building2 size={20} color="#f87171" />
+                <h4 style={{ fontSize: '1.05rem' }}>Quem Devemos (Contas a Pagar)</h4>
+              </div>
+              <span className="badge badge-vencido">A Pagar</span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', marginBottom: '1rem' }}>
+              <div style={{ background: 'var(--bg-main)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Total a Pagar</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#f87171' }}>
+                  {formatBRL(totalQueDevemosPendente)}
+                </div>
+              </div>
+
+              <div style={{ background: 'var(--bg-main)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Já Quitado</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#34d399' }}>
+                  {formatBRL(totalQueDevemosPago)}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              {countCredoresPendentes === 0 ? (
+                <span style={{ color: '#34d399' }}>✓ Todos os credores e contas estão em dia!</span>
+              ) : (
                 <span>
-                  {Math.round((metrics.valorTotalRecebido / metrics.valorTotalMensal) * 100)}%
+                  <strong>{countCredoresPendentes}</strong> credores/fornecedores aguardando quitação.
                 </span>
+              )}
+            </div>
+          </div>
+
+          {onNavigateToContasPagar && (
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={onNavigateToContasPagar}
+              style={{
+                width: '100%',
+                justifyContent: 'center',
+                marginTop: '0.5rem',
+                borderColor: 'rgba(239, 68, 68, 0.35)',
+                color: '#f87171',
+              }}
+            >
+              <Building2 size={14} /> Acessar Tela Quem Devemos <ArrowRight size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* CARD 3: Balanço Líquido Geral do Negócio */}
+        <div
+          className="card"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            background: 'linear-gradient(135deg, rgba(17, 24, 39, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%)',
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <DollarSign size={20} color={saldoLiquidoPrevisto >= 0 ? '#10b981' : '#ef4444'} />
+                <h4 style={{ fontSize: '1.05rem' }}>Balanço Líquido Geral</h4>
               </div>
-              <div style={{ height: '8px', background: 'var(--bg-input)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div
-                  style={{
-                    height: '100%',
-                    width: `${Math.min(100, Math.round((metrics.valorTotalRecebido / metrics.valorTotalMensal) * 100))}%`,
-                    background: 'var(--primary)',
-                    borderRadius: '4px',
-                    transition: 'width 300ms ease-out',
-                  }}
-                />
+              <span className={`badge ${saldoLiquidoPrevisto >= 0 ? 'badge-pago' : 'badge-vencido'}`}>
+                {saldoLiquidoPrevisto >= 0 ? 'Superávit Previsto' : 'Déficit'}
+              </span>
+            </div>
+
+            <div style={{ textAlign: 'center', padding: '1rem', background: 'var(--bg-main)', borderRadius: '10px', border: '1px solid var(--border-subtle)', marginBottom: '1rem' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                Saldo Estimado (Receber - Pagar)
               </div>
+              <div
+                style={{
+                  fontSize: '1.65rem',
+                  fontWeight: 800,
+                  color: saldoLiquidoPrevisto >= 0 ? '#34d399' : '#f87171',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {saldoLiquidoPrevisto >= 0 ? '+' : ''}
+                {formatBRL(saldoLiquidoPrevisto)}
+              </div>
+            </div>
+
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', textAlign: 'center', lineHeight: '1.4' }}>
+              Cálculo em tempo real do faturamento previsto menos os compromissos com credores cadastrados.
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '0.75rem', marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+            <span>A Receber: {formatBRL(metrics.valorTotalMensal)}</span>
+            <span style={{ color: '#f87171' }}>A Pagar: {formatBRL(totalQueDevemosPendente)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* LINHA INFERIOR: RESUMO DE QUEM DEVEMOS & STATUS WHATSAPP */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1rem' }}>
+        {/* Widget: Próximos Pagamentos de Quem Devemos */}
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Building2 size={18} color="#f87171" />
+              <h4 style={{ fontSize: '1rem' }}>Próximos Pagamentos a Fornecedores</h4>
+            </div>
+            {onNavigateToContasPagar && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={onNavigateToContasPagar}
+                style={{ fontSize: '0.76rem', padding: '3px 8px' }}
+              >
+                Ver todos
+              </button>
+            )}
+          </div>
+
+          {contasPagar.filter((c) => !c.pago).length === 0 ? (
+            <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+              Nenhuma conta ou credor com pagamento pendente no momento.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {contasPagar
+                .filter((c) => !c.pago)
+                .slice(0, 4)
+                .map((conta) => (
+                  <div
+                    key={conta.id}
+                    style={{
+                      background: 'var(--bg-main)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: '8px',
+                      padding: '10px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.88rem' }}>
+                        {conta.nome_credor}
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: 'var(--text-dim)' }}>
+                        {conta.descricao || 'Sem descrição'}
+                        {conta.data_vencimento && ` • Vencimento: ${formatDate(conta.data_vencimento)}`}
+                      </div>
+                    </div>
+
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontWeight: 700, color: '#f87171', fontSize: '0.94rem' }}>
+                        {formatBRL(conta.valor)}
+                      </div>
+                      <span className="badge badge-vencido" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
+                        Pendente
+                      </span>
+                    </div>
+                  </div>
+                ))}
             </div>
           )}
         </div>
@@ -289,7 +506,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </button>
             <button className="btn btn-secondary btn-sm" onClick={onNavigateToClientes}>
               <Users size={15} />
-              Ver Clientes & Vendas
+              Ver Clientes Devedores
             </button>
           </div>
         </div>

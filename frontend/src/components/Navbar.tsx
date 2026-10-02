@@ -1,11 +1,11 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext.js';
-import { MessageSquare, Users, LayoutDashboard, LogOut, QrCode, Bell } from 'lucide-react';
+import { MessageSquare, Users, LayoutDashboard, LogOut, QrCode, Bell, Building2 } from 'lucide-react';
 import { WhatsAppStatus } from '../types/index.js';
 
 interface NavbarProps {
-  currentTab: 'dashboard' | 'clientes' | 'notificacoes';
-  onTabChange: (tab: 'dashboard' | 'clientes' | 'notificacoes') => void;
+  currentTab: 'dashboard' | 'clientes' | 'contas-pagar' | 'notificacoes';
+  onTabChange: (tab: 'dashboard' | 'clientes' | 'contas-pagar' | 'notificacoes') => void;
   whatsAppStatus: WhatsAppStatus['state'];
   onOpenWhatsAppModal: () => void;
 }
@@ -75,6 +75,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Users size={16} /> Clientes & Vendas
+              </span>
+            </button>
+            <button
+              className={`nav-tab ${currentTab === 'contas-pagar' ? 'active' : ''}`}
+              onClick={() => onTabChange('contas-pagar')}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Building2 size={16} /> Quem Devemos
               </span>
             </button>
             <button
