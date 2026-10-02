@@ -12,15 +12,19 @@ import {
   Phone,
   Table,
   DollarSign,
-  AlertCircle,
   Calendar,
   Check,
-  ArrowUpDown,
   X,
+  Trash2,
+  TrendingUp,
+  LayoutGrid,
+  CreditCard,
+  Building2,
 } from 'lucide-react';
-import { Cliente, Venda } from '../types/index.js';
+import { Cliente, Venda, ContaPagar } from '../types/index.js';
 import { api } from '../services/api.js';
 import { formatFullWhatsApp } from '../utils/phone.js';
+import { ContaPagarModal } from '../components/ContaPagarModal.js';
 
 interface ClientesViewProps {
   onOpenNovoClienteModal: () => void;
@@ -30,8 +34,8 @@ interface ClientesViewProps {
   onOpenHistoricoModal: (venda: Venda) => void;
 }
 
-type StatusFilter = 'todos' | 'pendente' | 'avisado' | 'vencido' | 'pago';
-type SortOption = 'vencimento' | 'nome' | 'valor';
+type TabViewMode = 'unificada' | 'devedores' | 'credores';
+type StatusFilter = 'todos' | 'pendente' | 'vencido' | 'pago';
 
 export const ClientesView: React.FC<ClientesViewProps> = ({
   onOpenNovoClienteModal,
@@ -42,22 +46,30 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
 }) => {
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [contasPagar, setContasPagar] = useState<ContaPagar[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [tabMode, setTabMode] = useState<TabViewMode>('unificada');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todos');
-  const [sortBy, setSortBy] = useState<SortOption>('vencimento');
   const [payingVendaId, setPayingVendaId] = useState<number | null>(null);
+  const [payingContaId, setPayingContaId] = useState<number | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+
+  // Modal de Conta a Pagar (Quem Devemos)
+  const [isContaModalOpen, setIsContaModalOpen] = useState(false);
+  const [contaToEdit, setContaToEdit] = useState<ContaPagar | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [vendasRes, clientesRes] = await Promise.all([
+      const [vendasRes, clientesRes, contasRes] = await Promise.all([
         api.get('/vendas'),
         api.get('/clientes'),
+        api.get('/contas-pagar'),
       ]);
-      setVendas(vendasRes.data);
-      setClientes(clientesRes.data);
+      setVendas(vendasRes.data || []);
+      setClientes(clientesRes.data || []);
+      setContasPagar(contasRes.data || []);
     } catch {
       // Ignora erro passageiro
     } finally {
@@ -69,6 +81,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
     fetchData();
   }, []);
 
+  // Marcar recebimento de venda de cliente
   const handleMarkAsPaid = async (venda: Venda) => {
     const isParcelado = venda.total_parcelas && venda.total_parcelas > 1;
     const infoParcela = isParcelado
@@ -76,7 +89,11 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
       : '';
 
     const confirm = window.confirm(
-      `Confirmar recebimento do pagamento de "${venda.descricao}"${infoParcela} no valor de R$ ${Number(venda.valor).toFixed(2).replace('.', ',')}?`
+      `Confirmar recebimento do pagamento de "${venda.descricao}"${infoParcela} no valor de R$ ${Number(
+        venda.valor
+      )
+        .toFixed(2)
+        .replace('.', ',')}?`
     );
     if (!confirm) return;
 
@@ -102,11 +119,52 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
     }
   };
 
-  // Filtragem e ordenação dinâmica em tempo real (como no Excel)
+  // Toggle de pagamento de Conta a Pagar (Quem Devemos)
+  const handleToggleContaPaga = async (conta: ContaPagar) => {
+    const novoStatus = !conta.pago;
+    setPayingContaId(conta.id);
+    try {
+      await api.put(`/contas-pagar/${conta.id}`, {
+        pago: novoStatus,
+        data_pagamento: novoStatus ? new Date().toISOString().split('T')[0] : null,
+      });
+      setFeedbackMsg(
+        novoStatus
+          ? `Dívida de "${conta.nome_credor}" marcada como PAGA!`
+          : `Dívida de "${conta.nome_credor}" marcada como PENDENTE.`
+      );
+      setTimeout(() => setFeedbackMsg(null), 4000);
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Erro ao atualizar conta a pagar.');
+    } finally {
+      setPayingContaId(null);
+    }
+  };
+
+  // Excluir Conta a Pagar
+  const handleDeleteConta = async (conta: ContaPagar) => {
+    const confirm = window.confirm(
+      `Excluir o registro de débito com "${conta.nome_credor}" no valor de R$ ${Number(conta.valor)
+        .toFixed(2)
+        .replace('.', ',')}?`
+    );
+    if (!confirm) return;
+
+    try {
+      await api.delete(`/contas-pagar/${conta.id}`);
+      setFeedbackMsg(`Registro "${conta.nome_credor}" excluído.`);
+      setTimeout(() => setFeedbackMsg(null), 4000);
+      fetchData();
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Erro ao excluir conta a pagar.');
+    }
+  };
+
+  // Filtragem Clientes Devedores
   const filteredVendas = useMemo(() => {
     return vendas
       .filter((v) => {
-        // Busca textual por nome do cliente, WhatsApp ou descrição do item
         const term = search.toLowerCase().trim();
         if (term) {
           const matchNome = (v.cliente?.nome || '').toLowerCase().includes(term);
@@ -115,119 +173,132 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
           if (!matchNome && !matchWhats && !matchDesc) return false;
         }
 
-        // Filtro por status
-        if (statusFilter === 'pendente') return v.status_mes_atual === 'pendente';
-        if (statusFilter === 'avisado') return v.status_mes_atual.startsWith('avisado');
+        if (statusFilter === 'pendente') return v.status_mes_atual === 'pendente' || v.status_mes_atual.startsWith('avisado');
         if (statusFilter === 'vencido') return v.status_mes_atual === 'vencido';
         if (statusFilter === 'pago') return v.status_mes_atual === 'pago';
 
         return true;
       })
       .sort((a, b) => {
-        if (sortBy === 'nome') {
-          return (a.cliente?.nome || '').localeCompare(b.cliente?.nome || '');
-        }
-        if (sortBy === 'valor') {
-          return Number(b.valor) - Number(a.valor);
-        }
-        // Padrão: Vencimento mais próximo
         return (a.data_vencimento_atual || '').localeCompare(b.data_vencimento_atual || '');
       });
-  }, [vendas, search, statusFilter, sortBy]);
+  }, [vendas, search, statusFilter]);
 
-  // Totais da Planilha
-  const totals = useMemo(() => {
-    let sumParcelas = 0;
-    let sumTotalVendas = 0;
-    let countPendentes = 0;
-    let countAvisados = 0;
-    let countVencidos = 0;
-    let countPagos = 0;
-    let valorRecebido = 0;
-    let valorEmAberto = 0;
-
-    vendas.forEach((v) => {
-      const vParcela = Number(v.valor) || 0;
-      const vTotal = Number(v.valor_total) || vParcela * (v.total_parcelas || 1);
-      sumParcelas += vParcela;
-      sumTotalVendas += vTotal;
-
-      if (v.status_mes_atual === 'pago') {
-        countPagos++;
-        valorRecebido += vParcela;
-      } else {
-        valorEmAberto += vParcela;
-        if (v.status_mes_atual === 'vencido') countVencidos++;
-        else if (v.status_mes_atual.startsWith('avisado')) countAvisados++;
-        else countPendentes++;
+  // Filtragem Quem Devemos
+  const filteredContasPagar = useMemo(() => {
+    return contasPagar.filter((c) => {
+      const term = search.toLowerCase().trim();
+      if (term) {
+        const matchNome = c.nome_credor.toLowerCase().includes(term);
+        const matchDesc = (c.descricao || '').toLowerCase().includes(term);
+        if (!matchNome && !matchDesc) return false;
       }
+
+      if (statusFilter === 'pendente') return !c.pago;
+      if (statusFilter === 'pago') return c.pago;
+      // Para 'vencido', checa se data de vencimento passou e não está pago
+      if (statusFilter === 'vencido') {
+        if (c.pago) return false;
+        if (!c.data_vencimento) return false;
+        return c.data_vencimento < new Date().toISOString().split('T')[0];
+      }
+
+      return true;
     });
+  }, [contasPagar, search, statusFilter]);
+
+  // Totais Balanço Geral
+  const totals = useMemo(() => {
+    // Clientes devedores
+    const totalDividasClientes = vendas
+      .filter((v) => v.status_mes_atual !== 'pago' && v.ativo)
+      .reduce((sum, v) => sum + (Number(v.valor) || 0), 0);
+
+    const totalVencidosClientes = vendas
+      .filter((v) => v.status_mes_atual === 'vencido' && v.ativo)
+      .reduce((sum, v) => sum + (Number(v.valor) || 0), 0);
+
+    const countVencidosClientes = vendas.filter(
+      (v) => v.status_mes_atual === 'vencido' && v.ativo
+    ).length;
+
+    // Quem Devemos
+    const totalQueDevemos = contasPagar
+      .filter((c) => !c.pago)
+      .reduce((sum, c) => sum + (Number(c.valor) || 0), 0);
+
+    const totalPagoCredores = contasPagar
+      .filter((c) => c.pago)
+      .reduce((sum, c) => sum + (Number(c.valor) || 0), 0);
+
+    // Saldo Líquido
+    const saldoLiquido = totalDividasClientes - totalQueDevemos;
 
     return {
-      sumParcelas,
-      sumTotalVendas,
-      countPendentes,
-      countAvisados,
-      countVencidos,
-      countPagos,
-      valorRecebido,
-      valorEmAberto,
-      totalRegistros: vendas.length,
+      totalDividasClientes,
+      totalVencidosClientes,
+      countVencidosClientes,
+      totalQueDevemos,
+      totalPagoCredores,
+      saldoLiquido,
     };
-  }, [vendas]);
+  }, [vendas, contasPagar]);
+
+  const formatDate = (dateStr?: string | null) => {
+    if (!dateStr) return '-';
+    const [y, m, d] = dateStr.split('T')[0].split('-');
+    return `${d}/${m}/${y}`;
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pago':
         return (
-          <span className="badge badge-pago" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }}>
+          <span className="badge badge-pago" style={{ whiteSpace: 'nowrap', padding: '3px 8px', fontSize: '0.72rem' }}>
             <Check size={11} /> Pago
           </span>
         );
       case 'avisado_3d':
-        return (
-          <span className="badge badge-avisado" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }}>
-            ● Avisado (3d)
-          </span>
-        );
       case 'avisado_1d':
         return (
-          <span className="badge badge-avisado" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }}>
-            ● Avisado (1d)
+          <span className="badge badge-avisado" style={{ whiteSpace: 'nowrap', padding: '3px 8px', fontSize: '0.72rem' }}>
+            ● Avisado
           </span>
         );
       case 'vencido':
         return (
-          <span className="badge badge-vencido" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }}>
+          <span className="badge badge-vencido" style={{ whiteSpace: 'nowrap', padding: '3px 8px', fontSize: '0.72rem' }}>
             ● Vencido
           </span>
         );
       default:
         return (
-          <span className="badge badge-pendente" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }}>
-            ● Pendente
+          <span className="badge badge-pendente" style={{ whiteSpace: 'nowrap', padding: '3px 8px', fontSize: '0.72rem' }}>
+            ● Em Aberto
           </span>
         );
     }
   };
 
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '-';
-    const [y, m, d] = dateStr.split('-');
-    return `${d}/${m}/${y}`;
-  };
-
-
   return (
     <div>
       {/* Top Header com Título e Botões de Ação */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '1.25rem',
+          flexWrap: 'wrap',
+          gap: '1rem',
+        }}
+      >
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div
               style={{
-                width: '36px',
-                height: '36px',
+                width: '38px',
+                height: '38px',
                 borderRadius: '8px',
                 background: 'rgba(16, 185, 129, 0.12)',
                 border: '1px solid rgba(16, 185, 129, 0.25)',
@@ -238,20 +309,44 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
             >
               <Table size={20} color="var(--primary)" />
             </div>
-            <h2 style={{ fontSize: '1.55rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
-              Planilha de Cobranças & Vendas
+            <h2 style={{ fontSize: '1.6rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
+              Planilha Financeira & Cobranças
             </h2>
           </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '4px' }}>
-            Visão centralizada estilo planilha para controle de vendas parceladas, vencimentos e histórico WhatsApp.
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.86rem', marginTop: '4px' }}>
+            Controle integrado estilo Excel ({clientes.length} clientes na base): <strong>Clientes Devedores</strong> (A Receber) e <strong>Quem Devemos</strong> (Contas a Pagar).
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary btn-sm" onClick={onOpenNovoClienteModal} style={{ padding: '0.5rem 1rem' }}>
-            <UserPlus size={16} /> Cadastrar Novo Cliente
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={onOpenNovoClienteModal}
+            style={{ padding: '0.5rem 1rem' }}
+          >
+            <UserPlus size={16} /> Cadastrar Cliente
           </button>
-          <button className="btn btn-primary btn-sm" onClick={() => onOpenNovaVendaModal()} style={{ padding: '0.5rem 1.15rem', fontWeight: 600 }}>
+          <button
+            className="btn btn-sm"
+            onClick={() => {
+              setContaToEdit(null);
+              setIsContaModalOpen(true);
+            }}
+            style={{
+              padding: '0.5rem 1.15rem',
+              fontWeight: 600,
+              background: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.35)',
+              color: '#f87171',
+            }}
+          >
+            <Building2 size={16} /> + Quem Devemos
+          </button>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => onOpenNovaVendaModal()}
+            style={{ padding: '0.5rem 1.15rem', fontWeight: 600 }}
+          >
             <PlusCircle size={16} /> + Nova Venda / Cobrança
           </button>
         </div>
@@ -278,84 +373,150 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
         </div>
       )}
 
-      {/* Cards de Métricas da Planilha (KPIs Rápidos) */}
-      <div className="grid-cards" style={{ marginBottom: '1.5rem' }}>
-        <div className="card stat-card" style={{ padding: '1.1rem 1.25rem', borderLeft: '3px solid #10b981' }}>
-          <div className="stat-info">
-            <span className="stat-label">A RECEBER NO CICLO</span>
-            <span className="stat-value" style={{ color: '#34d399', fontSize: '1.5rem', fontVariantNumeric: 'tabular-nums' }}>
-              R$ {totals.valorEmAberto.toFixed(2).replace('.', ',')}
+      {/* DUAL BALANÇO HEADER (Idêntico ao Excel do Lojista: Verde R$ 97k à esq. e Vermelho R$ 8.5k à dir.) */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))',
+          gap: '1.15rem',
+          marginBottom: '1.5rem',
+        }}
+      >
+        {/* CARD VERDE: VALOR TOTAL DAS DÍVIDAS (Clientes Devedores) */}
+        <div
+          className="card"
+          style={{
+            padding: '1.25rem',
+            border: '1px solid rgba(0, 176, 80, 0.4)',
+            background: 'linear-gradient(135deg, rgba(0, 176, 80, 0.08) 0%, rgba(17, 24, 39, 0.95) 100%)',
+            borderRadius: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.74rem', fontWeight: 700, letterSpacing: '0.06em', color: '#6ee7b7' }}>
+              VALOR TOTAL DAS DÍVIDAS (A RECEBER)
             </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-              {totals.countPendentes + totals.countAvisados} parcelas em aberto
-            </span>
+            <DollarSign size={18} color="#00b050" />
           </div>
-          <div className="stat-icon" style={{ background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
-            <DollarSign size={22} color="#10b981" />
-          </div>
-        </div>
 
-        <div className="card stat-card" style={{ padding: '1.1rem 1.25rem', borderLeft: `3px solid ${totals.countVencidos > 0 ? '#ef4444' : 'var(--border-subtle)'}` }}>
-          <div className="stat-info">
-            <span className="stat-label">VENCIDOS (ATENÇÃO)</span>
-            <span className="stat-value" style={{ color: totals.countVencidos > 0 ? '#f87171' : '#fff', fontSize: '1.5rem' }}>
-              {totals.countVencidos} {totals.countVencidos === 1 ? 'venda' : 'vendas'}
-            </span>
-            <span style={{ fontSize: '0.75rem', color: totals.countVencidos > 0 ? '#f87171' : 'var(--text-dim)', marginTop: '4px' }}>
-              {totals.countVencidos > 0 ? 'Requer cobrança imediata' : 'Nenhuma parcela atrasada'}
-            </span>
+          <div
+            className="excel-box-green"
+            style={{
+              padding: '10px 16px',
+              borderRadius: '8px',
+              fontSize: '1.65rem',
+              letterSpacing: '-0.02em',
+              textAlign: 'center',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            R$ {totals.totalDividasClientes.toFixed(2).replace('.', ',')}
           </div>
-          <div className="stat-icon" style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
-            <AlertCircle size={22} color={totals.countVencidos > 0 ? '#ef4444' : 'var(--text-dim)'} />
-          </div>
-        </div>
 
-        <div className="card stat-card" style={{ padding: '1.1rem 1.25rem', borderLeft: '3px solid #3b82f6' }}>
-          <div className="stat-info">
-            <span className="stat-label">RECEBIDOS NO CICLO</span>
-            <span className="stat-value" style={{ color: '#60a5fa', fontSize: '1.5rem', fontVariantNumeric: 'tabular-nums' }}>
-              R$ {totals.valorRecebido.toFixed(2).replace('.', ',')}
-            </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-              {totals.countPagos} parcelas confirmadas
-            </span>
-          </div>
-          <div className="stat-icon" style={{ background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
-            <CheckCircle2 size={22} color="#3b82f6" />
-          </div>
-        </div>
-
-        <div className="card stat-card" style={{ padding: '1.1rem 1.25rem', borderLeft: '3px solid #8b5cf6' }}>
-          <div className="stat-info">
-            <span className="stat-label">BASE DE CLIENTES</span>
-            <span className="stat-value" style={{ fontSize: '1.5rem' }}>
-              {clientes.length}{' '}
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-dim)', fontWeight: 400 }}>
-                ({totals.totalRegistros} vendas)
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            <span>{vendas.filter((v) => v.status_mes_atual !== 'pago' && v.ativo).length} parcelas em aberto</span>
+            {totals.countVencidosClientes > 0 && (
+              <span style={{ color: '#f87171', fontWeight: 600 }}>
+                {totals.countVencidosClientes} vencidas (R$ {totals.totalVencidosClientes.toFixed(2).replace('.', ',')})
               </span>
-            </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-              Clientes cadastrados na loja
-            </span>
+            )}
           </div>
-          <div className="stat-icon" style={{ background: 'rgba(139, 92, 246, 0.12)', border: '1px solid rgba(139, 92, 246, 0.25)' }}>
-            <Table size={22} color="#a78bfa" />
+        </div>
+
+        {/* CARD BALANÇO LÍQUIDO */}
+        <div
+          className="card"
+          style={{
+            padding: '1.25rem',
+            border: '1px solid var(--border-subtle)',
+            background: 'rgba(17, 24, 39, 0.85)',
+            borderRadius: '12px',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.74rem', fontWeight: 700, letterSpacing: '0.06em', color: 'var(--text-dim)' }}>
+              SALDO LÍQUIDO PREVISTO
+            </span>
+            <TrendingUp size={18} color={totals.saldoLiquido >= 0 ? '#10b981' : '#ef4444'} />
+          </div>
+
+          <div
+            style={{
+              background: totals.saldoLiquido >= 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+              border: `1px solid ${totals.saldoLiquido >= 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+              color: totals.saldoLiquido >= 0 ? '#34d399' : '#f87171',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              fontSize: '1.65rem',
+              fontWeight: 800,
+              textAlign: 'center',
+              letterSpacing: '-0.02em',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {totals.saldoLiquido >= 0 ? '+' : ''} R${' '}
+            {totals.saldoLiquido.toFixed(2).replace('.', ',')}
+          </div>
+
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', textAlign: 'center', marginTop: '10px' }}>
+            (Total a Receber) menos (Total que Devemos)
+          </div>
+        </div>
+
+        {/* CARD VERMELHO: VALOR TOTAL QUE DEVEMOS (Quem Devemos) */}
+        <div
+          className="card"
+          style={{
+            padding: '1.25rem',
+            border: '1px solid rgba(192, 0, 0, 0.4)',
+            background: 'linear-gradient(135deg, rgba(192, 0, 0, 0.08) 0%, rgba(17, 24, 39, 0.95) 100%)',
+            borderRadius: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.74rem', fontWeight: 700, letterSpacing: '0.06em', color: '#fca5a5' }}>
+              VALOR TOTAL QUE DEVEMOS (A PAGAR)
+            </span>
+            <Building2 size={18} color="#c00000" />
+          </div>
+
+          <div
+            className="excel-box-red"
+            style={{
+              padding: '10px 16px',
+              borderRadius: '8px',
+              fontSize: '1.65rem',
+              letterSpacing: '-0.02em',
+              textAlign: 'center',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            R$ {totals.totalQueDevemos.toFixed(2).replace('.', ',')}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+            <span>{contasPagar.filter((c) => !c.pago).length} credores / contas pendentes</span>
+            <span style={{ color: '#34d399' }}>
+              Quitados: R$ {totals.totalPagoCredores.toFixed(2).replace('.', ',')}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Tabela Principal Estilo Excel */}
-      <div className="excel-wrapper">
-        {/* Barra de Ferramentas / Filtros Estilo Planilha */}
+      {/* BARRA DE FERRAMENTAS: BUSCA, ABAS DE VISUALIZAÇÃO E FILTRO DE STATUS */}
+      <div className="excel-wrapper" style={{ marginBottom: '1.5rem' }}>
         <div className="excel-toolbar">
-          {/* Campo de Busca Rápida */}
+          {/* Campo de Busca Unificada */}
           <div className="excel-search-box">
             <input
               type="text"
               className="form-input"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por cliente, WhatsApp ou aparelho..."
+              placeholder="Buscar devedor, credor, aparelho ou WhatsApp..."
               style={{
                 paddingLeft: '2.3rem',
                 paddingRight: search ? '2rem' : '0.8rem',
@@ -393,31 +554,50 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
             )}
           </div>
 
-          {/* Abas Rápidas de Filtro de Status com Contador */}
+          {/* Abas de Modo de Visualização */}
+          <div style={{ display: 'flex', gap: '6px', background: '#090e17', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+            <button
+              type="button"
+              className={`excel-filter-btn ${tabMode === 'unificada' ? 'active' : ''}`}
+              onClick={() => setTabMode('unificada')}
+              title="Exibir ambas as tabelas lado a lado conforme a planilha real"
+            >
+              <LayoutGrid size={14} />
+              <span>Planilha Integrada</span>
+            </button>
+            <button
+              type="button"
+              className={`excel-filter-btn ${tabMode === 'devedores' ? 'active' : ''}`}
+              onClick={() => setTabMode('devedores')}
+            >
+              <CreditCard size={14} />
+              <span>Clientes Devedores ({filteredVendas.length})</span>
+            </button>
+            <button
+              type="button"
+              className={`excel-filter-btn ${tabMode === 'credores' ? 'active' : ''}`}
+              onClick={() => setTabMode('credores')}
+            >
+              <Building2 size={14} />
+              <span>Quem Devemos ({filteredContasPagar.length})</span>
+            </button>
+          </div>
+
+          {/* Filtros Rápidos de Status */}
           <div className="excel-filters">
             <button
               type="button"
               className={`excel-filter-btn ${statusFilter === 'todos' ? 'active' : ''}`}
               onClick={() => setStatusFilter('todos')}
             >
-              <span>Todas</span>
-              <span className="excel-filter-count">{totals.totalRegistros}</span>
+              <span>Todos</span>
             </button>
             <button
               type="button"
               className={`excel-filter-btn ${statusFilter === 'pendente' ? 'active' : ''}`}
               onClick={() => setStatusFilter('pendente')}
             >
-              <span>Pendentes</span>
-              <span className="excel-filter-count">{totals.countPendentes}</span>
-            </button>
-            <button
-              type="button"
-              className={`excel-filter-btn ${statusFilter === 'avisado' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('avisado')}
-            >
-              <span>Avisados</span>
-              <span className="excel-filter-count">{totals.countAvisados}</span>
+              <span>Em Aberto</span>
             </button>
             <button
               type="button"
@@ -425,12 +605,6 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
               onClick={() => setStatusFilter('vencido')}
             >
               <span>Vencidos</span>
-              <span
-                className="excel-filter-count"
-                style={{ color: totals.countVencidos > 0 ? '#f87171' : undefined }}
-              >
-                {totals.countVencidos}
-              </span>
             </button>
             <button
               type="button"
@@ -438,363 +612,493 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
               onClick={() => setStatusFilter('pago')}
             >
               <span>Pagos</span>
-              <span className="excel-filter-count">{totals.countPagos}</span>
             </button>
           </div>
-
-          {/* Controles de Ordenação e Contador */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <ArrowUpDown size={14} color="var(--text-dim)" />
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>Ordenar:</span>
-              <select
-                className="form-select"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortOption)}
-                style={{ fontSize: '0.8rem', padding: '5px 10px', height: '34px', borderRadius: '6px' }}
-              >
-                <option value="vencimento">Vencimento mais próximo</option>
-                <option value="nome">Cliente (A-Z)</option>
-                <option value="valor">Maior valor</option>
-              </select>
-            </div>
-
-            <div
-              style={{
-                fontSize: '0.75rem',
-                color: 'var(--text-dim)',
-                background: 'rgba(255, 255, 255, 0.04)',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                border: '1px solid var(--border-subtle)',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Exibindo <strong>{filteredVendas.length}</strong> de {vendas.length}
-            </div>
-          </div>
         </div>
 
-        {/* Tabela Excel com Scroll Suave e Largura Mínima Garantida */}
-        <div className="excel-table-container">
-          <table className="excel-table">
-            <thead>
-              <tr>
-                <th style={{ width: '48px', textAlign: 'center' }}>#</th>
-                <th style={{ minWidth: '180px' }}>Cliente</th>
-                <th style={{ minWidth: '190px' }}>WhatsApp</th>
-                <th style={{ minWidth: '220px' }}>Descrição da Venda / Aparelho</th>
-                <th style={{ minWidth: '110px', textAlign: 'center' }}>Parcelas</th>
-                <th style={{ minWidth: '130px', textAlign: 'right' }}>Valor Parcela</th>
-                <th style={{ minWidth: '130px', textAlign: 'right' }}>Valor Total</th>
-                <th style={{ minWidth: '95px', textAlign: 'center' }}>Dia Fixo</th>
-                <th style={{ minWidth: '135px', textAlign: 'center' }}>Vencimento Atual</th>
-                <th style={{ minWidth: '125px', textAlign: 'center' }}>Status</th>
-                <th style={{ minWidth: '210px', textAlign: 'center' }}>Ações Rápidas</th>
-              </tr>
-            </thead>
+        {/* ============================================================== */}
+        {/* CORPO DA PLANILHA: LADO A LADO OU TELA CHEIA                   */}
+        {/* ============================================================== */}
+        <div style={{ padding: '1rem' }}>
+          <div className={tabMode === 'unificada' ? 'dual-excel-container' : ''}>
+            {/* ------------------------------------------------------------ */}
+            {/* SEÇÃO 1: CLIENTES DEVEDORES                                  */}
+            {/* ------------------------------------------------------------ */}
+            {(tabMode === 'unificada' || tabMode === 'devedores') && (
+              <div
+                style={{
+                  background: 'rgba(15, 23, 42, 0.65)',
+                  border: '1px solid rgba(0, 176, 80, 0.3)',
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Header de Seção Clientes Devedores */}
+                <div
+                  style={{
+                    padding: '0.85rem 1.15rem',
+                    background: 'linear-gradient(90deg, rgba(0, 176, 80, 0.22) 0%, rgba(15, 23, 42, 0.9) 100%)',
+                    borderBottom: '1px solid rgba(0, 176, 80, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div
+                      style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: '#00b050',
+                        boxShadow: '0 0 6px #00b050',
+                      }}
+                    />
+                    <strong style={{ color: '#fff', fontSize: '0.9rem', letterSpacing: '0.02em' }}>
+                      CLIENTES DEVEDORES
+                    </strong>
+                    <span style={{ fontSize: '0.76rem', color: '#6ee7b7', background: 'rgba(0,176,80,0.15)', padding: '2px 8px', borderRadius: '4px' }}>
+                      {filteredVendas.length} registros
+                    </span>
+                  </div>
 
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={11} style={{ textAlign: 'center', padding: '3.5rem', color: 'var(--text-dim)' }}>
-                    Carregando registros da planilha...
-                  </td>
-                </tr>
-              ) : filteredVendas.length === 0 ? (
-                <tr>
-                  <td colSpan={11} style={{ textAlign: 'center', padding: '4rem 1rem' }}>
-                    <div style={{ color: 'var(--text-muted)', marginBottom: '10px', fontSize: '0.95rem' }}>
-                      Nenhuma venda encontrada para os filtros atuais.
-                    </div>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => onOpenNovaVendaModal()}
-                      style={{ marginTop: '0.5rem' }}
-                    >
-                      <PlusCircle size={14} /> Cadastrar Nova Venda
-                    </button>
-                  </td>
-                </tr>
-              ) : (
-                filteredVendas.map((v, idx) => {
-                  const isParcelado = v.total_parcelas && v.total_parcelas > 1;
-                  const valorTotalCalc = v.valor_total || Number(v.valor) * (v.total_parcelas || 1);
-                  const isVencido = v.status_mes_atual === 'vencido';
-                  const isPago = v.status_mes_atual === 'pago';
+                  <button
+                    className="btn btn-primary btn-sm"
+                    onClick={() => onOpenNovaVendaModal()}
+                    style={{ fontSize: '0.76rem', padding: '4px 10px' }}
+                  >
+                    <PlusCircle size={13} /> Nova Cobrança
+                  </button>
+                </div>
 
-                  return (
-                    <tr
-                      key={v.id}
-                      className={isVencido ? 'row-vencido' : isPago ? 'row-pago' : ''}
-                      style={{ opacity: v.ativo ? 1 : 0.6 }}
-                    >
-                      {/* # Linha */}
-                      <td style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.76rem', fontFamily: 'monospace' }}>
-                        {idx + 1}
-                      </td>
+                {/* Tabela de Devedores */}
+                <div className="excel-table-container" style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                  <table className="excel-table" style={{ minWidth: tabMode === 'unificada' ? '700px' : '1100px' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: '38px', textAlign: 'center' }}>#</th>
+                        <th style={{ minWidth: '190px' }}>NOME CLIENTE DEVEDOR</th>
+                        <th style={{ minWidth: '110px', textAlign: 'center' }}>DATA DE PAGAMENTO</th>
+                        <th style={{ minWidth: '115px', textAlign: 'right' }}>VALOR DA DÍVIDA</th>
+                        <th style={{ minWidth: '90px', textAlign: 'center' }}>STATUS</th>
+                        <th style={{ minWidth: '135px', textAlign: 'center' }}>AÇÕES</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loading ? (
+                        <tr>
+                          <td colSpan={6} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-dim)' }}>
+                            Carregando clientes devedores...
+                          </td>
+                        </tr>
+                      ) : filteredVendas.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+                            Nenhum cliente devedor encontrado para o filtro.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredVendas.map((v, idx) => {
+                          const isVencido = v.status_mes_atual === 'vencido';
+                          const isPago = v.status_mes_atual === 'pago';
 
-                      {/* Nome do Cliente */}
-                      <td style={{ whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontWeight: 600, color: '#fff', fontSize: '0.88rem' }}>
-                            {v.cliente?.nome || 'Cliente Desconhecido'}
-                          </span>
-                          {v.cliente && (
-                            <button
-                              type="button"
-                              onClick={() => onEditCliente(v.cliente!)}
-                              title="Editar dados cadastrais do cliente"
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'var(--text-dim)',
-                                cursor: 'pointer',
-                                padding: '2px 4px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                borderRadius: '4px',
-                              }}
+                          return (
+                            <tr
+                              key={v.id}
+                              className={isVencido ? 'row-vencido' : isPago ? 'row-pago' : ''}
+                              style={{ opacity: v.ativo ? 1 : 0.6 }}
                             >
-                              <Edit2 size={12} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
+                              <td style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.75rem', fontFamily: 'monospace' }}>
+                                {idx + 1}
+                              </td>
 
-                      {/* WhatsApp com Pill de 1 clique no wa.me */}
-                      <td>
-                        {v.cliente?.whatsapp ? (
-                          <a
-                            href={`https://wa.me/${v.cliente.whatsapp}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="whatsapp-pill-btn"
-                            title="Abrir conversa no WhatsApp Web"
-                          >
-                            <Phone size={11} />
-                            <span>{formatFullWhatsApp(v.cliente.whatsapp)}</span>
-                            <ExternalLink size={10} style={{ opacity: 0.7 }} />
-                          </a>
-                        ) : (
-                          <span style={{ color: 'var(--text-dim)' }}>-</span>
-                        )}
-                      </td>
+                              <td>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontWeight: 600, color: '#fff', fontSize: '0.86rem' }}>
+                                    {v.cliente?.nome || 'Cliente Desconhecido'}
+                                  </span>
+                                  {v.cliente && (
+                                    <button
+                                      type="button"
+                                      onClick={() => onEditCliente(v.cliente!)}
+                                      title="Editar cadastro do cliente"
+                                      style={{
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--text-dim)',
+                                        cursor: 'pointer',
+                                        padding: '1px 3px',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                      }}
+                                    >
+                                      <Edit2 size={11} />
+                                    </button>
+                                  )}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '3px' }}>
+                                  {v.cliente?.whatsapp && (
+                                    <a
+                                      href={`https://wa.me/${v.cliente.whatsapp}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="whatsapp-pill-btn"
+                                      title="Abrir WhatsApp"
+                                      style={{ padding: '2px 7px', fontSize: '0.73rem' }}
+                                    >
+                                      <Phone size={10} />
+                                      {formatFullWhatsApp(v.cliente.whatsapp)}
+                                      <ExternalLink size={9} style={{ opacity: 0.7 }} />
+                                    </a>
+                                  )}
+                                  <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
+                                    {v.descricao}
+                                  </span>
+                                </div>
+                              </td>
 
-                      {/* Descrição do Produto / Aparelho */}
-                      <td>
-                        <div style={{ fontWeight: 600, color: '#f3f4f6', fontSize: '0.86rem' }}>
-                          {v.descricao}
-                        </div>
-                        {!v.ativo && (
-                          <span style={{ fontSize: '0.7rem', color: 'var(--danger)', fontWeight: 500 }}>
-                            {isParcelado && v.parcela_atual && v.parcela_atual >= v.total_parcelas!
-                              ? 'Totalmente Quitado'
-                              : 'Cobrança Pausada'}
-                          </span>
-                        )}
-                      </td>
+                              <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                <span
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    fontSize: '0.8rem',
+                                    color: isVencido ? '#f87171' : 'var(--text-main)',
+                                    fontWeight: isVencido ? 600 : 400,
+                                  }}
+                                >
+                                  <Calendar size={12} color={isVencido ? '#ef4444' : 'var(--text-dim)'} />
+                                  {formatDate(v.data_vencimento_atual)}
+                                </span>
+                              </td>
 
-                      {/* Parcelas */}
-                      <td style={{ textAlign: 'center' }}>
-                        {isParcelado ? (
-                          <span
-                            className="badge badge-avisado"
-                            style={{ fontSize: '0.74rem', padding: '3px 8px', fontWeight: 600, whiteSpace: 'nowrap' }}
-                          >
-                            {v.parcela_atual || 1} / {v.total_parcelas}x
-                          </span>
-                        ) : (
-                          <span
-                            className="badge"
+                              <td
+                                style={{
+                                  textAlign: 'right',
+                                  fontWeight: 700,
+                                  color: '#34d399',
+                                  fontSize: '0.92rem',
+                                  whiteSpace: 'nowrap',
+                                  fontVariantNumeric: 'tabular-nums',
+                                }}
+                              >
+                                R$ {Number(v.valor).toFixed(2).replace('.', ',')}
+                              </td>
+
+                              <td style={{ textAlign: 'center' }}>
+                                {getStatusBadge(v.status_mes_atual)}
+                              </td>
+
+                              <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  {v.ativo && v.status_mes_atual !== 'pago' && (
+                                    <button
+                                      className="btn btn-primary btn-sm"
+                                      style={{ padding: '3px 8px', fontSize: '0.72rem', gap: '3px', fontWeight: 600 }}
+                                      onClick={() => handleMarkAsPaid(v)}
+                                      disabled={payingVendaId === v.id}
+                                      title="Marcar recebimento desta dívida"
+                                    >
+                                      <Check size={12} />
+                                      {payingVendaId === v.id ? '...' : 'Receber'}
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    className="table-action-btn"
+                                    onClick={() => onOpenHistoricoModal(v)}
+                                    title="Histórico WhatsApp"
+                                    style={{ padding: '3px 6px' }}
+                                  >
+                                    <History size={13} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="table-action-btn"
+                                    onClick={() => onEditVenda(v)}
+                                    title="Editar venda"
+                                    style={{ padding: '3px 6px' }}
+                                  >
+                                    <Edit2 size={13} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="table-action-btn"
+                                    onClick={() => handleToggleVendaAtivo(v)}
+                                    title={v.ativo ? 'Pausar' : 'Reativar'}
+                                    style={{ padding: '3px 6px' }}
+                                  >
+                                    {v.ativo ? (
+                                      <ToggleRight size={14} color="var(--primary)" />
+                                    ) : (
+                                      <ToggleLeft size={14} color="var(--text-dim)" />
+                                    )}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                    {filteredVendas.length > 0 && (
+                      <tfoot>
+                        <tr>
+                          <td colSpan={3} style={{ textAlign: 'left', color: 'var(--text-muted)' }}>
+                            TOTAL DEVEDORES:
+                          </td>
+                          <td
                             style={{
-                              fontSize: '0.74rem',
-                              padding: '3px 8px',
-                              background: 'rgba(255, 255, 255, 0.05)',
-                              color: 'var(--text-muted)',
-                              border: '1px solid var(--border-subtle)',
-                              whiteSpace: 'nowrap',
+                              textAlign: 'right',
+                              color: '#34d399',
+                              fontSize: '0.96rem',
+                              fontWeight: 700,
+                              fontVariantNumeric: 'tabular-nums',
                             }}
                           >
-                            1x (À vista)
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Valor da Parcela */}
-                      <td
-                        style={{
-                          textAlign: 'right',
-                          fontWeight: 700,
-                          color: '#34d399',
-                          fontSize: '0.9rem',
-                          whiteSpace: 'nowrap',
-                          fontVariantNumeric: 'tabular-nums',
-                        }}
-                      >
-                        R$ {Number(v.valor).toFixed(2).replace('.', ',')}
-                      </td>
-
-                      {/* Valor Total */}
-                      <td
-                        style={{
-                          textAlign: 'right',
-                          color: 'var(--text-main)',
-                          fontSize: '0.85rem',
-                          whiteSpace: 'nowrap',
-                          fontVariantNumeric: 'tabular-nums',
-                        }}
-                      >
-                        R$ {Number(valorTotalCalc).toFixed(2).replace('.', ',')}
-                      </td>
-
-                      {/* Dia Fixo */}
-                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <span
-                          style={{
-                            fontSize: '0.75rem',
-                            background: 'rgba(255, 255, 255, 0.04)',
-                            border: '1px solid var(--border-subtle)',
-                            padding: '2px 7px',
-                            borderRadius: '4px',
-                            color: 'var(--text-dim)',
-                            fontFamily: 'monospace',
-                          }}
-                        >
-                          Dia {String(v.dia_vencimento).padStart(2, '0')}
-                        </span>
-                      </td>
-
-                      {/* Vencimento Atual */}
-                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            fontSize: '0.82rem',
-                            color: isVencido ? '#f87171' : 'var(--text-main)',
-                            fontWeight: isVencido ? 600 : 400,
-                          }}
-                        >
-                          <Calendar size={13} color={isVencido ? '#ef4444' : 'var(--text-dim)'} />
-                          {formatDate(v.data_vencimento_atual)}
-                        </span>
-                      </td>
-
-                      {/* Status */}
-                      <td style={{ textAlign: 'center' }}>
-                        {getStatusBadge(v.status_mes_atual)}
-                      </td>
-
-                      {/* Ações Rápidas */}
-                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                          {v.ativo && v.status_mes_atual !== 'pago' && (
-                            <button
-                              className="btn btn-primary btn-sm"
-                              style={{ padding: '4px 10px', fontSize: '0.76rem', gap: '4px', fontWeight: 600 }}
-                              onClick={() => handleMarkAsPaid(v)}
-                              disabled={payingVendaId === v.id}
-                              title="Confirmar recebimento do pagamento"
-                            >
-                              <Check size={13} />
-                              {payingVendaId === v.id ? 'Salvando...' : 'Marcar Pago'}
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            className="table-action-btn"
-                            onClick={() => onOpenHistoricoModal(v)}
-                            title="Ver histórico de mensagens WhatsApp"
-                          >
-                            <History size={14} />
-                          </button>
-
-                          <button
-                            type="button"
-                            className="table-action-btn"
-                            onClick={() => onEditVenda(v)}
-                            title="Editar dados da venda"
-                          >
-                            <Edit2 size={14} />
-                          </button>
-
-                          <button
-                            type="button"
-                            className="table-action-btn"
-                            onClick={() => handleToggleVendaAtivo(v)}
-                            title={v.ativo ? 'Pausar cobrança' : 'Reativar cobrança'}
-                          >
-                            {v.ativo ? (
-                              <ToggleRight size={15} color="var(--primary)" />
-                            ) : (
-                              <ToggleLeft size={15} color="var(--text-dim)" />
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-
-            {/* Linha de Totais da Planilha (Estilo Excel Footer) */}
-            {filteredVendas.length > 0 && (
-              <tfoot>
-                <tr>
-                  <td colSpan={4} style={{ textAlign: 'left', color: 'var(--text-muted)' }}>
-                    <strong style={{ color: '#fff' }}>TOTAL CONSOLIDADO</strong> ({filteredVendas.length}{' '}
-                    {filteredVendas.length === 1 ? 'registro exibido' : 'registros exibidos'}):
-                  </td>
-                  <td style={{ textAlign: 'center', color: 'var(--text-dim)' }}>-</td>
-                  <td
-                    style={{
-                      textAlign: 'right',
-                      color: '#34d399',
-                      fontSize: '0.96rem',
-                      fontWeight: 700,
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  >
-                    R${' '}
-                    {filteredVendas
-                      .reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0)
-                      .toFixed(2)
-                      .replace('.', ',')}
-                  </td>
-                  <td
-                    style={{
-                      textAlign: 'right',
-                      color: '#fff',
-                      fontSize: '0.92rem',
-                      fontWeight: 700,
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  >
-                    R${' '}
-                    {filteredVendas
-                      .reduce(
-                        (acc, curr) =>
-                          acc +
-                          (Number(curr.valor_total) ||
-                            Number(curr.valor) * (curr.total_parcelas || 1)),
-                        0
-                      )
-                      .toFixed(2)
-                      .replace('.', ',')}
-                  </td>
-                  <td colSpan={4} style={{ textAlign: 'right', color: 'var(--text-dim)', fontSize: '0.78rem' }}>
-                    Valores calculados automaticamente em tempo real
-                  </td>
-                </tr>
-              </tfoot>
+                            R${' '}
+                            {filteredVendas
+                              .reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0)
+                              .toFixed(2)
+                              .replace('.', ',')}
+                          </td>
+                          <td colSpan={2} style={{ textAlign: 'right', color: 'var(--text-dim)', fontSize: '0.74rem' }}>
+                            Calculado em tempo real
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </div>
             )}
-          </table>
+
+            {/* ------------------------------------------------------------ */}
+            {/* SEÇÃO 2: QUEM DEVEMOS (CONTAS A PAGAR / FORNECEDORES)         */}
+            {/* ------------------------------------------------------------ */}
+            {(tabMode === 'unificada' || tabMode === 'credores') && (
+              <div
+                style={{
+                  background: 'rgba(15, 23, 42, 0.65)',
+                  border: '1px solid rgba(192, 0, 0, 0.3)',
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Header de Seção Quem Devemos */}
+                <div
+                  style={{
+                    padding: '0.85rem 1.15rem',
+                    background: 'linear-gradient(90deg, rgba(192, 0, 0, 0.22) 0%, rgba(15, 23, 42, 0.9) 100%)',
+                    borderBottom: '1px solid rgba(192, 0, 0, 0.25)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div
+                      style={{
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        backgroundColor: '#c00000',
+                        boxShadow: '0 0 6px #c00000',
+                      }}
+                    />
+                    <strong style={{ color: '#fff', fontSize: '0.9rem', letterSpacing: '0.02em' }}>
+                      NOME DE QUEM DEVEMOS
+                    </strong>
+                    <span style={{ fontSize: '0.76rem', color: '#fca5a5', background: 'rgba(192,0,0,0.15)', padding: '2px 8px', borderRadius: '4px' }}>
+                      {filteredContasPagar.length} registros
+                    </span>
+                  </div>
+
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => {
+                      setContaToEdit(null);
+                      setIsContaModalOpen(true);
+                    }}
+                    style={{
+                      fontSize: '0.76rem',
+                      padding: '4px 10px',
+                      background: 'rgba(239, 68, 68, 0.2)',
+                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                      color: '#f87171',
+                    }}
+                  >
+                    <PlusCircle size={13} /> + Quem Devemos
+                  </button>
+                </div>
+
+                {/* Tabela de Quem Devemos */}
+                <div className="excel-table-container" style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                  <table className="excel-table" style={{ minWidth: tabMode === 'unificada' ? '540px' : '900px' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ width: '38px', textAlign: 'center' }}>#</th>
+                        <th style={{ minWidth: '180px' }}>NOME DE QUEM DEVEMOS</th>
+                        <th style={{ minWidth: '110px', textAlign: 'center' }}>VENCIMENTO</th>
+                        <th style={{ minWidth: '110px', textAlign: 'right' }}>VALOR</th>
+                        <th style={{ minWidth: '85px', textAlign: 'center' }}>STATUS</th>
+                        <th style={{ minWidth: '110px', textAlign: 'center' }}>AÇÕES</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loading ? (
+                        <tr>
+                          <td colSpan={6} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-dim)' }}>
+                            Carregando registros de quem devemos...
+                          </td>
+                        </tr>
+                      ) : filteredContasPagar.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
+                            Nenhum débito pendente registrado.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredContasPagar.map((c, idx) => (
+                          <tr
+                            key={c.id}
+                            className={c.pago ? 'row-pago' : ''}
+                            style={{ opacity: c.pago ? 0.65 : 1 }}
+                          >
+                            <td style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.75rem', fontFamily: 'monospace' }}>
+                              {idx + 1}
+                            </td>
+
+                            <td>
+                              <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.86rem' }}>
+                                {c.nome_credor}
+                              </div>
+                              {c.descricao && (
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '2px' }}>
+                                  {c.descricao}
+                                </div>
+                              )}
+                            </td>
+
+                            <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                {formatDate(c.data_vencimento)}
+                              </span>
+                            </td>
+
+                            <td
+                              style={{
+                                textAlign: 'right',
+                                fontWeight: 700,
+                                color: c.pago ? '#94a3b8' : '#f87171',
+                                fontSize: '0.92rem',
+                                whiteSpace: 'nowrap',
+                                fontVariantNumeric: 'tabular-nums',
+                              }}
+                            >
+                              R$ {Number(c.valor).toFixed(2).replace('.', ',')}
+                            </td>
+
+                            <td style={{ textAlign: 'center' }}>
+                              {c.pago ? (
+                                <span className="badge badge-pago" style={{ padding: '3px 8px', fontSize: '0.72rem' }}>
+                                  <Check size={11} /> Pago
+                                </span>
+                              ) : (
+                                <span className="badge badge-vencido" style={{ padding: '3px 8px', fontSize: '0.72rem' }}>
+                                  ● A Pagar
+                                </span>
+                              )}
+                            </td>
+
+                            <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                <button
+                                  className={`btn btn-sm ${c.pago ? 'btn-secondary' : 'btn-primary'}`}
+                                  style={{ padding: '3px 8px', fontSize: '0.72rem', gap: '3px', fontWeight: 600 }}
+                                  onClick={() => handleToggleContaPaga(c)}
+                                  disabled={payingContaId === c.id}
+                                  title={c.pago ? 'Desmarcar como pago' : 'Marcar débito como liquidado'}
+                                >
+                                  <Check size={12} />
+                                  {c.pago ? 'Desfazer' : 'Pagar'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="table-action-btn"
+                                  onClick={() => {
+                                    setContaToEdit(c);
+                                    setIsContaModalOpen(true);
+                                  }}
+                                  title="Editar"
+                                  style={{ padding: '3px 6px' }}
+                                >
+                                  <Edit2 size={13} />
+                                </button>
+                                <button
+                                  type="button"
+                                  className="table-action-btn"
+                                  onClick={() => handleDeleteConta(c)}
+                                  title="Excluir"
+                                  style={{ padding: '3px 6px', color: 'var(--danger)' }}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    {filteredContasPagar.length > 0 && (
+                      <tfoot>
+                        <tr>
+                          <td colSpan={3} style={{ textAlign: 'left', color: 'var(--text-muted)' }}>
+                            TOTAL QUE DEVEMOS:
+                          </td>
+                          <td
+                            style={{
+                              textAlign: 'right',
+                              color: '#f87171',
+                              fontSize: '0.96rem',
+                              fontWeight: 700,
+                              fontVariantNumeric: 'tabular-nums',
+                            }}
+                          >
+                            R${' '}
+                            {filteredContasPagar
+                              .filter((c) => !c.pago)
+                              .reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0)
+                              .toFixed(2)
+                              .replace('.', ',')}
+                          </td>
+                          <td colSpan={2} style={{ textAlign: 'right', color: 'var(--text-dim)', fontSize: '0.74rem' }}>
+                            Pendente a quitar
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Modal para Adicionar / Editar Conta a Pagar (Quem Devemos) */}
+      <ContaPagarModal
+        isOpen={isContaModalOpen}
+        onClose={() => {
+          setIsContaModalOpen(false);
+          setContaToEdit(null);
+        }}
+        contaToEdit={contaToEdit}
+        onSuccess={() => {
+          fetchData();
+        }}
+      />
     </div>
   );
 };

@@ -116,3 +116,17 @@ export interface CentralNotificacoesData {
   };
 }
 
+export interface ContaPagar {
+  id: number;
+  nome_credor: string;
+  descricao?: string | null;
+  valor: number;
+  data_vencimento?: string | null;
+  pago: boolean;
+  data_pagamento?: string | null;
+  observacoes?: string | null;
+  criado_em?: string;
+  atualizado_em?: string;
+}
+
+

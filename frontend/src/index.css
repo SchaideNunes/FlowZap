@@ -585,6 +585,49 @@ h1, h2, h3, h4, h5, h6 {
   flex-shrink: 0;
 }
 
+/* Dual Excel Spreadsheet Layout (Clientes Devedores & Quem Devemos) */
+.dual-excel-container {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 1200px) {
+  .dual-excel-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+.excel-header-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+}
+
+.excel-box-green {
+  background-color: #00b050 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  border: 1px solid #008a3e;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 8px rgba(0, 176, 80, 0.3);
+}
+
+.excel-box-red {
+  background-color: #c00000 !important;
+  color: #ffffff !important;
+  font-weight: 700;
+  border: 1px solid #990000;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 8px rgba(192, 0, 0, 0.3);
+}
+
 /* Table Quick Action Buttons */
 .table-action-btn {
   background-color: var(--bg-input);
