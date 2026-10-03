@@ -115,4 +115,5 @@ export function createApp(): { app: Express; scheduler: SchedulerService } {
   return { app, scheduler };
 }
 
-export default createApp;
+export const { app, scheduler } = createApp();
+export default app;
