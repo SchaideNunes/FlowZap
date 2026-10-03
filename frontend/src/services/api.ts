@@ -1,11 +1,17 @@
 import axios from 'axios';
 
-// Detecta dinamicamente o IP ou hostname atual da máquina-sede para conexões via rede local
-const backendHost = window.location.hostname;
-const API_BASE_URL = `http://${backendHost}:3001/api`;
+// Na Vercel (deploy de múltiplos serviços) e em produção, as requisições do navegador
+// utilizam o prefixo relativo '/api', roteado automaticamente para o serviço backend.
+// Em desenvolvimento, o proxy do Vite encaminha para o BACKEND_URL injetado ou localhost:3001.
+const getApiBaseUrl = (): string => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  return '/api';
+};
 
 export const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: getApiBaseUrl(),
   timeout: 20000,
 });
 

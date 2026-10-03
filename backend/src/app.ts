@@ -36,10 +36,12 @@ export function createApp(): { app: Express; scheduler: SchedulerService } {
   );
   app.use(express.json());
 
-  // Rota de saúde pública
-  app.get('/health', (_req: Request, res: Response) => {
+  // Rota de saúde pública (suporta acesso direto e via proxy /api)
+  const healthHandler = (_req: Request, res: Response) => {
     res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
-  });
+  };
+  app.get('/health', healthHandler);
+  app.get('/api/health', healthHandler);
 
   // Inicialização de dependências
   const supabase = getSupabaseClient();
