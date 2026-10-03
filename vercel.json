@@ -3,11 +3,17 @@
   "services": {
     "backend": {
       "root": "backend",
-      "framework": "express"
+      "framework": "express",
+      "entrypoint": "dist/index.js",
+      "installCommand": "npm install",
+      "buildCommand": "npm run build"
     },
     "frontend": {
       "root": "frontend",
       "framework": "vite",
+      "installCommand": "npm install",
+      "buildCommand": "npm run build",
+      "outputDirectory": "dist",
       "bindings": [
         {
           "type": "service",

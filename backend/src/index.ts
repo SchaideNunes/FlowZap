@@ -15,16 +15,14 @@ const { app, scheduler } = createApp();
 
 let server: any;
 
-// Inicia o listener HTTP se não estiver em ambiente puramente serverless sem porta
-if (!process.env.VERCEL || process.env.PORT) {
-  server = app.listen(port, host, () => {
-    console.log(`=======================================================`);
-    console.log(`🚀 Flow-Zap Backend rodando com sucesso!`);
-    console.log(`📡 Local:        http://localhost:${port}`);
-    console.log(`🌐 Rede Local:   http://${host}:${port}`);
-    console.log(`=======================================================`);
-  });
-}
+// Inicia o listener HTTP (Vercel captura o listener do Express ou executa via porta)
+server = app.listen(port, () => {
+  console.log(`=======================================================`);
+  console.log(`🚀 Flow-Zap Backend rodando com sucesso!`);
+  console.log(`📡 Local:        http://localhost:${port}`);
+  console.log(`🌐 Rede Local:   http://${host}:${port}`);
+  console.log(`=======================================================`);
+});
 
 // Inicia o agendador automático diário de cobranças se não for serverless efêmero
 if (!process.env.VERCEL) {

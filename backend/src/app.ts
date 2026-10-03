@@ -114,3 +114,5 @@ export function createApp(): { app: Express; scheduler: SchedulerService } {
 
   return { app, scheduler };
 }
+
+export default createApp;
