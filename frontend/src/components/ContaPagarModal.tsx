@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, DollarSign, Save } from 'lucide-react';
 import { ContaPagar } from '../types/index.js';
 import { api } from '../services/api.js';
+import { extractErrorMessage } from '../utils/error.js';
 
 interface ContaPagarModalProps {
   isOpen: boolean;
@@ -76,7 +77,7 @@ export const ContaPagarModal: React.FC<ContaPagarModalProps> = ({
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao salvar dívida / credor.');
+      setError(extractErrorMessage(err, 'Erro ao salvar dívida / credor.'));
     } finally {
       setSaving(false);
     }

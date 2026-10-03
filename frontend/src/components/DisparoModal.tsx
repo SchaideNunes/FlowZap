@@ -3,6 +3,7 @@ import { X, Send, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { ReminderPreviewItem } from '../types/index.js';
 import { api } from '../services/api.js';
 import { formatFullWhatsApp } from '../utils/phone.js';
+import { extractErrorMessage } from '../utils/error.js';
 
 interface DisparoModalProps {
   isOpen: boolean;
@@ -46,7 +47,7 @@ export const DisparoModal: React.FC<DisparoModalProps> = ({ isOpen, onClose, onS
       setSentSuccess(true);
       onSuccess();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao iniciar disparo de cobranças.');
+      setError(extractErrorMessage(err, 'Erro ao iniciar disparo de cobranças.'));
     } finally {
       setSending(false);
     }

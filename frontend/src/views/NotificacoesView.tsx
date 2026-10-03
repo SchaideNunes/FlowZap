@@ -26,6 +26,7 @@ import {
 } from '../types/index.js';
 import { api } from '../services/api.js';
 import { formatFullWhatsApp } from '../utils/phone.js';
+import { extractErrorMessage } from '../utils/error.js';
 
 interface NotificacoesViewProps {
   whatsAppStatus: WhatsAppStatus['state'];
@@ -115,7 +116,7 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
       await fetchCentralData();
       setActiveTab('enviados');
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao iniciar disparo de notificações.');
+      alert(extractErrorMessage(err, 'Erro ao iniciar disparo de notificações.'));
     } finally {
       setDispatching(false);
     }
@@ -134,7 +135,7 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
       setTimeout(() => setFeedbackMsg(null), 4000);
       fetchCentralData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao registrar pagamento.');
+      alert(extractErrorMessage(err, 'Erro ao registrar pagamento.'));
     } finally {
       setPayingVendaId(null);
     }

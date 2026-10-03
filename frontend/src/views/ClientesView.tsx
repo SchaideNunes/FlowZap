@@ -22,6 +22,7 @@ import {
 import { Cliente, Venda } from '../types/index.js';
 import { api } from '../services/api.js';
 import { formatFullWhatsApp } from '../utils/phone.js';
+import { extractErrorMessage } from '../utils/error.js';
 
 interface ClientesViewProps {
   onOpenNovoClienteModal: () => void;
@@ -92,7 +93,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
       setTimeout(() => setFeedbackMsg(null), 4000);
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao registrar pagamento.');
+      alert(extractErrorMessage(err, 'Erro ao registrar pagamento.'));
     } finally {
       setPayingVendaId(null);
     }
@@ -103,7 +104,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
       await api.patch(`/vendas/${venda.id}/status`, { ativo: !venda.ativo });
       fetchData();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao alterar status da cobrança.');
+      alert(extractErrorMessage(err, 'Erro ao alterar status da cobrança.'));
     }
   };
 

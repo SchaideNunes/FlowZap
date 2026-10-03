@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import { api } from '../services/api.js';
 import { MessageSquare, Lock, Mail, ArrowRight } from 'lucide-react';
+import { extractErrorMessage } from '../utils/error.js';
 
 export const Login: React.FC = () => {
   const { login } = useAuth();
@@ -19,7 +20,7 @@ export const Login: React.FC = () => {
       const response = await api.post('/auth/login', { email, senha });
       login(response.data.token, response.data.user);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Falha ao autenticar. Verifique o email e senha.');
+      setError(extractErrorMessage(err, 'Falha ao autenticar. Verifique o email e senha.'));
     } finally {
       setLoading(false);
     }

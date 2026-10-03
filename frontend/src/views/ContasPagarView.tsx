@@ -15,6 +15,7 @@ import {
 import { ContaPagar } from '../types/index.js';
 import { api } from '../services/api.js';
 import { ContaPagarModal } from '../components/ContaPagarModal.js';
+import { extractErrorMessage } from '../utils/error.js';
 
 type StatusFilter = 'todos' | 'pendente' | 'vencido' | 'pago';
 
@@ -62,7 +63,7 @@ export const ContasPagarView: React.FC = () => {
       setTimeout(() => setFeedbackMsg(null), 4000);
       fetchContas();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao atualizar conta a pagar.');
+      alert(extractErrorMessage(err, 'Erro ao atualizar conta a pagar.'));
     } finally {
       setPayingContaId(null);
     }
@@ -82,7 +83,7 @@ export const ContasPagarView: React.FC = () => {
       setTimeout(() => setFeedbackMsg(null), 4000);
       fetchContas();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Erro ao excluir conta a pagar.');
+      alert(extractErrorMessage(err, 'Erro ao excluir conta a pagar.'));
     }
   };
 

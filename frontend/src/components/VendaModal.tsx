@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ShoppingBag, Save, Calendar, Tag } from 'lucide-react';
 import { Venda, Cliente } from '../types/index.js';
 import { api } from '../services/api.js';
+import { extractErrorMessage } from '../utils/error.js';
 
 interface VendaModalProps {
   isOpen: boolean;
@@ -124,7 +125,7 @@ export const VendaModal: React.FC<VendaModalProps> = ({
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao salvar cobrança.');
+      setError(extractErrorMessage(err, 'Erro ao salvar cobrança.'));
     } finally {
       setSaving(false);
     }

@@ -3,6 +3,7 @@ import { X, UserPlus, Save } from 'lucide-react';
 import { Cliente } from '../types/index.js';
 import { api } from '../services/api.js';
 import { maskPhone } from '../utils/phone.js';
+import { extractErrorMessage } from '../utils/error.js';
 
 interface ClienteModalProps {
   isOpen: boolean;
@@ -83,7 +84,7 @@ export const ClienteModal: React.FC<ClienteModalProps> = ({
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Erro ao salvar cliente.');
+      setError(extractErrorMessage(err, 'Erro ao salvar cliente.'));
     } finally {
       setSaving(false);
     }
