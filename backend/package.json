@@ -2,11 +2,10 @@
   "name": "flowzap-backend",
   "version": "1.0.0",
   "description": "Backend API e Motor de Cobrança Recorrente via WhatsApp para Flow-Zap",
-  "type": "module",
   "main": "app.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc && node build.js",
+    "build": "tsc && node build.mjs",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
