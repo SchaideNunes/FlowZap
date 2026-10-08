@@ -1,6 +1,6 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import { getSupabaseClient } from './config/supabase.js';
+import { getSupabaseClient, isSupabaseConfigured } from './config/supabase.js';
 import { SupabaseUserRepository } from './repositories/supabase-user.repository.js';
 import { SupabaseClienteRepository } from './repositories/supabase-cliente.repository.js';
 import { SupabaseVendaRepository } from './repositories/supabase-venda.repository.js';
@@ -38,7 +38,11 @@ export function createApp(): { app: Express; scheduler: SchedulerService } {
 
   // Rota de saúde pública (suporta acesso direto e via proxy /api)
   const healthHandler = (_req: Request, res: Response) => {
-    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+    res.status(200).json({
+      status: 'ok',
+      supabase: isSupabaseConfigured() ? 'configurado' : 'nao_configurado',
+      timestamp: new Date().toISOString(),
+    });
   };
   app.get('/health', healthHandler);
   app.get('/api/health', healthHandler);

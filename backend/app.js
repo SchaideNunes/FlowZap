@@ -54760,33 +54760,49 @@ function shouldShowDeprecationWarning() {
 if (shouldShowDeprecationWarning()) console.warn("\u26A0\uFE0F  Node.js 20 and below are deprecated and will no longer be supported in future versions of @supabase/supabase-js. Please upgrade to Node.js 22 or later. For more information, visit: https://github.com/orgs/supabase/discussions/45715");
 
 // src/config/supabase.ts
+var CLIENT_OPTIONS = {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false
+  }
+};
 var supabaseInstance = null;
+var configured = false;
+function cleanEnvValue(value) {
+  return (value || "").trim().replace(/^["']+|["']+$/g, "").trim();
+}
+function createWaitingClient() {
+  return createClient(
+    "https://placeholder.supabase.co",
+    "placeholder-service-key-waiting-for-env",
+    CLIENT_OPTIONS
+  );
+}
+function isSupabaseConfigured() {
+  return configured;
+}
 function getSupabaseClient() {
   if (supabaseInstance) {
     return supabaseInstance;
   }
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (supabaseInstance && supabaseUrl && supabaseKey) {
-    return supabaseInstance;
-  }
+  const supabaseUrl = cleanEnvValue(process.env.SUPABASE_URL);
+  const supabaseKey = cleanEnvValue(process.env.SUPABASE_SERVICE_ROLE_KEY);
   if (!supabaseUrl || !supabaseKey) {
     console.warn("[Supabase] SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY n\xE3o configurados no ambiente. Inicializando cliente em espera.");
-    return createClient("https://placeholder.supabase.co", "placeholder-service-key-waiting-for-env", {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false
-      }
-    });
+    return createWaitingClient();
   }
-  const cleanUrl = supabaseUrl.trim().replace(/\/rest\/v1\/?$/, "").replace(/\/+$/, "");
-  supabaseInstance = createClient(cleanUrl, supabaseKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false
-    }
-  });
-  return supabaseInstance;
+  const cleanUrl = supabaseUrl.replace(/\/rest\/v1\/?$/, "").replace(/\/+$/, "");
+  try {
+    supabaseInstance = createClient(cleanUrl, supabaseKey, CLIENT_OPTIONS);
+    configured = true;
+    return supabaseInstance;
+  } catch (err) {
+    console.error(
+      "[Supabase] SUPABASE_URL inv\xE1lida (deve come\xE7ar com https://). Inicializando cliente em espera.",
+      err instanceof Error ? err.message : err
+    );
+    return createWaitingClient();
+  }
 }
 
 // src/repositories/supabase-user.repository.ts
@@ -66153,7 +66169,11 @@ function createApp() {
   );
   app2.use(import_express6.default.json());
   const healthHandler = (_req, res) => {
-    res.status(200).json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
+    res.status(200).json({
+      status: "ok",
+      supabase: isSupabaseConfigured() ? "configurado" : "nao_configurado",
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    });
   };
   app2.get("/health", healthHandler);
   app2.get("/api/health", healthHandler);
