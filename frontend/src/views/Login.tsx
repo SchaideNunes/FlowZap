@@ -6,8 +6,8 @@ import { extractErrorMessage } from '../utils/error.js';
 
 export const Login: React.FC = () => {
   const { login } = useAuth();
-  const [email, setEmail] = useState('aevcelulares@outlook.com');
-  const [senha, setSenha] = useState('AEVStore@123');
+  const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

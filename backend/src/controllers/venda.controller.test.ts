@@ -60,7 +60,7 @@ describe('VendaController (TDD)', () => {
           status_mes_atual: 'pendente' as const,
           data_vencimento_atual: '2026-10-05',
           ativo: true,
-          cliente: { id: 1, nome: 'Schaide', whatsapp: '5575991503949', ativo: true },
+          cliente: { id: 1, nome: 'Schaide', whatsapp: '5511912345678', ativo: true },
         },
       ];
       vi.mocked(mockVendaRepo.findAllVendas).mockResolvedValue(mockList);

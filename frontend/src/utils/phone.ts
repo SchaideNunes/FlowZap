@@ -7,7 +7,7 @@
  */
 export function extractPhoneDigits(value: string): string {
   let digits = value.replace(/\D/g, '');
-  // Se já tiver mais de 11 dígitos e começar com 55 (ex: 5575991503949), remove o 55 do início
+  // Se já tiver mais de 11 dígitos e começar com 55 (ex: 5511912345678), remove o 55 do início
   if (digits.length > 11 && digits.startsWith('55')) {
     digits = digits.slice(2);
   }
@@ -47,8 +47,8 @@ export function maskPhone(value: string): { display: string; digits: string } {
 }
 
 /**
- * Formata um número completo salvo no banco (ex: 5575991503949) para exibição legível:
- * "+55 (75) 99150-3949"
+ * Formata um número completo salvo no banco (ex: 5511912345678) para exibição legível:
+ * "+55 (11) 91234-5678"
  */
 export function formatFullWhatsApp(rawNumber: string): string {
   if (!rawNumber) return '-';

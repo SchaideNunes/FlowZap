@@ -58,7 +58,7 @@ export const ClienteModal: React.FC<ClienteModalProps> = ({
     setError(null);
 
     if (phoneDigits.length < 10) {
-      setError('Informe o DDD e o número completo (ex: 75 99150-3949)');
+      setError('Informe o DDD e o número completo (ex: 11 91234-5678)');
       setSaving(false);
       return;
     }
@@ -137,12 +137,12 @@ export const ClienteModal: React.FC<ClienteModalProps> = ({
                   required
                   value={phoneDisplay}
                   onChange={handlePhoneChange}
-                  placeholder="(75) 99150-3949"
+                  placeholder="(11) 91234-5678"
                   maxLength={15}
                 />
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-                Digite o DDD e o número (ex: 75991503949). O código +55 do Brasil já fica cravado automaticamente.
+                Digite o DDD e o número (ex: 11912345678). O código +55 do Brasil já fica cravado automaticamente.
               </div>
             </div>
 
