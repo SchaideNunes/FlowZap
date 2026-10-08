@@ -9,9 +9,6 @@ node_modules/
 .env.*.local
 *.env
 
-# Evolution API / Docker local data
-evolution_instances/
-evolution_store/
 
 # Logs
 logs/
@@ -34,3 +31,7 @@ build/
 Thumbs.db
 .vscode/
 .idea/
+
+
+#others
+ROADMAP.md

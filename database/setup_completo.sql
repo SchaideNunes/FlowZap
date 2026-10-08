@@ -76,6 +76,14 @@ CREATE TABLE IF NOT EXISTS contas_a_pagar (
     atualizado_em TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- 5.1. Status da Máquina-Sede (uma única linha: sinal de vida, estado do WhatsApp e última rotina)
+CREATE TABLE IF NOT EXISTS sede_status (
+    id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    estado_whatsapp TEXT NOT NULL DEFAULT 'close',
+    atualizado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
+    ultima_rotina_data DATE
+);
+
 -- 6. Índices para Otimização de Consultas e do Cron Diário
 CREATE INDEX IF NOT EXISTS idx_clientes_ativo ON clientes(ativo);
 CREATE INDEX IF NOT EXISTS idx_clientes_whatsapp ON clientes(whatsapp);
@@ -140,3 +148,4 @@ ALTER TABLE clientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE vendas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE historico_mensagens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contas_a_pagar ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sede_status ENABLE ROW LEVEL SECURITY;

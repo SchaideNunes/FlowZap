@@ -8,7 +8,8 @@ import { SupabaseHistoricoRepository } from './repositories/supabase-historico.r
 import { AuthService } from './services/auth.service.js';
 import { BillingService } from './services/billing.service.js';
 import { TemplateService } from './services/template.service.js';
-import { EvolutionService } from './services/evolution.service.js';
+import { IWhatsAppGateway } from './services/whatsapp-gateway.interface.js';
+import { UnavailableWhatsAppGateway } from './services/unavailable-gateway.js';
 import { MessageQueueService } from './services/message-queue.service.js';
 import { ReminderService } from './services/reminder.service.js';
 import { SchedulerService } from './services/scheduler.service.js';
@@ -17,6 +18,8 @@ import { ClienteController } from './controllers/cliente.controller.js';
 import { VendaController } from './controllers/venda.controller.js';
 import { CobrancaController } from './controllers/cobranca.controller.js';
 import { SupabaseContaPagarRepository } from './repositories/supabase-conta-pagar.repository.js';
+import { SupabaseSedeStatusRepository } from './repositories/supabase-sede-status.repository.js';
+import { ISedeStatusRepository } from './repositories/sede-status.repository.interface.js';
 import { ContaPagarController } from './controllers/conta-pagar.controller.js';
 import { createContaPagarRouter } from './routes/conta-pagar.routes.js';
 import { createAuthRouter } from './routes/auth.routes.js';
@@ -24,7 +27,16 @@ import { createClienteRouter } from './routes/cliente.routes.js';
 import { createVendaRouter } from './routes/venda.routes.js';
 import { createCobrancaRouter } from './routes/cobranca.routes.js';
 
-export function createApp(): { app: Express; scheduler: SchedulerService } {
+export interface CreateAppOptions {
+  /** Conexão com o WhatsApp. Sem ela (ex.: Vercel) o envio fica indisponível. */
+  whatsAppGateway?: IWhatsAppGateway;
+}
+
+export function createApp(options: CreateAppOptions = {}): {
+  app: Express;
+  scheduler: SchedulerService;
+  sedeStatusRepo: ISedeStatusRepository;
+} {
   const app = express();
 
   // CORS configurado para permitir localhost e IP local da máquina-sede na rede interna
@@ -54,27 +66,20 @@ export function createApp(): { app: Express; scheduler: SchedulerService } {
   const vendaRepo = new SupabaseVendaRepository(supabase);
   const historicoRepo = new SupabaseHistoricoRepository(supabase);
   const contaPagarRepo = new SupabaseContaPagarRepository(supabase);
+  const sedeStatusRepo = new SupabaseSedeStatusRepository(supabase);
 
   const jwtSecret = process.env.JWT_SECRET || 'flowzap_jwt_secret_change_me_in_env_file';
   const authService = new AuthService(userRepo, jwtSecret);
   const billingService = new BillingService(vendaRepo, clienteRepo, historicoRepo);
   const templateService = new TemplateService();
 
-  const evolutionBaseUrl = process.env.EVOLUTION_API_URL || 'http://localhost:8080';
-  const evolutionApiKey = process.env.EVOLUTION_API_KEY || 'flowzap_super_secret_evolution_key_2026';
-  const evolutionInstanceName = process.env.EVOLUTION_INSTANCE_NAME || 'flowzap_cobranca';
-
-  const evolutionService = new EvolutionService({
-    baseUrl: evolutionBaseUrl,
-    apiKey: evolutionApiKey,
-    instanceName: evolutionInstanceName,
-  });
+  const whatsAppGateway = options.whatsAppGateway ?? new UnavailableWhatsAppGateway();
 
   const minDelayMs = (Number(process.env.MIN_DELAY_SECONDS) || 8) * 1000;
   const maxDelayMs = (Number(process.env.MAX_DELAY_SECONDS) || 20) * 1000;
   const simulateTyping = process.env.SIMULATE_TYPING !== 'false';
 
-  const queueService = new MessageQueueService(evolutionService, {
+  const queueService = new MessageQueueService(whatsAppGateway, {
     minDelayMs,
     maxDelayMs,
     simulateTyping,
@@ -90,7 +95,7 @@ export function createApp(): { app: Express; scheduler: SchedulerService } {
   );
 
   const cronExpression = process.env.CRON_SCHEDULE || '0 9 * * *';
-  const scheduler = new SchedulerService(reminderService, cronExpression);
+  const scheduler = new SchedulerService(reminderService, cronExpression, sedeStatusRepo);
 
   // Controladores
   const authController = new AuthController(authService);
@@ -98,8 +103,9 @@ export function createApp(): { app: Express; scheduler: SchedulerService } {
   const vendaController = new VendaController(vendaRepo, historicoRepo, billingService);
   const cobrancaController = new CobrancaController(
     reminderService,
-    evolutionService,
-    queueService
+    whatsAppGateway,
+    queueService,
+    sedeStatusRepo
   );
   const contaPagarController = new ContaPagarController(contaPagarRepo);
 
@@ -116,7 +122,7 @@ export function createApp(): { app: Express; scheduler: SchedulerService } {
     res.status(500).json({ error: 'Erro interno no servidor' });
   });
 
-  return { app, scheduler };
+  return { app, scheduler, sedeStatusRepo };
 }
 
 export const { app, scheduler } = createApp();

@@ -1,45 +1,37 @@
 @echo off
-chcp 65001 > nul
-title Flow-Zap - Inicializador da Máquina Sede
+rem Script somente em ASCII de proposito: com acentos + "chcp 65001" o cmd do Windows
+rem le o arquivo na posicao errada e "come" letras de alguns comandos.
+title Flow-Zap - Inicializador da Maquina Sede
 
 echo ========================================================
-echo   FLOW-ZAP - Sistema de Cobrança Recorrente WhatsApp
-echo   Iniciando serviços na Máquina Sede...
+echo   FLOW-ZAP - Sistema de Cobranca Recorrente WhatsApp
+echo   Iniciando servicos na Maquina Sede...
 echo ========================================================
 echo.
 
 cd /d "%~dp0\.."
 
-:: 1. Iniciar Evolution API via Docker
-echo [1/3] Verificando e iniciando Evolution API (Docker)...
-docker compose up -d evolution-api
-if %errorlevel% neq 0 (
-    echo [AVISO] Falha ao iniciar Evolution API no Docker. Certifique-se de que o Docker Desktop esta aberto.
-) else (
-    echo [OK] Evolution API ativa na porta 8085.
-)
-echo.
-
-:: 2. Iniciar Servidor Backend (Node.js + Express + Scheduler)
-echo [2/3] Iniciando Backend & Motor de Agendamento...
+rem 1. Backend (API + conexao WhatsApp + agendador diario)
+echo [1/2] Iniciando Backend, Motor de Agendamento e conexao WhatsApp...
 start "FlowZap Backend" /min cmd /c "cd backend && npm run dev"
 echo [OK] Backend rodando em background na porta 3001.
 echo.
 
-:: 3. Iniciar Frontend (Vite)
-echo [3/3] Iniciando Frontend Web...
+rem 2. Frontend (painel)
+echo [2/2] Iniciando Frontend Web...
 start "FlowZap Frontend" /min cmd /c "cd frontend && npm run dev"
 echo [OK] Frontend rodando na porta 5173.
 echo.
 
 echo ========================================================
-echo   Todos os serviços foram iniciados com sucesso!
+echo   Todos os servicos foram iniciados!
 echo.
 echo   - Acesso local: http://localhost:5173
-echo   - Para acessar da outra maquina, use o IP local desta maquina:
+echo   - Para acessar de outra maquina, use o IP local desta maquina:
 echo.
-powershell -Command "Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias 'Wi-Fi*','Ethernet*' | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } | ForEach-Object { Write-Host '     http://' + $_.IPAddress + ':5173' -ForegroundColor Green }"
+powershell -NoProfile -Command "Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias 'Wi-Fi*','Ethernet*' | Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } | ForEach-Object { Write-Host ('     http://' + $_.IPAddress + ':5173') -ForegroundColor Green }"
 echo.
 echo ========================================================
-timeout /t 5 > nul
+rem ping em vez de timeout: o timeout falha quando o script roda sem teclado (ex.: pelo VS Code)
+ping -n 6 127.0.0.1 > nul
 exit

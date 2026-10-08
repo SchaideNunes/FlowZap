@@ -1,8 +1,32 @@
 import './config/env.js';
-import { app, scheduler } from './app.js';
+import path from 'path';
+import { createApp } from './app.js';
+import { BaileysService } from './services/baileys.service.js';
+import { SedeHeartbeatService } from './services/sede-heartbeat.service.js';
+import {
+  createBaileysSocketFactory,
+  hasRegisteredSession,
+  clearAuthDir,
+} from './services/baileys.socket-factory.js';
 
 const port = Number(process.env.PORT) || 3001;
 const host = process.env.HOST || '0.0.0.0';
+
+// Na Vercel (serverless) não há processo contínuo: o WhatsApp só conecta na máquina-sede.
+const isServerless = Boolean(process.env.VERCEL);
+
+const authDir = path.resolve(process.env.WHATSAPP_AUTH_DIR || path.join(process.cwd(), '.whatsapp-auth'));
+
+const whatsApp = isServerless
+  ? undefined
+  : new BaileysService({
+      createSocket: createBaileysSocketFactory(authDir),
+      clearAuth: () => clearAuthDir(authDir),
+      hasSession: () => hasRegisteredSession(authDir),
+    });
+
+const { app, scheduler, sedeStatusRepo } = createApp({ whatsAppGateway: whatsApp });
+const heartbeat = whatsApp ? new SedeHeartbeatService(sedeStatusRepo, whatsApp) : undefined;
 
 let server: any;
 
@@ -17,14 +41,32 @@ if (!process.env.VERCEL || process.env.PORT) {
   });
 }
 
-// Inicia o agendador automático diário de cobranças se não for serverless efêmero
-if (!process.env.VERCEL) {
+if (!isServerless) {
+  // Inicia o agendador automático diário de cobranças
   scheduler.start();
+
+  // Avisa o painel online que a sede está ligada
+  heartbeat?.start();
+
+  // Se o computador estava desligado no horário agendado, recupera a rotina do dia
+  scheduler
+    .runCatchUpIfNeeded()
+    .catch((error) => console.error('[Scheduler] Erro na rotina de recuperação:', error));
+
+  // Reabre a sessão salva do WhatsApp. Sem sessão, a conexão só é aberta quando
+  // alguém pede o QR Code no painel, evitando tentativas à toa.
+  if (whatsApp && hasRegisteredSession(authDir)) {
+    void whatsApp.start();
+  } else {
+    console.log('[WhatsApp] Nenhum número conectado. Abra o painel e leia o QR Code para conectar.');
+  }
 }
 
 const shutdown = () => {
   console.log('\nEncerrando servidor Flow-Zap com segurança...');
   scheduler.stop();
+  heartbeat?.stop();
+  whatsApp?.stop();
   if (server) {
     server.close(() => {
       console.log('Servidor finalizado.');
