@@ -8,10 +8,10 @@ Este documento apresenta o mapeamento completo do ciclo de vida do **Flow-Zap**:
 
 - **Versão:** 1.2.0
 - **Metodologia de Engenharia:** 100% TDD (Test-Driven Development)
-- **Suíte de Testes:** 15 arquivos de testes, 80 testes unitários e de integração passando com 100% de sucesso (`Vitest`).
+- **Suíte de Testes:** 25 arquivos de testes, 161 testes unitários e de integração passando com 100% de sucesso (`Vitest`).
 - **Arquitetura:** Clean Architecture no Backend (Node.js + Express + TypeScript + Zod) + React 19 SPA no Frontend (Vite + TypeScript).
 - **Banco de Dados:** PostgreSQL em nuvem gerenciado via Supabase.
-- **WhatsApp Gateway:** Evolution API v2 conteinerizada via Docker com PostgreSQL e Redis.
+- **WhatsApp:** Baileys integrado ao backend na máquina-sede (sem Docker), atrás da interface `IWhatsAppGateway`.
 - **Hospedagem & Deploy:** Híbrido (Rede Local com máquina-sede + Vercel Multi-Services Cloud).
 
 ---
@@ -38,11 +38,10 @@ Este documento apresenta o mapeamento completo do ciclo de vida do **Flow-Zap**:
 - [x] **Cálculo Determinístico de Ciclos & Datas (`date-calculator`)**:
   - Suporte completo a meses de 28, 29 (anos bissextos), 30 e 31 dias.
   - Lógica do botão **"Marcar como Pago"**: avanço determinístico de exatamente 1 mês (`avancarProximoMes()`) sem quebrar vendas criadas em dias como 31 de janeiro ou 29 de fevereiro.
-- [x] **Motor de Lembretes em 3 Momentos (`ReminderService`)**:
-  - Disparo de aviso 3 dias antes do vencimento (`lembrete_3d`).
-  - Disparo de aviso 1 dia antes do vencimento (`lembrete_1d`).
-  - Disparo de cobrança no dia do vencimento (`vencido`).
-  - **Prevenção de Duplicidade:** O motor consulta a tabela `historico_mensagens` e nunca envia o mesmo lembrete duas vezes dentro do mesmo ciclo mensal.
+- [x] **Motor de Lembretes com Janela de 3 Avisos (`ReminderService`)**:
+  - Um aviso por dia nos 3 dias antes do vencimento: `lembrete_3d`, `lembrete_2d` e `lembrete_1d`. Uma venda que entra na janela depois recebe só os avisos dos dias que restam.
+  - Aviso final ("ultimato") no vencimento (`vencido`), uma única vez.
+  - **Prevenção de Duplicidade:** O motor consulta a tabela `historico_mensagens` e nunca envia o mesmo tipo de lembrete duas vezes dentro do mesmo ciclo (janela de 20 dias antes do vencimento) e lembra em memória o que já enviou, mesmo que a gravação do histórico falhe.
 - [x] **Proteções Anti-Ban WhatsApp de Última Geração (`MessageQueueService`)**:
   - **Fila Sequencial FIFO:** Mensagens processadas uma a uma, impedindo rajadas simultâneas.
   - **Jitter Aleatório:** Atraso dinâmico de 8 a 20 segundos entre cada envio consecutivo.
@@ -51,10 +50,10 @@ Este documento apresenta o mapeamento completo do ciclo de vida do **Flow-Zap**:
 - [x] **Agendador Diário & Disparo Manual sob Demanda**:
   - Tarefa diária automática via `node-cron` executando às 09:00 na máquina-sede.
   - Botão de **"Disparo Manual de Hoje"** na interface com tela de confirmação e listagem prévia de todos os clientes que receberão lembretes.
-- [x] **Integração com Evolution API v2**:
-  - Conexão nativa com a API v2 da Evolution.
+- [x] **Integração direta com o WhatsApp (Baileys)**:
+  - Substituiu a Evolution API: sem Docker, Postgres ou Redis. Reconexão automática com espera crescente, fila que aguarda reconexão e verificação de número com WhatsApp antes do envio.
   - Modal na interface com visualização do **QR Code do WhatsApp** em tempo real e detecção automática de conexão ativa.
-  - Stack Docker Compose contendo Evolution API, PostgreSQL e Redis com persistência em volumes.
+  - Sessão do número salva em `backend/.whatsapp-auth`; sessão encerrada pelo celular apaga a sessão e pede novo QR.
 
 ### 1.3. Gestão de Clientes, Vendas & Modalidade Parcelada
 - [x] **Cadastro e Gestão de Clientes**:
@@ -114,17 +113,15 @@ Abaixo estão listadas as próximas melhorias, organizadas por ordem de priorida
 ---
 
 ### 🔴 Prioridade 1: Ativação e Homologação Final em Produção na Vercel
-- [ ] **Configuração das Variáveis de Ambiente no Painel Vercel**:
-  - Configurar no Vercel Dashboard (*Settings > Environment Variables*) para o ambiente de Produção:
-    - `SUPABASE_URL`
-    - `SUPABASE_SERVICE_ROLE_KEY`
-    - `JWT_SECRET`
-    - `EVOLUTION_API_URL`
-    - `EVOLUTION_API_KEY`
-    - `EVOLUTION_INSTANCE_NAME`
-- [ ] **Estratégia de Conexão com a Evolution API em Nuvem**:
-  - **Opção A (Híbrida com Máquina-Sede):** Manter o container Docker da Evolution API rodando na sede e expor a porta 8085 através de um túnel seguro (ex: Cloudflare Tunnel ou Ngrok) apontando para `EVOLUTION_API_URL` na Vercel.
-  - **Opção B (Totalmente em Nuvem):** Subir a Evolution API em uma VPS em nuvem (ex: Hetzner, DigitalOcean ou Railway) para que os disparos ocorram mesmo com o computador local desligado.
+- [x] **Variáveis de Ambiente no Painel Vercel**: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e `JWT_SECRET` configuradas; painel e API de cadastro no ar.
+- [x] **Arquitetura "Vercel só painel, envios só na sede"** (sem mensalidade de nuvem para o envio):
+  - Todo envio e o cron rodam exclusivamente na máquina-sede. O painel da Vercel consulta, cadastra e marca como pago (tudo via Supabase), mas não envia: o botão de disparo e o QR Code ficam ocultos e a API recusa o disparo (409).
+  - Rotina ao ligar: se o computador estava desligado às 09:00, a sede executa a rotina do dia ao iniciar (`SchedulerService.runCatchUpIfNeeded`), protegida pelo anti-duplicidade.
+  - Indicador "Sede online/offline": a sede grava um sinal de vida a cada minuto e o estado do WhatsApp na tabela `sede_status`, exibidos no painel online.
+- [x] **`database/migration_sede_status.sql` executada** (tabela `sede_status`).
+- [ ] **Executar `database/migration_lembrete_2d.sql` no Supabase** (aceita o tipo `lembrete_2d` no histórico). Obrigatória antes de disparar com a regra nova: sem ela o aviso de 2 dias é enviado, mas o histórico não é gravado.
+- [ ] **Teste real de envio**: conectar um chip de teste, enviar para outro número e validar QR Code, reconexão (reiniciar, cair a internet, desconectar pelo celular) e a janela de avisos.
+- [ ] **Salvaguardas anti-ban adicionais**: limite diário de mensagens, opção de sair da lista ("responda SAIR") e aquecimento gradual do número.
 - [ ] **Homologação Ponta a Ponta na URL da Vercel**:
   - Realizar login com as credenciais do Dono e do Sócio diretamente no domínio de produção.
   - Validar criação de cliente, alteração de status e confirmação de pagamento.
@@ -137,7 +134,7 @@ Abaixo estão listadas as próximas melhorias, organizadas por ordem de priorida
   - Incluir automaticamente a linha "Chave PIX Copia-e-Cola:" formatada na mensagem do WhatsApp para facilitar o pagamento pelo cliente com 1 toque.
 - [ ] **Geração de QR Code PIX Estático / Dinâmico**:
   - Adicionar suporte à geração do payload EMV do Banco Central (PIX Copia e Cola) direto no backend.
-  - Opção de enviar a imagem do QR Code PIX como anexo via Evolution API.
+  - Opção de enviar a imagem do QR Code PIX como anexo pelo WhatsApp.
 - [ ] **Envio de Comprovante / Recibo de Quitação**:
   - Ao clicar em "Marcar como Pago", disparar uma mensagem opcional de confirmação para o WhatsApp do cliente agradecendo pelo pagamento e informando o próximo vencimento.
 
@@ -160,7 +157,7 @@ Abaixo estão listadas as próximas melhorias, organizadas por ordem de priorida
 
 ### 🟢 Prioridade 4: Webhooks Reversos & Interação com o Cliente
 - [ ] **Webhook de Resposta do Cliente no WhatsApp**:
-  - Endpoint no backend para receber webhooks de mensagens recebidas da Evolution API (`MESSAGES_UPSERT`).
+  - Tratamento no backend das mensagens recebidas pelo Baileys (evento `messages.upsert`).
   - Identificar mensagens de clientes com palavras-chave (ex: "paguei", "comprovante", "boleto").
   - Exibir alerta ou badge no painel sinalizando: "Cliente X respondeu à cobrança".
 - [ ] **Disparo Manual Personalizado por Cliente**:
