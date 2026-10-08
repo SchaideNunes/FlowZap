@@ -15,9 +15,10 @@ import {
 } from 'lucide-react';
 import { DashboardMetrics, WhatsAppStatus, ContaPagar } from '../types/index.js';
 import { api } from '../services/api.js';
+import { summarizeSede, SEDE_BADGE_CLASS } from '../utils/sede.js';
 
 interface DashboardProps {
-  whatsAppStatus: WhatsAppStatus['state'];
+  whatsAppInfo: WhatsAppStatus;
   onOpenWhatsAppModal: () => void;
   onOpenDisparoModal: () => void;
   onOpenNovoClienteModal: () => void;
@@ -27,7 +28,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
-  whatsAppStatus,
+  whatsAppInfo,
   onOpenWhatsAppModal,
   onOpenDisparoModal,
   onOpenNovoClienteModal,
@@ -35,6 +36,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNavigateToClientes,
   onNavigateToContasPagar,
 }) => {
+  const whatsAppStatus = whatsAppInfo.state;
+  // Painel online (ex.: Vercel): não envia mensagens, só mostra o estado da máquina-sede
+  const isRemotePanel = whatsAppInfo.available === false;
+  const sede = summarizeSede(whatsAppInfo);
+
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalPendentes: 0,
     totalAvisados: 0,
@@ -138,33 +144,40 @@ export const Dashboard: React.FC<DashboardProps> = ({
       >
         <div style={{ maxWidth: '640px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.35rem' }}>
-            <span className="badge badge-pago">Motor de Automação Ativo</span>
+            {isRemotePanel ? (
+              <span className={`badge ${SEDE_BADGE_CLASS[sede.tone]}`}>{sede.label}</span>
+            ) : (
+              <span className="badge badge-pago">Motor de Automação Ativo</span>
+            )}
             <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
               Cron automático roda diariamente às 09:00 na sede
             </span>
           </div>
           <h3 style={{ fontSize: '1.35rem', marginBottom: '0.4rem', color: '#fff' }}>
-            Disparo Manual de Cobranças
+            {isRemotePanel ? 'Disparos de Cobranças' : 'Disparo Manual de Cobranças'}
           </h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', lineHeight: '1.4' }}>
-            O computador esteve desligado no horário agendado ou deseja disparar os lembretes do dia agora?
-            Visualize a lista de clientes antes de autorizar o envio seguro.
+            {isRemotePanel
+              ? `Os lembretes saem automaticamente do computador da loja. ${sede.detail} Para disparar manualmente, abra o sistema na máquina-sede.`
+              : 'O computador esteve desligado no horário agendado ou deseja disparar os lembretes do dia agora? Visualize a lista de clientes antes de autorizar o envio seguro.'}
           </p>
         </div>
 
-        <div className="dashboard-banner-action">
-          <button
-            className="btn btn-primary btn-lg"
-            onClick={onOpenDisparoModal}
-            style={{
-              boxShadow: '0 6px 20px rgba(16, 185, 129, 0.35)',
-              fontWeight: 600,
-            }}
-          >
-            <Send size={18} />
-            Disparar cobranças de hoje
-          </button>
-        </div>
+        {!isRemotePanel && (
+          <div className="dashboard-banner-action">
+            <button
+              className="btn btn-primary btn-lg"
+              onClick={onOpenDisparoModal}
+              style={{
+                boxShadow: '0 6px 20px rgba(16, 185, 129, 0.35)',
+                fontWeight: 600,
+              }}
+            >
+              <Send size={18} />
+              Disparar cobranças de hoje
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Grid de Cards de Estatísticas das Cobranças */}
@@ -475,9 +488,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Smartphone size={20} color="var(--primary)" />
-              <h4 style={{ fontSize: '1.05rem' }}>Status do WhatsApp (Sede)</h4>
+              <h4 style={{ fontSize: '1.05rem' }}>
+                {isRemotePanel ? 'Status da Máquina-Sede' : 'Status do WhatsApp (Sede)'}
+              </h4>
             </div>
-            {whatsAppStatus === 'open' ? (
+            {isRemotePanel ? (
+              <span className={`badge ${SEDE_BADGE_CLASS[sede.tone]}`}>{sede.short}</span>
+            ) : whatsAppStatus === 'open' ? (
               <span className="badge badge-pago">Conectado</span>
             ) : (
               <span className="badge badge-vencido">Desconectado</span>
@@ -485,16 +502,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: '1.4' }}>
-            {whatsAppStatus === 'open'
-              ? 'A sessão está ativa e sincronizada com a máquina-sede. As mensagens de cobrança serão disparadas normalmente.'
-              : 'O WhatsApp não está emparelhado. Clique no botão abaixo para escanear o QR Code e autorizar os envios.'}
+            {isRemotePanel
+              ? sede.detail
+              : whatsAppStatus === 'open'
+                ? 'A sessão está ativa e sincronizada com a máquina-sede. As mensagens de cobrança serão disparadas normalmente.'
+                : 'O WhatsApp não está emparelhado. Clique no botão abaixo para escanear o QR Code e autorizar os envios.'}
           </p>
 
           <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button className="btn btn-outline-primary btn-sm" onClick={onOpenWhatsAppModal}>
-              <Smartphone size={15} />
-              {whatsAppStatus === 'open' ? 'Gerenciar Conexão' : 'Escanear QR Code'}
-            </button>
+            {!isRemotePanel && (
+              <button className="btn btn-outline-primary btn-sm" onClick={onOpenWhatsAppModal}>
+                <Smartphone size={15} />
+                {whatsAppStatus === 'open' ? 'Gerenciar Conexão' : 'Escanear QR Code'}
+              </button>
+            )}
             <button className="btn btn-secondary btn-sm" onClick={onNavigateToClientes}>
               <Users size={15} />
               Ver Clientes Devedores

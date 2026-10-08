@@ -19,7 +19,12 @@ export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'clientes' | 'contas-pagar' | 'notificacoes'>('dashboard');
 
   // WhatsApp connection state
-  const [whatsAppStatus, setWhatsAppStatus] = useState<WhatsAppStatus['state']>('unknown');
+  const [whatsAppInfo, setWhatsAppInfo] = useState<WhatsAppStatus>({ state: 'unknown' });
+  const whatsAppStatus = whatsAppInfo.state;
+  // false quando o painel não está na máquina-sede (ex.: Vercel): não envia mensagens
+  const sendingAvailable = whatsAppInfo.available !== false;
+  const setWhatsAppStatus = (state: WhatsAppStatus['state']) =>
+    setWhatsAppInfo((prev) => ({ ...prev, state }));
 
   // Modals state
   const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
@@ -41,7 +46,11 @@ export const App: React.FC = () => {
   const checkWhatsApp = async () => {
     try {
       const res = await api.get('/cobrancas/whatsapp-status');
-      setWhatsAppStatus(res.data.state);
+      setWhatsAppInfo({
+        state: res.data.state,
+        available: res.data.available,
+        sede: res.data.sede,
+      });
     } catch {
       setWhatsAppStatus('close');
     }
@@ -108,14 +117,14 @@ export const App: React.FC = () => {
       <Navbar
         currentTab={currentTab}
         onTabChange={setCurrentTab}
-        whatsAppStatus={whatsAppStatus}
+        whatsAppInfo={whatsAppInfo}
         onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
       />
 
       <main className="main-content">
         {currentTab === 'dashboard' ? (
           <Dashboard
-            whatsAppStatus={whatsAppStatus}
+            whatsAppInfo={whatsAppInfo}
             onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
             onOpenDisparoModal={() => setIsDisparoModalOpen(true)}
             onOpenNovoClienteModal={() => {
@@ -141,7 +150,7 @@ export const App: React.FC = () => {
           <ContasPagarView />
         ) : (
           <NotificacoesView
-            whatsAppStatus={whatsAppStatus}
+            whatsAppInfo={whatsAppInfo}
             onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
             onOpenHistoricoModal={handleOpenHistorico}
           />
@@ -157,7 +166,7 @@ export const App: React.FC = () => {
       />
 
       <DisparoModal
-        isOpen={isDisparoModalOpen}
+        isOpen={isDisparoModalOpen && sendingAvailable}
         onClose={() => setIsDisparoModalOpen(false)}
         onSuccess={handleDataChanged}
       />

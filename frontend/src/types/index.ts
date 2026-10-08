@@ -61,8 +61,17 @@ export interface ReminderPreviewItem {
   mensagem: string;
 }
 
+export interface SedeInfo {
+  online: boolean;
+  lastSeen: string | null;
+}
+
 export interface WhatsAppStatus {
   state: 'open' | 'connecting' | 'close' | 'refused' | 'unknown';
+  /** false quando este painel não roda na máquina-sede e, portanto, não envia mensagens. */
+  available?: boolean;
+  /** Estado da máquina-sede informado pelo Supabase (só no painel online). */
+  sede?: SedeInfo | null;
 }
 
 export interface OverdueReminderItem {

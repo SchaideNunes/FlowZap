@@ -2,23 +2,38 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import { MessageSquare, Users, LayoutDashboard, LogOut, QrCode, Bell, Building2 } from 'lucide-react';
 import { WhatsAppStatus } from '../types/index.js';
+import { summarizeSede, SEDE_BADGE_CLASS, SEDE_DOT_CLASS } from '../utils/sede.js';
 
 interface NavbarProps {
   currentTab: 'dashboard' | 'clientes' | 'contas-pagar' | 'notificacoes';
   onTabChange: (tab: 'dashboard' | 'clientes' | 'contas-pagar' | 'notificacoes') => void;
-  whatsAppStatus: WhatsAppStatus['state'];
+  whatsAppInfo: WhatsAppStatus;
   onOpenWhatsAppModal: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   currentTab,
   onTabChange,
-  whatsAppStatus,
+  whatsAppInfo,
   onOpenWhatsAppModal,
 }) => {
   const { user, logout } = useAuth();
+  const whatsAppStatus = whatsAppInfo.state;
+  // Painel online (ex.: Vercel): não envia mensagens, apenas mostra o estado da sede
+  const isRemotePanel = whatsAppInfo.available === false;
 
   const getStatusBadge = () => {
+    if (isRemotePanel) {
+      const sede = summarizeSede(whatsAppInfo);
+      return (
+        <span className={`badge ${SEDE_BADGE_CLASS[sede.tone]} nav-status-pill`} title={sede.detail}>
+          <span className={`status-dot ${SEDE_DOT_CLASS[sede.tone]}`}></span>
+          <span className="status-text-full">{sede.label}</span>
+          <span className="status-text-short">{sede.short}</span>
+        </span>
+      );
+    }
+
     switch (whatsAppStatus) {
       case 'open':
         return (
@@ -58,7 +73,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="brand-text-block">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="brand-title">FlowZap</span>
-              <span className="brand-badge">Sede</span>
+              <span className="brand-badge">{isRemotePanel ? 'Online' : 'Sede'}</span>
             </div>
             <div className="brand-subtitle">
               Cobrança Recorrente WhatsApp
@@ -104,13 +119,15 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="nav-user-actions">
           {getStatusBadge()}
 
-          <button
-            className="btn btn-secondary btn-sm nav-qr-btn"
-            title="Escanear QR Code do WhatsApp"
-            onClick={onOpenWhatsAppModal}
-          >
-            <QrCode size={16} />
-          </button>
+          {!isRemotePanel && (
+            <button
+              className="btn btn-secondary btn-sm nav-qr-btn"
+              title="Escanear QR Code do WhatsApp"
+              onClick={onOpenWhatsAppModal}
+            >
+              <QrCode size={16} />
+            </button>
+          )}
 
           <div className="nav-user-profile">
             <div className="nav-user-text">

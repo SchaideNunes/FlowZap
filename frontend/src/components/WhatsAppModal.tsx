@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, RefreshCw, Smartphone, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { api } from '../services/api.js';
 
@@ -20,9 +20,12 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const statusRef = useRef(status);
+  statusRef.current = status;
 
-  const fetchQrCode = async () => {
-    setLoading(true);
+  // silent: renovação automática do QR (ele expira em ~20s) sem piscar o indicador de carregamento
+  const fetchQrCode = async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const res = await api.get('/cobrancas/whatsapp-qrcode');
@@ -33,9 +36,9 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
         onStatusChange(res.data.state);
       }
     } catch (err: any) {
-      setError('Não foi possível obter o QR Code. Verifique se o Docker / Evolution API está em execução.');
+      setError('Não foi possível obter o QR Code. Verifique se o sistema da máquina-sede está ligado e acesse o painel por ele.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -52,7 +55,13 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
     if (isOpen) {
       fetchQrCode();
       const interval = setInterval(checkStatus, 4000);
-      return () => clearInterval(interval);
+      const qrInterval = setInterval(() => {
+        if (statusRef.current !== 'open') fetchQrCode(true);
+      }, 15000);
+      return () => {
+        clearInterval(interval);
+        clearInterval(qrInterval);
+      };
     }
   }, [isOpen]);
 
@@ -64,7 +73,7 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Smartphone size={20} color="var(--primary)" />
-            <h3 className="modal-title">Conexão WhatsApp (Evolution API)</h3>
+            <h3 className="modal-title">Conexão WhatsApp</h3>
           </div>
           <button className="modal-close" onClick={onClose}>
             <X size={18} />
@@ -138,7 +147,7 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
 
         <div className="modal-footer">
           {status !== 'open' && (
-            <button className="btn btn-secondary btn-sm" onClick={fetchQrCode} disabled={loading}>
+            <button className="btn btn-secondary btn-sm" onClick={() => fetchQrCode()} disabled={loading}>
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
               Atualizar QR Code
             </button>

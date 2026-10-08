@@ -27,18 +27,24 @@ import {
 import { api } from '../services/api.js';
 import { formatFullWhatsApp } from '../utils/phone.js';
 import { extractErrorMessage } from '../utils/error.js';
+import { summarizeSede } from '../utils/sede.js';
 
 interface NotificacoesViewProps {
-  whatsAppStatus: WhatsAppStatus['state'];
+  whatsAppInfo: WhatsAppStatus;
   onOpenWhatsAppModal: () => void;
   onOpenHistoricoModal: (venda: Venda) => void;
 }
 
 export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
-  whatsAppStatus,
+  whatsAppInfo,
   onOpenWhatsAppModal,
   onOpenHistoricoModal,
 }) => {
+  const whatsAppStatus = whatsAppInfo.state;
+  // Painel online (ex.: Vercel): não envia mensagens, só mostra o estado da máquina-sede
+  const isRemotePanel = whatsAppInfo.available === false;
+  const sede = summarizeSede(whatsAppInfo);
+
   const [data, setData] = useState<CentralNotificacoesData>({
     agendadosHoje: [],
     emAtraso: [],
@@ -88,6 +94,11 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
   }, []);
 
   const handleDispatchToday = async () => {
+    if (isRemotePanel) {
+      alert('Os disparos só podem ser feitos pela máquina-sede. Abra o sistema no computador da loja.');
+      return;
+    }
+
     if (data.agendadosHoje.length === 0) {
       alert('Não há cobranças elegíveis para envio hoje.');
       return;
@@ -272,7 +283,8 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
           <button
             className="btn btn-primary btn-sm"
             onClick={handleDispatchToday}
-            disabled={dispatching || data.agendadosHoje.length === 0}
+            disabled={isRemotePanel || dispatching || data.agendadosHoje.length === 0}
+            title={isRemotePanel ? 'Os disparos saem pela máquina-sede' : undefined}
             style={{ fontWeight: 600, padding: '0.5rem 1.15rem' }}
           >
             <Send size={15} />
@@ -352,9 +364,18 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
 
         <div className="card stat-card" style={{ padding: '1.1rem 1.25rem', borderLeft: '3px solid #8b5cf6' }}>
           <div className="stat-info">
-            <span className="stat-label">CONEXÃO WHATSAPP</span>
+            <span className="stat-label">{isRemotePanel ? 'MÁQUINA-SEDE' : 'CONEXÃO WHATSAPP'}</span>
             <span className="stat-value" style={{ fontSize: '1.35rem' }}>
-              {whatsAppStatus === 'open' ? (
+              {isRemotePanel ? (
+                <span
+                  style={{
+                    color: sede.tone === 'ok' ? '#34d399' : sede.tone === 'warn' ? '#fbbf24' : sede.tone === 'off' ? '#f87171' : 'var(--text-muted)',
+                    fontSize: '1.25rem',
+                  }}
+                >
+                  {sede.short}
+                </span>
+              ) : whatsAppStatus === 'open' ? (
                 <span style={{ color: '#34d399', fontSize: '1.25rem' }}>Conectado</span>
               ) : whatsAppStatus === 'connecting' ? (
                 <span style={{ color: '#fbbf24', fontSize: '1.25rem' }}>Conectando...</span>
@@ -363,13 +384,22 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
               )}
             </span>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-              {whatsAppStatus === 'open' ? 'Pronto para disparos' : 'Clique para conectar'}
+              {isRemotePanel
+                ? 'Envios saem pelo computador da loja'
+                : whatsAppStatus === 'open'
+                  ? 'Pronto para disparos'
+                  : 'Clique para conectar'}
             </span>
           </div>
           <div
             className="stat-icon"
-            style={{ background: 'rgba(139, 92, 246, 0.12)', border: '1px solid rgba(139, 92, 246, 0.25)', cursor: 'pointer' }}
-            onClick={onOpenWhatsAppModal}
+            style={{
+              background: 'rgba(139, 92, 246, 0.12)',
+              border: '1px solid rgba(139, 92, 246, 0.25)',
+              cursor: isRemotePanel ? 'default' : 'pointer',
+            }}
+            onClick={isRemotePanel ? undefined : onOpenWhatsAppModal}
+            title={isRemotePanel ? sede.detail : undefined}
           >
             <Phone size={22} color="#a78bfa" />
           </div>
