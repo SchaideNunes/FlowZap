@@ -112,6 +112,42 @@ describe('MessageQueueService with Anti-Ban (TDD)', () => {
     expect(onSuccess2).toHaveBeenCalled();
   });
 
+  it('falha ao registrar o sucesso não vira "falha de envio" nem derruba a fila', async () => {
+    const onSuccess1 = vi.fn().mockRejectedValue(new Error('banco recusou o histórico'));
+    const onError1 = vi.fn();
+    const onSuccess2 = vi.fn();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    queueService.enqueue({ whatsapp: '5511111111111', message: 'A', onSuccess: onSuccess1, onError: onError1 });
+    queueService.enqueue({ whatsapp: '5511222222222', message: 'B', onSuccess: onSuccess2 });
+
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(mockGateway.sendText).toHaveBeenCalledWith('5511111111111', 'A');
+    expect(onSuccess1).toHaveBeenCalledTimes(1);
+    // A mensagem foi enviada: não pode ser registrada como falha
+    expect(onError1).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(5500);
+    expect(onSuccess2).toHaveBeenCalled();
+  });
+
+  it('erro dentro do onError também não derruba a fila', async () => {
+    mockGateway.sendText.mockRejectedValueOnce(new Error('falha de rede'));
+    const onError1 = vi.fn().mockRejectedValue(new Error('banco indisponível'));
+    const onSuccess2 = vi.fn();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    queueService.enqueue({ whatsapp: '5511111111111', message: 'A', onError: onError1 });
+    queueService.enqueue({ whatsapp: '5511222222222', message: 'B', onSuccess: onSuccess2 });
+
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(onError1).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(5500);
+    expect(onSuccess2).toHaveBeenCalled();
+    expect(queueService.getTotalPending()).toBe(0);
+  });
+
   it('registra erro de envio e continua a fila', async () => {
     mockGateway.sendText.mockRejectedValueOnce(new Error('falha de rede'));
     const onError = vi.fn();

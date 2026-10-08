@@ -77,6 +77,12 @@ const shutdown = () => {
   }
 };
 
+// Rede de segurança: uma falha inesperada em uma tarefa em segundo plano (ex.: banco fora do ar
+// durante um envio) deve ser registrada, não derrubar o sistema que precisa ficar ligado.
+process.on('unhandledRejection', (reason) => {
+  console.error('[Erro não tratado]', reason instanceof Error ? reason.message : reason);
+});
+
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 

@@ -52276,7 +52276,10 @@ var MessageQueueService = class {
   enqueue(item) {
     this.queue.push(item);
     if (!this.isProcessing) {
-      this.processNext();
+      this.processNext().catch((err) => {
+        console.error("[Fila] Erro inesperado ao processar a fila:", err instanceof Error ? err.message : err);
+        this.isProcessing = false;
+      });
     }
   }
   getRandomDelay() {
@@ -52313,28 +52316,43 @@ var MessageQueueService = class {
       return;
     }
     try {
-      await this.waitUntilConnected();
-      if (!await this.gateway.numberExists(currentItem.whatsapp)) {
-        throw new NumeroSemWhatsAppError(currentItem.whatsapp);
+      let response;
+      try {
+        await this.waitUntilConnected();
+        if (!await this.gateway.numberExists(currentItem.whatsapp)) {
+          throw new NumeroSemWhatsAppError(currentItem.whatsapp);
+        }
+        if (this.simulateTyping) {
+          await this.gateway.sendPresence(currentItem.whatsapp, "composing");
+          await this.wait(this.typingDurationMs);
+        }
+        response = await this.gateway.sendText(currentItem.whatsapp, currentItem.message);
+      } catch (err) {
+        await this.runCallback("onError", currentItem.onError, err);
+        return;
       }
-      if (this.simulateTyping) {
-        await this.gateway.sendPresence(currentItem.whatsapp, "composing");
-        await this.wait(this.typingDurationMs);
-      }
-      const response = await this.gateway.sendText(currentItem.whatsapp, currentItem.message);
-      if (currentItem.onSuccess) {
-        await currentItem.onSuccess(response);
-      }
-    } catch (err) {
-      if (currentItem.onError) {
-        await currentItem.onError(err);
-      }
+      await this.runCallback("onSuccess", currentItem.onSuccess, response);
     } finally {
       if (this.queue.length > 0) {
         const delay = this.getRandomDelay();
         await this.wait(delay);
       }
-      this.processNext();
+      this.processNext().catch((err) => {
+        console.error("[Fila] Erro inesperado ao processar a fila:", err instanceof Error ? err.message : err);
+        this.isProcessing = false;
+      });
+    }
+  }
+  /**
+   * Executa os callbacks do item sem deixar que uma falha deles (ex.: banco fora do ar)
+   * derrube a fila ou o processo.
+   */
+  async runCallback(name, callback, arg) {
+    if (!callback) return;
+    try {
+      await callback(arg);
+    } catch (err) {
+      console.error(`[Fila] Falha no ${name} (a fila continua): ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 };

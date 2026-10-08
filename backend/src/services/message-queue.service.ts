@@ -51,7 +51,10 @@ export class MessageQueueService {
   enqueue(item: QueueItem): void {
     this.queue.push(item);
     if (!this.isProcessing) {
-      this.processNext();
+      this.processNext().catch((err) => {
+        console.error('[Fila] Erro inesperado ao processar a fila:', err instanceof Error ? err.message : err);
+        this.isProcessing = false;
+      });
     }
   }
 
@@ -95,29 +98,31 @@ export class MessageQueueService {
     }
 
     try {
-      await this.waitUntilConnected();
+      let response: unknown;
 
-      // 1. Não envia para número sem WhatsApp (sinal ruim para o anti-ban)
-      if (!(await this.gateway.numberExists(currentItem.whatsapp))) {
-        throw new NumeroSemWhatsAppError(currentItem.whatsapp);
+      try {
+        await this.waitUntilConnected();
+
+        // 1. Não envia para número sem WhatsApp (sinal ruim para o anti-ban)
+        if (!(await this.gateway.numberExists(currentItem.whatsapp))) {
+          throw new NumeroSemWhatsAppError(currentItem.whatsapp);
+        }
+
+        // 2. Simulação de digitação (Anti-ban)
+        if (this.simulateTyping) {
+          await this.gateway.sendPresence(currentItem.whatsapp, 'composing');
+          await this.wait(this.typingDurationMs);
+        }
+
+        // 3. Envio da mensagem
+        response = await this.gateway.sendText(currentItem.whatsapp, currentItem.message);
+      } catch (err: any) {
+        await this.runCallback('onError', currentItem.onError, err);
+        return;
       }
 
-      // 2. Simulação de digitação (Anti-ban)
-      if (this.simulateTyping) {
-        await this.gateway.sendPresence(currentItem.whatsapp, 'composing');
-        await this.wait(this.typingDurationMs);
-      }
-
-      // 3. Envio da mensagem
-      const response = await this.gateway.sendText(currentItem.whatsapp, currentItem.message);
-
-      if (currentItem.onSuccess) {
-        await currentItem.onSuccess(response);
-      }
-    } catch (err: any) {
-      if (currentItem.onError) {
-        await currentItem.onError(err);
-      }
+      // A mensagem já foi enviada: erro ao registrar o sucesso não pode virar "falha de envio"
+      await this.runCallback('onSuccess', currentItem.onSuccess, response);
     } finally {
       // 4. Jitter / delay anti-ban aleatório antes de processar o próximo item da fila
       if (this.queue.length > 0) {
@@ -125,7 +130,27 @@ export class MessageQueueService {
         await this.wait(delay);
       }
       // Processa o próximo
-      this.processNext();
+      this.processNext().catch((err) => {
+        console.error('[Fila] Erro inesperado ao processar a fila:', err instanceof Error ? err.message : err);
+        this.isProcessing = false;
+      });
+    }
+  }
+
+  /**
+   * Executa os callbacks do item sem deixar que uma falha deles (ex.: banco fora do ar)
+   * derrube a fila ou o processo.
+   */
+  private async runCallback(
+    name: 'onSuccess' | 'onError',
+    callback: ((arg: any) => Promise<void> | void) | undefined,
+    arg: unknown
+  ): Promise<void> {
+    if (!callback) return;
+    try {
+      await callback(arg);
+    } catch (err) {
+      console.error(`[Fila] Falha no ${name} (a fila continua): ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 }
