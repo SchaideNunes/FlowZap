@@ -1,4 +1,4 @@
-export type TipoMensagem = 'lembrete_3d' | 'lembrete_1d' | 'vencido' | 'confirmacao_manual';
+export type TipoMensagem = 'lembrete_3d' | 'lembrete_2d' | 'lembrete_1d' | 'vencido' | 'confirmacao_manual';
 export type StatusEnvio = 'enviado' | 'falha';
 
 export interface HistoricoMensagem {

@@ -74,6 +74,9 @@ export class ReminderService {
   private billingService: BillingService;
   private templateService: TemplateService;
   private queueService: MessageQueueService;
+  // Defesa extra contra reenvio: lembra o que já foi enviado neste processo, mesmo que o
+  // registro no histórico falhe (ex.: banco rejeitando o tipo de mensagem).
+  private sentThisSession = new Set<string>();
 
   constructor(
     vendaRepo: IVendaRepository,
@@ -87,6 +90,10 @@ export class ReminderService {
     this.billingService = billingService;
     this.templateService = templateService;
     this.queueService = queueService;
+  }
+
+  private sessionKey(vendaId: number, tipo: TipoMensagem, dataVencimento: string): string {
+    return `${vendaId}:${tipo}:${dataVencimento}`;
   }
 
   /**
@@ -121,6 +128,10 @@ export class ReminderService {
       // Formatação da data para o usuário (DD/MM/AAAA)
       const [ano, mes, dia] = (venda.data_vencimento_atual || '').split('-');
       const formattedDate = `${dia}/${mes}/${ano}`;
+
+      if (this.sentThisSession.has(this.sessionKey(venda.id!, decision.tipo, formattedDate))) {
+        continue;
+      }
 
       const message = this.templateService.generateMessage(decision.tipo, {
         nome: venda.cliente.nome,
@@ -161,6 +172,9 @@ export class ReminderService {
         whatsapp: item.whatsapp,
         message: item.mensagem,
         onSuccess: async (response) => {
+          // Marca como enviado antes de qualquer gravação que possa falhar
+          this.sentThisSession.add(this.sessionKey(item.vendaId, item.tipo, item.dataVencimento));
+
           // Determina o novo status
           let novoStatus: any = 'avisado_3d';
           if (item.tipo === 'lembrete_1d') novoStatus = 'avisado_1d';

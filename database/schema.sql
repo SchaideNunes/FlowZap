@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS historico_mensagens (
     id BIGSERIAL PRIMARY KEY,
     venda_id BIGINT NOT NULL REFERENCES vendas(id) ON DELETE CASCADE,
     tipo TEXT NOT NULL CHECK (
-        tipo IN ('lembrete_3d', 'lembrete_1d', 'vencido', 'confirmacao_manual')
+        tipo IN ('lembrete_3d', 'lembrete_2d', 'lembrete_1d', 'vencido', 'confirmacao_manual')
     ),
     data_envio TIMESTAMPTZ NOT NULL DEFAULT now(),
     status_envio TEXT NOT NULL CHECK (status_envio IN ('enviado', 'falha')),

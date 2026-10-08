@@ -59,6 +59,8 @@ export const DisparoModal: React.FC<DisparoModalProps> = ({ isOpen, onClose, onS
     switch (tipo) {
       case 'lembrete_3d':
         return <span className="badge badge-avisado">Vence em 3 dias</span>;
+      case 'lembrete_2d':
+        return <span className="badge badge-avisado">Vence em 2 dias</span>;
       case 'lembrete_1d':
         return <span className="badge badge-avisado">Vence amanhã</span>;
       case 'vencido':

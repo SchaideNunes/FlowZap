@@ -160,6 +160,12 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
             <Clock size={12} /> Lembrete (3 dias antes)
           </span>
         );
+      case 'lembrete_2d':
+        return (
+          <span className="badge badge-avisado" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }}>
+            <Clock size={12} /> Lembrete (2 dias antes)
+          </span>
+        );
       case 'lembrete_1d':
         return (
           <span
@@ -922,6 +928,8 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
                                   ? 'Aviso Vencido'
                                   : item.ultimoEnvio.tipo === 'lembrete_1d'
                                   ? 'Lembrete (1d)'
+                                  : item.ultimoEnvio.tipo === 'lembrete_2d'
+                                  ? 'Lembrete (2d)'
                                   : 'Lembrete (3d)'}
                               </span>
                               {item.ultimoEnvio.dataEnvio && (

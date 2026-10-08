@@ -43,6 +43,9 @@ export class TemplateService {
       case 'lembrete_3d':
         return `${greeting} ${data.nome}, passando para lembrar que sua cobrança${descText}, no valor de *R$ ${formattedValor}*, vence em 3 dias, no dia *${data.dataVencimento}*.`;
 
+      case 'lembrete_2d':
+        return `${greeting} ${data.nome}, passando para lembrar que sua cobrança${descText}, no valor de *R$ ${formattedValor}*, vence em 2 dias, no dia *${data.dataVencimento}*.`;
+
       case 'lembrete_1d':
         return `${greeting} ${data.nome}, sua cobrança${descText}, no valor de *R$ ${formattedValor}*, vence amanhã, dia *${data.dataVencimento}*.`;
 

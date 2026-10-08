@@ -137,10 +137,18 @@ export class BillingService {
 
     const diff = daysDifference(dueDate, referenceDateStr);
 
-    // 3 dias antes do vencimento
+    // Janela de aviso: um lembrete por dia nos 3 dias anteriores ao vencimento
+    // (3 dias, 2 dias e 1 dia antes). Depois vem o aviso final (vencido).
     if (diff === 3 && venda.status_mes_atual === 'pendente') {
       return {
         tipo: 'lembrete_3d',
+        novoStatus: 'avisado_3d',
+      };
+    }
+
+    if (diff === 2 && (venda.status_mes_atual === 'pendente' || venda.status_mes_atual === 'avisado_3d')) {
+      return {
+        tipo: 'lembrete_2d',
         novoStatus: 'avisado_3d',
       };
     }

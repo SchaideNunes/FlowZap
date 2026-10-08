@@ -120,6 +120,34 @@ describe('ReminderService (TDD)', () => {
     });
   });
 
+  describe('proteção contra reenvio na mesma sessão', () => {
+    it('não reenvia o que já foi enviado mesmo se o histórico não puder ser gravado', async () => {
+      // Simula o banco rejeitando o registro (ex.: migração pendente) depois do envio bem-sucedido
+      vi.mocked(mockQueueService.enqueue).mockImplementation(async (item: any) => {
+        await item.onSuccess?.({});
+      });
+      vi.mocked(mockHistoricoRepo.create).mockRejectedValue(new Error('violates check constraint'));
+
+      await reminderService.dispatchReminders('2026-09-15');
+      await new Promise((resolve) => setImmediate(resolve));
+
+      const again = await reminderService.previewReminders('2026-09-15');
+      expect(again).toHaveLength(0);
+    });
+
+    it('mensagens que falharam no envio continuam elegíveis para nova tentativa', async () => {
+      vi.mocked(mockQueueService.enqueue).mockImplementation(async (item: any) => {
+        await item.onError?.(new Error('falha de rede'));
+      });
+
+      await reminderService.dispatchReminders('2026-09-15');
+      await new Promise((resolve) => setImmediate(resolve));
+
+      const again = await reminderService.previewReminders('2026-09-15');
+      expect(again).toHaveLength(2);
+    });
+  });
+
   describe('dispatchReminders', () => {
     it('should enqueue eligible reminders and update statuses on dispatch', async () => {
       const result = await reminderService.dispatchReminders('2026-09-15');

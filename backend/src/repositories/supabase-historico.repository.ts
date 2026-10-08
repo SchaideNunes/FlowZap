@@ -6,6 +6,8 @@ import {
   TipoMensagem,
 } from './historico.repository.interface.js';
 
+const CYCLE_WINDOW_DAYS = 20;
+
 export class SupabaseHistoricoRepository implements IHistoricoRepository {
   private client: SupabaseClient;
 
@@ -67,10 +69,10 @@ export class SupabaseHistoricoRepository implements IHistoricoRepository {
     tipo: TipoMensagem,
     cycleDueDate: string
   ): Promise<boolean> {
-    // Busca se existe envio com status 'enviado' para o mesmo tipo
-    // desde o início do ciclo atual (30 dias antes do vencimento até hoje)
-    const cycleStart = new Date(cycleDueDate);
-    cycleStart.setDate(cycleStart.getDate() - 30);
+    // Busca se existe envio com status 'enviado' para o mesmo tipo no ciclo atual.
+    // Os avisos de um ciclo saem no máximo 3 dias antes do vencimento, então 20 dias bastam;
+    // uma janela de 30 dias confundia o aviso do mês anterior em meses curtos (ex.: fevereiro).
+    const cycleStart = new Date(Date.parse(cycleDueDate) - CYCLE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
     const { data, error } = await this.client
       .from('historico_mensagens')

@@ -34,7 +34,7 @@ export interface Venda {
 export interface HistoricoItem {
   id: number;
   venda_id: number;
-  tipo: 'lembrete_3d' | 'lembrete_1d' | 'vencido' | 'confirmacao_manual';
+  tipo: 'lembrete_3d' | 'lembrete_2d' | 'lembrete_1d' | 'vencido' | 'confirmacao_manual';
   data_envio: string;
   status_envio: 'enviado' | 'falha';
   mensagem: string | null;

@@ -21,6 +21,17 @@ describe('TemplateService (TDD)', () => {
     expect(message).toContain('3 dias');
   });
 
+  it('should format lembrete_2d message saying it is due in 2 days', () => {
+    const message = templateService.generateMessage('lembrete_2d', mockData);
+
+    expect(message).toContain('Carlos Santos');
+    expect(message).toContain('Plano Pro 500MB');
+    expect(message).toContain('149,90');
+    expect(message).toContain('15/09/2026');
+    expect(message).toContain('2 dias');
+    expect(message).not.toContain('3 dias');
+  });
+
   it('should format lembrete_1d message with all variables', () => {
     const message = templateService.generateMessage('lembrete_1d', mockData);
 

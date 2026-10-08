@@ -38,6 +38,8 @@ export const HistoricoModal: React.FC<HistoricoModalProps> = ({ isOpen, onClose,
     switch (tipo) {
       case 'lembrete_3d':
         return 'Lembrete (3 dias antes)';
+      case 'lembrete_2d':
+        return 'Lembrete (2 dias antes)';
       case 'lembrete_1d':
         return 'Lembrete (1 dia antes)';
       case 'vencido':

@@ -255,6 +255,48 @@ describe('BillingService (TDD)', () => {
       });
     });
 
+    describe('janela de 3 dias: um aviso por dia até o vencimento', () => {
+      const makeVenda = (status: VendaWithCliente['status_mes_atual'], due: string): VendaWithCliente => ({
+        id: 1,
+        cliente_id: 1,
+        descricao: 'Plano',
+        valor: 100,
+        dia_vencimento: 18,
+        status_mes_atual: status,
+        data_vencimento_atual: due,
+        ativo: true,
+      });
+
+      it('avisa 2 dias antes (lembrete_2d) quando ainda só foi avisado há 3 dias', () => {
+        const action = billingService.evaluateReminderState(makeVenda('avisado_3d', '2026-09-17'), '2026-09-15');
+        expect(action).toEqual({ tipo: 'lembrete_2d', novoStatus: 'avisado_3d' });
+      });
+
+      it('avisa 2 dias antes também quando a venda entrou na janela agora (status pendente)', () => {
+        const action = billingService.evaluateReminderState(makeVenda('pendente', '2026-09-17'), '2026-09-15');
+        expect(action).toEqual({ tipo: 'lembrete_2d', novoStatus: 'avisado_3d' });
+      });
+
+      it('não avisa 2 dias antes se o aviso de 1 dia já foi enviado ou já venceu', () => {
+        expect(billingService.evaluateReminderState(makeVenda('avisado_1d', '2026-09-17'), '2026-09-15')).toBeNull();
+        expect(billingService.evaluateReminderState(makeVenda('vencido', '2026-09-17'), '2026-09-15')).toBeNull();
+      });
+
+      it('não repete o aviso de 3 dias quando ele já foi enviado', () => {
+        expect(billingService.evaluateReminderState(makeVenda('avisado_3d', '2026-09-18'), '2026-09-15')).toBeNull();
+      });
+
+      it('avisa 1 dia antes mesmo que a venda tenha entrado na janela só agora (status pendente)', () => {
+        const action = billingService.evaluateReminderState(makeVenda('pendente', '2026-09-16'), '2026-09-15');
+        expect(action).toEqual({ tipo: 'lembrete_1d', novoStatus: 'avisado_1d' });
+      });
+
+      it('não avisa nada fora da janela (mais de 3 dias para vencer)', () => {
+        expect(billingService.evaluateReminderState(makeVenda('pendente', '2026-09-19'), '2026-09-15')).toBeNull();
+        expect(billingService.evaluateReminderState(makeVenda('pendente', '2026-10-15'), '2026-09-15')).toBeNull();
+      });
+    });
+
     it('should return null if venda is already marked pago', () => {
       const venda: VendaWithCliente = {
         id: 1,

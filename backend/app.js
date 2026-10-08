@@ -51902,6 +51902,7 @@ var SupabaseVendaRepository = class {
 };
 
 // src/repositories/supabase-historico.repository.ts
+var CYCLE_WINDOW_DAYS = 20;
 var SupabaseHistoricoRepository = class {
   client;
   constructor(client) {
@@ -51935,8 +51936,7 @@ var SupabaseHistoricoRepository = class {
     return data;
   }
   async hasMessageBeenSentForCycle(vendaId, tipo, cycleDueDate) {
-    const cycleStart = new Date(cycleDueDate);
-    cycleStart.setDate(cycleStart.getDate() - 30);
+    const cycleStart = new Date(Date.parse(cycleDueDate) - CYCLE_WINDOW_DAYS * 24 * 60 * 60 * 1e3);
     const { data, error } = await this.client.from("historico_mensagens").select("id").eq("venda_id", vendaId).eq("tipo", tipo).eq("status_envio", "enviado").gte("data_envio", cycleStart.toISOString()).limit(1);
     if (error) {
       throw new Error(`Erro ao verificar hist\xF3rico de envio: ${error.message}`);
@@ -52153,6 +52153,12 @@ var BillingService = class {
         novoStatus: "avisado_3d"
       };
     }
+    if (diff === 2 && (venda.status_mes_atual === "pendente" || venda.status_mes_atual === "avisado_3d")) {
+      return {
+        tipo: "lembrete_2d",
+        novoStatus: "avisado_3d"
+      };
+    }
     if (diff === 1 && venda.status_mes_atual !== "avisado_1d" && venda.status_mes_atual !== "vencido") {
       return {
         tipo: "lembrete_1d",
@@ -52198,6 +52204,8 @@ var TemplateService = class {
     switch (tipo) {
       case "lembrete_3d":
         return `${greeting} ${data.nome}, passando para lembrar que sua cobran\xE7a${descText}, no valor de *R$ ${formattedValor}*, vence em 3 dias, no dia *${data.dataVencimento}*.`;
+      case "lembrete_2d":
+        return `${greeting} ${data.nome}, passando para lembrar que sua cobran\xE7a${descText}, no valor de *R$ ${formattedValor}*, vence em 2 dias, no dia *${data.dataVencimento}*.`;
       case "lembrete_1d":
         return `${greeting} ${data.nome}, sua cobran\xE7a${descText}, no valor de *R$ ${formattedValor}*, vence amanh\xE3, dia *${data.dataVencimento}*.`;
       case "vencido":
@@ -52338,12 +52346,18 @@ var ReminderService = class {
   billingService;
   templateService;
   queueService;
+  // Defesa extra contra reenvio: lembra o que já foi enviado neste processo, mesmo que o
+  // registro no histórico falhe (ex.: banco rejeitando o tipo de mensagem).
+  sentThisSession = /* @__PURE__ */ new Set();
   constructor(vendaRepo, historicoRepo, billingService, templateService, queueService) {
     this.vendaRepo = vendaRepo;
     this.historicoRepo = historicoRepo;
     this.billingService = billingService;
     this.templateService = templateService;
     this.queueService = queueService;
+  }
+  sessionKey(vendaId, tipo, dataVencimento) {
+    return `${vendaId}:${tipo}:${dataVencimento}`;
   }
   /**
    * Identifica e pré-visualiza todas as cobranças elegíveis para envio no dia
@@ -52370,6 +52384,9 @@ var ReminderService = class {
       }
       const [ano, mes, dia] = (venda.data_vencimento_atual || "").split("-");
       const formattedDate = `${dia}/${mes}/${ano}`;
+      if (this.sentThisSession.has(this.sessionKey(venda.id, decision.tipo, formattedDate))) {
+        continue;
+      }
       const message = this.templateService.generateMessage(decision.tipo, {
         nome: venda.cliente.nome,
         descricao: venda.descricao,
@@ -52402,6 +52419,7 @@ var ReminderService = class {
         whatsapp: item.whatsapp,
         message: item.mensagem,
         onSuccess: async (response) => {
+          this.sentThisSession.add(this.sessionKey(item.vendaId, item.tipo, item.dataVencimento));
           let novoStatus = "avisado_3d";
           if (item.tipo === "lembrete_1d") novoStatus = "avisado_1d";
           if (item.tipo === "vencido") novoStatus = "vencido";
