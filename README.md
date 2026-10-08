@@ -1,6 +1,6 @@
 # Flow-Zap: Sistema de Cobrança Recorrente via WhatsApp
 
-Sistema web autônomo para gerenciamento de cobranças mensais recorrentes de clientes com lembretes automáticos e seguros enviados via WhatsApp (Evolution API).
+Sistema web autônomo para gerenciamento de cobranças mensais recorrentes de clientes com lembretes automáticos e seguros enviados via WhatsApp (biblioteca Baileys, sem Docker).
 
 Projetado com arquitetura distribuída para permitir acesso simultâneo a partir de duas máquinas (computador de mesa e notebook) através de banco em nuvem gerenciado (Supabase - Plano Gratuito) e motor de envio executado na máquina designada como sede.
 
@@ -42,8 +42,8 @@ Projetado com arquitetura distribuída para permitir acesso simultâneo a partir
 - **Backend**: Node.js + Express + TypeScript (Clean Architecture: Controllers, Services, Repositories, DTOs com Zod)
 - **Frontend**: React 19 + TypeScript + Vite + Design System sob medida (Google Fonts Outfit & Inter, paleta refinada slate/emerald, micro-interações 150-250ms)
 - **Banco de Dados**: Supabase (PostgreSQL em Nuvem - Gratuito)
-- **WhatsApp Gateway**: Evolution API v2 (Docker com persistência de sessão)
-- **Testes**: Vitest (100% TDD - 63 testes unitários e de integração passando)
+- **WhatsApp**: Baileys integrado ao backend (sessão salva em pasta local, reconexão automática, sem Docker)
+- **Testes**: Vitest (100% TDD - 123 testes unitários e de integração passando)
 
 ---
 
@@ -52,8 +52,8 @@ Projetado com arquitetura distribuída para permitir acesso simultâneo a partir
 ### Passo 1: Configuração do Supabase (Banco de Dados)
 1. Acesse [supabase.com](https://supabase.com) e crie um projeto gratuito.
 2. No menu lateral esquerdo, vá em **SQL Editor**.
-3. Abra e copie todo o conteúdo de [`database/schema.sql`](file:///d:/Trabalho/Flow-Zap/database/schema.sql) e clique em **Run**.
-4. Em seguida, copie o conteúdo de [`database/seed_users.sql`](file:///d:/Trabalho/Flow-Zap/database/seed_users.sql) e clique em **Run** para criar os logins do Dono e do Sócio.
+3. Abra e copie todo o conteúdo de [`database/setup_completo.sql`](database/setup_completo.sql) e clique em **Run** (cria todas as tabelas, com RLS ativado). Se o banco já existia antes da tabela `sede_status`, rode apenas [`database/migration_sede_status.sql`](database/migration_sede_status.sql).
+4. Os logins do Dono e do Sócio são criados à parte, com senha em hash bcrypt, direto no banco (não ficam no repositório).
 5. Em **Project Settings** > **API**, copie a **Project URL** e a chave **service_role**.
 
 ### Passo 2: Configuração das Variáveis de Ambiente
@@ -75,9 +75,6 @@ scripts\iniciar_sede.bat
 ```
 Ou manualmente via terminal:
 ```bash
-# Iniciar o container do WhatsApp (Evolution API)
-docker compose up -d evolution-api
-
 # Em um terminal: Backend
 cd backend && npm run dev
 
@@ -87,12 +84,19 @@ cd frontend && npm run dev
 
 ### Passo 4: Conectar o WhatsApp
 1. Abra o painel no navegador: `http://localhost:5173`.
-2. Entre com um dos logins padrão:
-   - **Dono**: `admin@flowzap.com` / Senha: `FlowZap@2026`
-   - **Sócio**: `socio@flowzap.com` / Senha: `FlowZap@2026`
+2. Entre com o seu login.
 3. Clique no botão de QR Code no topo da tela.
 4. Abra o WhatsApp no celular: **Aparelhos conectados** > **Conectar aparelho** e leia o QR Code.
-5. Pronto! A sessão fica salva localmente na pasta da Evolution API e se reconecta sozinha entre reinicializações.
+5. Pronto! A sessão fica salva em `backend/.whatsapp-auth` e o sistema se reconecta sozinho após quedas e reinicializações. Só é preciso ler o QR Code de novo se o aparelho for desconectado pelo celular.
+
+---
+
+## ☁️ Painel Online (Vercel) e Máquina-Sede
+
+Os **envios de WhatsApp e o cron das 09:00 rodam somente no computador da loja (sede)**. O painel publicado na Vercel funciona como acesso remoto: consultar clientes, vendas e histórico, cadastrar e marcar pagamentos. Nele, o botão de disparo e o QR Code não aparecem, e um indicador mostra se a sede está **online/offline** e se o WhatsApp está conectado.
+
+- O computador da loja precisa estar ligado e com internet para os lembretes saírem.
+- Se ele ligar depois das 09:00, a rotina do dia é executada automaticamente ao iniciar.
 
 ---
 

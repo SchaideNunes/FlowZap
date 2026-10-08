@@ -6,8 +6,8 @@ Este documento define o conjunto mandatório de regras de arquitetura, qualidade
 
 ## 1. Visão Geral do Sistema
 
-O **Flow-Zap** é um sistema financeiro web e motor autônomo de gestão de cobranças recorrentes e parceladas via WhatsApp (integrado à Evolution API v2). O projeto foi desenhado para operação híbrida:
-- **Operação Local / Rede Interna**: Máquina-sede executando Docker (Evolution API + Postgres + Redis) e acessível na rede local pelo notebook do sócio.
+O **Flow-Zap** é um sistema financeiro web e motor autônomo de gestão de cobranças recorrentes e parceladas via WhatsApp (integrado diretamente ao WhatsApp pela biblioteca Baileys, sem Docker). O projeto foi desenhado para operação híbrida:
+- **Operação Local / Rede Interna**: Máquina-sede executando o backend Node (conexão WhatsApp via Baileys, cron diário e fila anti-ban), acessível na rede local pelo notebook do sócio. Não usa Docker.
 - **Operação Cloud / Serverless**: Frontend em React 19 (Vite) e Backend Express em TypeScript preparados para deploy multi-serviços na Vercel com banco em nuvem gerenciado no Supabase (PostgreSQL).
 
 ---
@@ -18,7 +18,7 @@ O **Flow-Zap** é um sistema financeiro web e motor autônomo de gestão de cobr
 - **Regra de Ouro:** Nenhuma nova rota, serviço, cálculo ou mutação deve ser implementada sem antes escrever testes automatizados que falham (*Red*).
 - **Ciclo:** Teste falhando -> Implementação mínima para passar (*Green*) -> Refatoração com garantia de qualidade (*Refactor*).
 - **Cobertura:** 100% de testes passando (`npm test` no backend com Vitest). Nenhuma funcionalidade é considerada concluída sem suíte de testes íntegra.
-- **Arquitetura de Testes:** Testes unitários com mocks para banco/Evolution API e testes de integração de fluxo de cobrança e datas.
+- **Arquitetura de Testes:** Testes unitários com mocks para banco/gateway de WhatsApp e testes de integração de fluxo de cobrança e datas.
 
 ### 2.2. Conventional Commits Estritos
 Todos os commits do repositório devem seguir o padrão Conventional Commits com mensagens atômicas e em português ou inglês padronizado:
@@ -92,7 +92,10 @@ O motor de cobrança segue rigorosamente as melhores práticas para proteção c
    - Antes do envio do texto, o sistema envia o estado `composing` ("digitando...") por 3 segundos, sinalizando atividade humana para os servidores da Meta.
 4. **Saudações Dinâmicas:**
    - O `TemplateService` rotaciona aleatoriamente saudações no início das mensagens ("Olá", "Oi", "Bom dia", "Boa tarde"), impedindo que todas as mensagens possuam o mesmo hash de texto idêntico.
-5. **Prevenção de Duplicidade:**
+5. **Fila que Espera, Não Falha:**
+   - Se o WhatsApp estiver desconectado, a fila aguarda a reconexão em vez de registrar falha.
+   - Números sem conta no WhatsApp (`onWhatsApp`) nunca recebem envio; o erro é registrado no histórico.
+6. **Prevenção de Duplicidade:**
    - O sistema audita cada envio na tabela `historico_mensagens`. Uma cobrança nunca recebe o mesmo tipo de lembrete mais de uma vez dentro do mesmo ciclo mensal.
 
 ---
@@ -142,6 +145,10 @@ O projeto adota o modelo oficial de múltiplos serviços em um único projeto Ve
 ### 6.2. Bundle Backend Híbrido (`backend/app.js`)
 - Para evitar problemas de dependências externas ausentes no runtime serverless (`Cannot find module 'express'`), o backend possui o script de build `backend/build.mjs` com **esbuild**.
 - O esbuild gera um arquivo único (`backend/app.js`) contendo todas as dependências puras embutidas com exportação compatível com CommonJS e ESM.
+- `npm run build` roda **apenas** o esbuild (`build.mjs`) e apaga `dist/`. Nunca recolocar o `tsc` nesse script: a Vercel passa a executar o `dist/app.js` (que chama o `express` de fora) em vez do bundle. A checagem de tipos é `npm run typecheck`.
+- **O Baileys nunca pode entrar no grafo de imports de `src/app.ts`** (é o ponto de entrada do bundle da Vercel). Ele é carregado só por `src/index.ts` (máquina-sede), via `createApp({ whatsAppGateway })`. Na Vercel o gateway é `UnavailableWhatsAppGateway` (WhatsApp sempre "desconectado").
+- Serviços e controllers dependem da interface `IWhatsAppGateway`, nunca de uma biblioteca de envio concreta.
+- A sessão do WhatsApp fica em `backend/.whatsapp-auth/` (ou `WHATSAPP_AUTH_DIR`), contém credenciais e jamais pode ser versionada.
 - O arquivo `backend/src/config/supabase.ts` implementa inicialização tolerante a falhas (fallback inicial) para que a ausência temporária de variáveis de ambiente no container não provoque encerramento do processo no boot.
 
 ---
