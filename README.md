@@ -17,10 +17,11 @@ Projetado com arquitetura distribuída para permitir acesso simultâneo a partir
 3. **Disparos Automáticos & Botão de Disparo Manual**:
    - **Rotina Automática (node-cron)**: Roda diariamente às 09:00 na máquina-sede.
    - **Disparo Manual de Hoje**: Permite disparar sob demanda (ex: se o computador esteve desligado no horário agendado) com tela de confirmação e pré-visualização de todos os destinatários antes de enviar.
-   - **Momentos dos Lembretes**:
-     - 3 dias antes do vencimento (`lembrete_3d`)
-     - 1 dia antes do vencimento (`lembrete_1d`)
-     - No dia do vencimento (`vencido`)
+   - **Janela de avisos**: um aviso por dia nos 3 dias antes do vencimento, e depois o aviso final:
+     - 3 dias antes (`lembrete_3d`)
+     - 2 dias antes (`lembrete_2d`)
+     - 1 dia antes (`lembrete_1d`)
+     - No dia do vencimento, o aviso final (`vencido`)
    - **Prevenção de Duplicidade**: Nunca envia a mesma notificação duas vezes no mesmo ciclo.
 4. **Proteções Anti-Ban WhatsApp de Última Geração**:
    - **Fila Sequencial (FIFO)**: Mensagens nunca são enviadas simultaneamente.

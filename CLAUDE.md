@@ -114,11 +114,14 @@ O motor de cobrança segue rigorosamente as melhores práticas para proteção c
   - O status de pagamento é reiniciado para pendente para o novo ciclo.
   - Para vendas parceladas, o número da parcela atual é incrementado (ex: de 2/12 para 3/12) e, ao atingir o total, a venda é automaticamente marcada como quitada.
 
-### 5.3. Três Momentos de Disparo
-Os disparos são filtrados para clientes ativos e pendentes de pagamento:
-1. `lembrete_3d`: Exatamente 3 dias antes do vencimento.
-2. `lembrete_1d`: Exatamente 1 dia antes do vencimento.
-3. `vencido`: No dia do vencimento da cobrança.
+### 5.3. Janela de Avisos (3 avisos + aviso final)
+Os disparos são filtrados para clientes ativos e pendentes de pagamento. Dentro da janela de 3 dias que antecede o vencimento o cliente recebe **um aviso por dia**; uma venda cadastrada já dentro da janela recebe os avisos dos dias que restam:
+1. `lembrete_3d`: 3 dias antes do vencimento.
+2. `lembrete_2d`: 2 dias antes do vencimento.
+3. `lembrete_1d`: 1 dia antes do vencimento.
+4. `vencido`: aviso final ("ultimato"), no dia do vencimento (ou depois, se ainda não enviado), uma única vez.
+
+Cada tipo é enviado no máximo uma vez por ciclo (histórico de 20 dias antes do vencimento). Alterar os tipos exige ajustar a constraint `historico_mensagens_tipo_check` no banco (ver `database/migration_lembrete_2d.sql`).
 
 ### 5.4. Contas a Pagar (Quem Devemos)
 - Gestão completa de despesas da empresa e dos sócios.
