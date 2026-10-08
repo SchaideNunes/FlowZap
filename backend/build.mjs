@@ -1,6 +1,11 @@
 import esbuild from 'esbuild';
+import { rmSync } from 'node:fs';
 
 async function build() {
+  // Remove saídas antigas do tsc: um dist/app.js com require("express") externo é
+  // reconhecido pela Vercel como entrada do Express e ofusca o bundle autocontido.
+  rmSync('dist', { recursive: true, force: true });
+
   await esbuild.build({
     entryPoints: ['src/app.ts'],
     bundle: true,
