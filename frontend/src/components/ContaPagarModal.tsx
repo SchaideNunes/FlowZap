@@ -88,7 +88,7 @@ export const ContaPagarModal: React.FC<ContaPagarModalProps> = ({
       <div className="modal-content">
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <DollarSign size={20} color="#f87171" />
+            <DollarSign size={20} color="var(--primary)" />
             <h3 className="modal-title">
               {contaToEdit ? 'Editar Conta a Pagar' : 'Cadastrar Quem Devemos'}
             </h3>

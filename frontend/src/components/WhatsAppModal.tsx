@@ -83,7 +83,7 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
         <div className="modal-body" style={{ textAlign: 'center' }}>
           {status === 'open' ? (
             <div style={{ padding: '2rem 1rem' }}>
-              <div style={{ color: 'var(--primary)', marginBottom: '1rem' }}>
+              <div style={{ color: 'var(--success)', marginBottom: '1rem' }}>
                 <CheckCircle2 size={56} style={{ margin: '0 auto' }} />
               </div>
               <h4 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>WhatsApp Conectado com Sucesso!</h4>
@@ -135,7 +135,7 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
                 </div>
               )}
 
-              <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '8px', padding: '10px 14px', textAlign: 'left', display: 'flex', gap: '10px', alignItems: 'flex-start', margin: '0 0 1rem 0' }}>
+              <div style={{ background: 'rgba(var(--neutral-rgb), 0.05)', border: '1px solid rgba(var(--neutral-rgb), 0.12)', borderRadius: '8px', padding: '10px 14px', textAlign: 'left', display: 'flex', gap: '10px', alignItems: 'flex-start', margin: '0 0 1rem 0' }}>
                 <ShieldCheck size={20} color="var(--primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                   <b style={{ color: '#fff' }}>Recomendação Anti-Ban:</b> Utilize um chip/número exclusivo para o negócio. O Flow-Zap já gerencia delays automáticos (8-20s) e simulação de presença humana para segurança do seu número.

@@ -1,15 +1,25 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext.js';
-import { MessageSquare, Users, LayoutDashboard, LogOut, QrCode, Bell, Building2 } from 'lucide-react';
+import { Users, LayoutDashboard, LogOut, QrCode, Bell, Building2 } from 'lucide-react';
 import { WhatsAppStatus } from '../types/index.js';
 import { summarizeSede, SEDE_BADGE_CLASS, SEDE_DOT_CLASS } from '../utils/sede.js';
 
+type Tab = 'dashboard' | 'clientes' | 'contas-pagar' | 'notificacoes';
+
 interface NavbarProps {
-  currentTab: 'dashboard' | 'clientes' | 'contas-pagar' | 'notificacoes';
-  onTabChange: (tab: 'dashboard' | 'clientes' | 'contas-pagar' | 'notificacoes') => void;
+  currentTab: Tab;
+  onTabChange: (tab: Tab) => void;
   whatsAppInfo: WhatsAppStatus;
   onOpenWhatsAppModal: () => void;
 }
+
+// "short" é o rótulo da barra inferior no celular
+const TABS: Array<{ id: Tab; label: string; short: string; icon: React.ReactNode }> = [
+  { id: 'dashboard', label: 'Visão geral', short: 'Início', icon: <LayoutDashboard size={16} /> },
+  { id: 'clientes', label: 'Clientes e vendas', short: 'Clientes', icon: <Users size={16} /> },
+  { id: 'contas-pagar', label: 'Quem devemos', short: 'A pagar', icon: <Building2 size={16} /> },
+  { id: 'notificacoes', label: 'Notificações', short: 'Avisos', icon: <Bell size={16} /> },
+];
 
 export const Navbar: React.FC<NavbarProps> = ({
   currentTab,
@@ -27,102 +37,75 @@ export const Navbar: React.FC<NavbarProps> = ({
       const sede = summarizeSede(whatsAppInfo);
       return (
         <span className={`badge ${SEDE_BADGE_CLASS[sede.tone]} nav-status-pill`} title={sede.detail}>
-          <span className={`status-dot ${SEDE_DOT_CLASS[sede.tone]}`}></span>
+          <span className={`status-dot ${SEDE_DOT_CLASS[sede.tone]}`} aria-hidden="true"></span>
           <span className="status-text-full">{sede.label}</span>
           <span className="status-text-short">{sede.short}</span>
         </span>
       );
     }
 
-    switch (whatsAppStatus) {
-      case 'open':
-        return (
-          <span className="badge badge-pago nav-status-pill" style={{ cursor: 'pointer' }} onClick={onOpenWhatsAppModal}>
-            <span className="status-dot online"></span>
-            <span className="status-text-full">WhatsApp Conectado</span>
-            <span className="status-text-short">Conectado</span>
-          </span>
-        );
-      case 'connecting':
-        return (
-          <span className="badge badge-avisado nav-status-pill" style={{ cursor: 'pointer' }} onClick={onOpenWhatsAppModal}>
-            <span className="status-dot connecting"></span>
-            <span className="status-text-full">Conectando...</span>
-            <span className="status-text-short">Conectando</span>
-          </span>
-        );
-      default:
-        return (
-          <span className="badge badge-vencido nav-status-pill" style={{ cursor: 'pointer' }} onClick={onOpenWhatsAppModal}>
-            <span className="status-dot offline"></span>
-            <span className="status-text-full">Conectar WhatsApp</span>
-            <span className="status-text-short">Conectar</span>
-          </span>
-        );
-    }
+    const status =
+      whatsAppStatus === 'open'
+        ? { badge: 'badge-pago', dot: 'online', full: 'WhatsApp conectado', short: 'Conectado' }
+        : whatsAppStatus === 'connecting'
+          ? { badge: 'badge-avisado', dot: 'connecting', full: 'Conectando...', short: 'Conectando' }
+          : { badge: 'badge-vencido', dot: 'offline', full: 'Conectar WhatsApp', short: 'Conectar' };
+
+    return (
+      <button
+        type="button"
+        className={`badge ${status.badge} nav-status-pill`}
+        onClick={onOpenWhatsAppModal}
+        title="Abrir a conexão do WhatsApp"
+      >
+        <span className={`status-dot ${status.dot}`} aria-hidden="true"></span>
+        <span className="status-text-full">{status.full}</span>
+        <span className="status-text-short">{status.short}</span>
+      </button>
+    );
   };
 
   return (
     <nav className="navbar">
       <div className="navbar-inner">
-        {/* Brand */}
-        <div className="brand" onClick={() => onTabChange('dashboard')}>
-          <div className="brand-icon">
-            <MessageSquare size={22} />
-          </div>
-          <div className="brand-text-block">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="brand-title">FlowZap</span>
-              <span className="brand-badge">{isRemotePanel ? 'Online' : 'Sede'}</span>
-            </div>
-            <div className="brand-subtitle">
-              Cobrança Recorrente WhatsApp
-            </div>
-          </div>
-        </div>
+        <button type="button" className="brand" onClick={() => onTabChange('dashboard')} title="Ir para a visão geral">
+          <img src="/logo.webp" alt="" className="brand-logo" width={38} height={38} />
+          <span className="brand-text-block">
+            <span className="brand-title">{'A&V Store'}</span>
+            <span className="brand-subtitle">
+              FlowZap · {isRemotePanel ? 'Painel online' : 'Sede'}
+            </span>
+          </span>
+        </button>
 
-        {/* Navigation Tabs (Row 2 on tablet/mobile, centered on desktop) */}
+        {/* Abas no topo (computador) e barra inferior (celular) */}
         <div className="nav-tabs-wrapper">
           <div className="nav-tabs">
-            <button
-              className={`nav-tab ${currentTab === 'dashboard' ? 'active' : ''}`}
-              onClick={() => onTabChange('dashboard')}
-            >
-              <LayoutDashboard size={16} />
-              <span>Dashboard</span>
-            </button>
-            <button
-              className={`nav-tab ${currentTab === 'clientes' ? 'active' : ''}`}
-              onClick={() => onTabChange('clientes')}
-            >
-              <Users size={16} />
-              <span>Clientes & Vendas</span>
-            </button>
-            <button
-              className={`nav-tab ${currentTab === 'contas-pagar' ? 'active' : ''}`}
-              onClick={() => onTabChange('contas-pagar')}
-            >
-              <Building2 size={16} />
-              <span>Quem Devemos</span>
-            </button>
-            <button
-              className={`nav-tab ${currentTab === 'notificacoes' ? 'active' : ''}`}
-              onClick={() => onTabChange('notificacoes')}
-            >
-              <Bell size={16} />
-              <span>Notificações do Dia</span>
-            </button>
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`nav-tab ${currentTab === tab.id ? 'active' : ''}`}
+                aria-current={currentTab === tab.id ? 'page' : undefined}
+                onClick={() => onTabChange(tab.id)}
+              >
+                {tab.icon}
+                <span className="tab-label-full">{tab.label}</span>
+                <span className="tab-label-short">{tab.short}</span>
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* User Controls & Connection Status */}
         <div className="nav-user-actions">
           {getStatusBadge()}
 
           {!isRemotePanel && (
             <button
+              type="button"
               className="btn btn-secondary btn-sm nav-qr-btn"
-              title="Escanear QR Code do WhatsApp"
+              title="QR Code do WhatsApp"
+              aria-label="QR Code do WhatsApp"
               onClick={onOpenWhatsAppModal}
             >
               <QrCode size={16} />
@@ -135,11 +118,13 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="nav-user-email">{user?.email}</div>
             </div>
             <button
+              type="button"
               className="btn btn-secondary btn-sm nav-logout-btn"
               title="Sair do sistema"
+              aria-label="Sair do sistema"
               onClick={logout}
             >
-              <LogOut size={16} color="var(--danger)" />
+              <LogOut size={16} />
             </button>
           </div>
         </div>

@@ -86,7 +86,7 @@ export const DisparoModal: React.FC<DisparoModalProps> = ({ isOpen, onClose, onS
         <div className="modal-body">
           {sentSuccess ? (
             <div style={{ textAlign: 'center', padding: '2rem 1rem' }}>
-              <CheckCircle size={52} color="var(--primary)" style={{ margin: '0 auto 1rem auto' }} />
+              <CheckCircle size={52} color="var(--success)" style={{ margin: '0 auto 1rem auto' }} />
               <h4 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>Envios Iniciados com Sucesso!</h4>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem', maxWidth: '480px', margin: '0 auto 1.5rem auto' }}>
                 As cobranças foram adicionadas à fila de envio segura com intervalos anti-ban (8 a 20 segundos entre cada envio) e simulação de digitação humana.
@@ -126,7 +126,7 @@ export const DisparoModal: React.FC<DisparoModalProps> = ({ isOpen, onClose, onS
                   <Clock size={36} color="var(--primary)" style={{ margin: '0 auto 0.75rem auto' }} />
                   <div style={{ fontWeight: 600, color: '#fff', marginBottom: '0.25rem' }}>Nenhuma cobrança pendente para hoje</div>
                   <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)' }}>
-                    Todas as cobranças do ciclo atual já foram enviadas ou ainda não atingiram o momento de lembrete (3 dias antes, 1 dia antes ou no dia do vencimento).
+                    Todas as cobranças do ciclo atual já foram enviadas ou ainda não atingiram o momento de lembrete (3, 2 ou 1 dia antes, ou no dia do vencimento).
                   </div>
                 </div>
               ) : (
@@ -167,7 +167,7 @@ export const DisparoModal: React.FC<DisparoModalProps> = ({ isOpen, onClose, onS
               )}
 
               {items.length > 0 && (
-                <div style={{ marginTop: '1.25rem', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.2)', padding: '10px 14px', borderRadius: '8px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <div style={{ marginTop: '1.25rem', background: 'rgba(var(--warning-rgb), 0.08)', border: '1px solid rgba(var(--warning-rgb), 0.2)', padding: '10px 14px', borderRadius: '8px', display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <AlertTriangle size={18} color="var(--warning)" style={{ flexShrink: 0 }} />
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                     Ao clicar em confirmar, as mensagens serão enviadas uma a uma com intervalo de segurança de 8 a 20 segundos entre cada cliente para proteção contra banimento.

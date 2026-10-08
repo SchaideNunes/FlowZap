@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext.js';
 import { api } from '../services/api.js';
-import { MessageSquare, Lock, Mail, ArrowRight } from 'lucide-react';
+import { Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 import { extractErrorMessage } from '../utils/error.js';
 
 export const Login: React.FC = () => {
@@ -27,110 +27,65 @@ export const Login: React.FC = () => {
   };
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '1.5rem',
-        background: 'radial-gradient(ellipse at top, #141f32 0%, #0b0f17 70%)',
-      }}
-    >
-      <div
-        className="card"
-        style={{
-          maxWidth: '440px',
-          width: '100%',
-          padding: '2.25rem',
-          boxShadow: 'var(--shadow-lg)',
-          borderColor: 'var(--border-subtle)',
-        }}
-      >
-        <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-          <div
-            className="brand-icon"
-            style={{ width: '48px', height: '48px', margin: '0 auto 1rem auto' }}
-          >
-            <MessageSquare size={26} />
-          </div>
-          <h1 style={{ fontSize: '1.65rem', marginBottom: '0.35rem' }}>AEV Celulares</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-            FlowZap • Cobranças Recorrentes via WhatsApp
-          </p>
+    <div className="login-page">
+      <div className="card login-card">
+        <div className="login-brand">
+          <img src="/logo.webp" alt="A&V Store" className="login-logo" width={96} height={96} />
+          <h1 className="login-title">{'A&V Store'}</h1>
+          <p className="login-subtitle">Gestão de cobranças · FlowZap</p>
         </div>
 
         {error && (
-          <div
-            style={{
-              color: 'var(--danger)',
-              fontSize: '0.85rem',
-              marginBottom: '1.25rem',
-              background: 'var(--danger-light)',
-              padding: '10px 12px',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
-            }}
-          >
+          <div className="alert alert-danger" role="alert">
+            <AlertCircle size={18} />
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">Email de Acesso</label>
-            <div style={{ position: 'relative' }}>
+            <label className="form-label" htmlFor="login-email">
+              E-mail
+            </label>
+            <div className="input-with-icon">
               <input
+                id="login-email"
                 type="email"
                 className="form-input"
                 required
+                autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="seu-email@flowzap.com"
-                style={{ paddingLeft: '2.5rem' }}
+                placeholder="voce@exemplo.com"
               />
-              <Mail
-                size={16}
-                color="var(--text-dim)"
-                style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
-              />
+              <Mail size={16} />
             </div>
           </div>
 
           <div className="form-group">
-            <label className="form-label">Senha</label>
-            <div style={{ position: 'relative' }}>
+            <label className="form-label" htmlFor="login-senha">
+              Senha
+            </label>
+            <div className="input-with-icon">
               <input
+                id="login-senha"
                 type="password"
                 className="form-input"
                 required
+                autoComplete="current-password"
                 value={senha}
                 onChange={(e) => setSenha(e.target.value)}
                 placeholder="Sua senha"
-                style={{ paddingLeft: '2.5rem' }}
               />
-              <Lock
-                size={16}
-                color="var(--text-dim)"
-                style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
-              />
+              <Lock size={16} />
             </div>
           </div>
 
-          <button
-            type="submit"
-            className="btn btn-primary btn-lg"
-            style={{ width: '100%', marginTop: '0.75rem' }}
-            disabled={loading}
-          >
-            {loading ? 'Entrando...' : 'Entrar no Painel'}
-            <ArrowRight size={18} />
+          <button type="submit" className="btn btn-primary btn-lg btn-block" style={{ marginTop: '0.5rem' }} disabled={loading}>
+            {loading ? 'Entrando...' : 'Entrar'}
+            {!loading && <ArrowRight size={18} />}
           </button>
         </form>
-
-        <div style={{ textAlign: 'center', marginTop: '1.5rem', fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-          Banco de Dados em Nuvem (Supabase) • Sede Local
-        </div>
       </div>
     </div>
   );

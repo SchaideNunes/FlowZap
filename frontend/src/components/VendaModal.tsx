@@ -146,11 +146,11 @@ export const VendaModal: React.FC<VendaModalProps> = ({
                 width: '36px',
                 height: '36px',
                 borderRadius: '8px',
-                background: 'rgba(16, 185, 129, 0.12)',
+                background: 'rgba(var(--neutral-rgb), 0.08)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                border: '1px solid rgba(16, 185, 129, 0.25)',
+                border: '1px solid rgba(var(--neutral-rgb), 0.14)',
               }}
             >
               <ShoppingBag size={18} color="var(--primary)" />
@@ -180,7 +180,7 @@ export const VendaModal: React.FC<VendaModalProps> = ({
                   background: 'var(--danger-light)',
                   padding: '8px 12px',
                   borderRadius: '8px',
-                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  border: '1px solid rgba(var(--danger-rgb), 0.25)',
                 }}
               >
                 {error}
@@ -350,7 +350,7 @@ export const VendaModal: React.FC<VendaModalProps> = ({
                   <span style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-dim)' }}>
                     {numParcelas === 1 ? 'Valor Final da Venda' : 'Valor da Parcela Mensal'}
                   </span>
-                  <span style={{ fontSize: '1.35rem', fontWeight: 800, color: '#34d399', letterSpacing: '-0.02em' }}>
+                  <span style={{ fontSize: '1.35rem', fontWeight: 600, color: '#fff', letterSpacing: '-0.02em', fontFamily: 'var(--font-heading)' }}>
                     {numParcelas === 1
                       ? `R$ ${totalComJuros.toFixed(2).replace('.', ',')}`
                       : `${numParcelas}x de R$ ${valorCadaParcela.toFixed(2).replace('.', ',')}`}
@@ -377,7 +377,7 @@ export const VendaModal: React.FC<VendaModalProps> = ({
                   {numJurosPct > 0 && (
                     <div>
                       <span style={{ color: 'var(--text-dim)' }}>Juros (+{numJurosPct}%): </span>
-                      <span style={{ color: '#fbbf24', fontWeight: 500 }}>
+                      <span style={{ color: 'var(--warning)', fontWeight: 500 }}>
                         +R$ {valorJurosCalculado.toFixed(2).replace('.', ',')}
                       </span>
                     </div>

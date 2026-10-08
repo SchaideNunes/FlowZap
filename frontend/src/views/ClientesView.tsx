@@ -2,27 +2,28 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Search,
   UserPlus,
-  PlusCircle,
+  Plus,
   CheckCircle2,
   ExternalLink,
   Edit2,
   History,
-  ToggleLeft,
-  ToggleRight,
   Phone,
-  Table,
-  DollarSign,
-  AlertCircle,
   Calendar,
   Check,
   ArrowUpDown,
   X,
   RefreshCw,
+  Pause,
+  Play,
 } from 'lucide-react';
 import { Cliente, Venda } from '../types/index.js';
 import { api } from '../services/api.js';
 import { formatFullWhatsApp } from '../utils/phone.js';
 import { extractErrorMessage } from '../utils/error.js';
+import { formatBRL, formatDateBR } from '../utils/format.js';
+import { PageHeader } from '../components/ui/PageHeader.js';
+import { StatTile } from '../components/ui/StatTile.js';
+import { EmptyState } from '../components/ui/EmptyState.js';
 
 interface ClientesViewProps {
   onOpenNovoClienteModal: () => void;
@@ -78,11 +79,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
       : '';
 
     const confirm = window.confirm(
-      `Confirmar recebimento do pagamento de "${venda.descricao}"${infoParcela} no valor de R$ ${Number(
-        venda.valor
-      )
-        .toFixed(2)
-        .replace('.', ',')}?`
+      `Confirmar recebimento do pagamento de "${venda.descricao}"${infoParcela} no valor de ${formatBRL(venda.valor)}?`
     );
     if (!confirm) return;
 
@@ -177,239 +174,113 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
     };
   }, [vendas]);
 
+  // Estado da cobrança: ponto colorido + rótulo (a cor nunca vai sozinha)
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pago':
         return (
-          <span className="badge badge-pago" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }}>
-            <Check size={11} /> Pago
+          <span className="badge badge-pago">
+            <span className="status-dot dot-success" aria-hidden="true" />
+            Pago
           </span>
         );
       case 'avisado_3d':
         return (
-          <span className="badge badge-avisado" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }}>
-            ● Avisado (3d)
+          <span className="badge badge-avisado" title="Já recebeu lembrete neste ciclo">
+            <span className="status-dot dot-warning" aria-hidden="true" />
+            Avisado
           </span>
         );
       case 'avisado_1d':
         return (
-          <span className="badge badge-avisado" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }}>
-            ● Avisado (1d)
+          <span className="badge badge-avisado" title="Recebeu o lembrete da véspera do vencimento">
+            <span className="status-dot dot-warning" aria-hidden="true" />
+            Avisado · véspera
           </span>
         );
       case 'vencido':
         return (
-          <span className="badge badge-vencido" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }}>
-            ● Vencido
+          <span className="badge badge-vencido">
+            <span className="status-dot dot-danger" aria-hidden="true" />
+            Vencido
           </span>
         );
       default:
         return (
-          <span className="badge badge-pendente" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }}>
-            ● Pendente
+          <span className="badge badge-pendente">
+            <span className="status-dot dot-neutral" aria-hidden="true" />
+            Pendente
           </span>
         );
     }
   };
 
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '-';
-    const [y, m, d] = dateStr.split('-');
-    return `${d}/${m}/${y}`;
-  };
+
+  const parcelasEmAberto = totals.countPendentes + totals.countAvisados + totals.countVencidos;
+  const somaValorFiltrado = filteredVendas.reduce((acc, v) => acc + (Number(v.valor) || 0), 0);
+  const somaTotalFiltrado = filteredVendas.reduce(
+    (acc, v) => acc + (Number(v.valor_total) || Number(v.valor) * (v.total_parcelas || 1)),
+    0
+  );
 
   return (
     <div>
-      {/* Top Header */}
-      <div className="view-header">
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div
-              style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '8px',
-                background: 'rgba(16, 185, 129, 0.12)',
-                border: '1px solid rgba(16, 185, 129, 0.25)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Table size={20} color="var(--primary)" />
-            </div>
-            <h2 style={{ fontSize: '1.6rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
-              Planilha de Clientes Devedores
-            </h2>
-          </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.86rem', marginTop: '4px' }}>
-            Visão centralizada estilo planilha para controle de vendas parceladas, vencimentos e cobranças via WhatsApp ({clientes.length} clientes cadastrados).
-          </p>
-        </div>
-
-        <div className="view-header-actions">
-          <button className="btn btn-secondary btn-sm" onClick={fetchData} disabled={loading}>
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            Atualizar
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={onOpenNovoClienteModal} style={{ padding: '0.5rem 1rem' }}>
-            <UserPlus size={16} /> Cadastrar Cliente
-          </button>
-          <button className="btn btn-primary btn-sm" onClick={() => onOpenNovaVendaModal()} style={{ padding: '0.5rem 1.15rem', fontWeight: 600 }}>
-            <PlusCircle size={16} /> + Nova Venda / Cobrança
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Clientes e vendas"
+        subtitle={`${clientes.length} ${clientes.length === 1 ? 'cliente' : 'clientes'} · ${totals.totalRegistros} ${
+          totals.totalRegistros === 1 ? 'venda' : 'vendas'
+        }`}
+        actions={
+          <>
+            <button className="btn btn-secondary btn-sm" onClick={fetchData} disabled={loading}>
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              Atualizar
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={onOpenNovoClienteModal}>
+              <UserPlus size={14} />
+              Novo cliente
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={() => onOpenNovaVendaModal()}>
+              <Plus size={15} />
+              Nova venda
+            </button>
+          </>
+        }
+      />
 
       {feedbackMsg && (
-        <div
-          style={{
-            background: 'rgba(16, 185, 129, 0.12)',
-            border: '1px solid var(--primary)',
-            color: '#34d399',
-            padding: '12px 18px',
-            borderRadius: '10px',
-            marginBottom: '1.25rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            fontSize: '0.9rem',
-            boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)',
-          }}
-        >
-          <CheckCircle2 size={19} />
+        <div className="alert alert-success" role="status">
+          <CheckCircle2 size={18} />
           {feedbackMsg}
         </div>
       )}
 
-      {/* BANNER VERDE EXCEL + CARDS DE KPIs */}
-      <div className="grid-cards" style={{ marginBottom: '1.5rem' }}>
-        {/* BANNER VERDE IDÊNTICO À PLANILHA */}
-        <div
-          className="card stat-card"
-          style={{
-            padding: '1.25rem',
-            borderLeft: '3px solid #00b050',
-          }}
-        >
-          <div className="stat-info">
-            <span className="stat-label" style={{ color: '#34d399', fontWeight: 700 }}>
-              VALOR TOTAL DAS DÍVIDAS
-            </span>
-            <span
-              className="stat-value"
-              style={{
-                color: '#34d399',
-                fontSize: '1.65rem',
-                fontVariantNumeric: 'tabular-nums',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              R$ {totals.valorEmAberto.toFixed(2).replace('.', ',')}
-            </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-              {totals.countPendentes + totals.countAvisados} parcelas em aberto no ciclo
-            </span>
-          </div>
-          <div
-            className="stat-icon"
-            style={{
-              background: 'rgba(16, 185, 129, 0.15)',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-            }}
-          >
-            <DollarSign size={22} color="#10b981" />
-          </div>
-        </div>
-
-        {/* Vencidos */}
-        <div
-          className="card stat-card"
-          style={{
-            padding: '1.25rem',
-            borderLeft: totals.countVencidos > 0 ? '3px solid #f43f5e' : '3px solid var(--border-subtle)',
-          }}
-        >
-          <div className="stat-info">
-            <span
-              className="stat-label"
-              style={{ color: totals.countVencidos > 0 ? '#fb7185' : 'var(--text-muted)' }}
-            >
-              VENCIDOS (ATENÇÃO)
-            </span>
-            <span
-              className="stat-value"
-              style={{ color: totals.countVencidos > 0 ? '#fb7185' : '#fff', fontSize: '1.65rem' }}
-            >
-              {totals.countVencidos} {totals.countVencidos === 1 ? 'venda' : 'vendas'}
-            </span>
-            <span
-              style={{
-                fontSize: '0.75rem',
-                color: totals.countVencidos > 0 ? '#fb7185' : 'var(--text-dim)',
-                marginTop: '4px',
-              }}
-            >
-              {totals.countVencidos > 0 ? 'Requer cobrança imediata' : 'Nenhuma parcela atrasada'}
-            </span>
-          </div>
-          <div
-            className="stat-icon"
-            style={{
-              background: 'rgba(244, 63, 94, 0.15)',
-              border: '1px solid rgba(244, 63, 94, 0.3)',
-            }}
-          >
-            <AlertCircle size={22} color={totals.countVencidos > 0 ? '#f43f5e' : 'var(--text-dim)'} />
-          </div>
-        </div>
-
-        {/* Recebidos */}
-        <div className="card stat-card" style={{ padding: '1.25rem', borderLeft: '3px solid #38bdf8' }}>
-          <div className="stat-info">
-            <span className="stat-label" style={{ color: '#38bdf8' }}>RECEBIDOS NO CICLO</span>
-            <span
-              className="stat-value"
-              style={{ color: '#38bdf8', fontSize: '1.65rem', fontVariantNumeric: 'tabular-nums' }}
-            >
-              R$ {totals.valorRecebido.toFixed(2).replace('.', ',')}
-            </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-              {totals.countPagos} parcelas confirmadas
-            </span>
-          </div>
-          <div
-            className="stat-icon"
-            style={{
-              background: 'rgba(56, 189, 248, 0.15)',
-              border: '1px solid rgba(56, 189, 248, 0.3)',
-            }}
-          >
-            <CheckCircle2 size={22} color="#38bdf8" />
-          </div>
-        </div>
-
-        {/* Base de Clientes */}
-        <div className="card stat-card" style={{ padding: '1.25rem', borderLeft: '3px solid #a855f7' }}>
-          <div className="stat-info">
-            <span className="stat-label" style={{ color: '#c084fc' }}>BASE DE CLIENTES</span>
-            <span className="stat-value" style={{ fontSize: '1.65rem' }}>
-              {clientes.length}
-            </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-              {totals.totalRegistros} vendas registradas
-            </span>
-          </div>
-          <div
-            className="stat-icon"
-            style={{
-              background: 'rgba(168, 85, 247, 0.15)',
-              border: '1px solid rgba(168, 85, 247, 0.3)',
-            }}
-          >
-            <Table size={22} color="#a855f7" />
-          </div>
-        </div>
+      {/* Indicadores (os clicáveis filtram a lista) */}
+      <div className="grid-cards">
+        <StatTile
+          label="Em aberto"
+          value={formatBRL(totals.valorEmAberto)}
+          hint={`${parcelasEmAberto} ${parcelasEmAberto === 1 ? 'parcela a receber' : 'parcelas a receber'}`}
+        />
+        <StatTile
+          label="Vencidas"
+          value={totals.countVencidos}
+          hint={totals.countVencidos > 0 ? 'Ver quem cobrar' : 'Nenhuma parcela atrasada'}
+          tone={totals.countVencidos > 0 ? 'danger' : 'neutral'}
+          onClick={() => setStatusFilter('vencido')}
+        />
+        <StatTile
+          label="Recebido no ciclo"
+          value={formatBRL(totals.valorRecebido)}
+          hint={`${totals.countPagos} ${totals.countPagos === 1 ? 'parcela confirmada' : 'parcelas confirmadas'}`}
+          tone={totals.countPagos > 0 ? 'success' : 'neutral'}
+          onClick={() => setStatusFilter('pago')}
+        />
+        <StatTile
+          label="Clientes"
+          value={clientes.length}
+          hint={`${totals.totalRegistros} ${totals.totalRegistros === 1 ? 'venda registrada' : 'vendas registradas'}`}
+        />
       </div>
 
       {/* Tabela Principal Estilo Excel */}
@@ -421,7 +292,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
               className="form-input"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por cliente devedor, WhatsApp ou aparelho..."
+              placeholder="Buscar cliente, WhatsApp ou produto"
               style={{
                 paddingLeft: '2.3rem',
                 paddingRight: search ? '2rem' : '0.8rem',
@@ -492,7 +363,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
               <span>Vencidos</span>
               <span
                 className="excel-filter-count"
-                style={{ color: totals.countVencidos > 0 ? '#f87171' : undefined }}
+                style={{ color: totals.countVencidos > 0 ? 'var(--danger)' : undefined }}
               >
                 {totals.countVencidos}
               </span>
@@ -539,203 +410,128 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
           </div>
         </div>
 
-        {/* Tabela Excel (Desktop e Tablet) */}
+        {/* Planilha (computador e tablet) */}
         <div className="excel-table-container desktop-table-view">
           <table className="excel-table">
             <thead>
               <tr>
-                <th style={{ width: '40px', textAlign: 'center' }}>#</th>
-                <th style={{ minWidth: '180px' }}>NOME CLIENTE DEVEDOR</th>
-                <th style={{ minWidth: '150px' }}>WHATSAPP</th>
-                <th style={{ minWidth: '180px' }}>DESCRIÇÃO DA VENDA / APARELHO</th>
-                <th style={{ minWidth: '95px', textAlign: 'center' }}>PARCELAS</th>
-                <th style={{ minWidth: '120px', textAlign: 'right' }}>VALOR DA DÍVIDA</th>
-                <th style={{ minWidth: '120px', textAlign: 'right' }}>VALOR TOTAL</th>
-                <th style={{ minWidth: '130px', textAlign: 'center' }}>DATA DE PAGAMENTO</th>
-                <th style={{ minWidth: '105px', textAlign: 'center' }}>STATUS</th>
-                <th style={{ minWidth: '180px', textAlign: 'center' }}>AÇÕES RÁPIDAS</th>
+                <th>Cliente</th>
+                <th>Venda</th>
+                <th style={{ textAlign: 'center' }}>Parcela</th>
+                <th className="num">Valor</th>
+                <th className="num col-optional">Total da venda</th>
+                <th>Vencimento</th>
+                <th>Status</th>
+                <th style={{ textAlign: 'right' }}>Ações</th>
               </tr>
             </thead>
 
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={10} style={{ textAlign: 'center', padding: '3.5rem', color: 'var(--text-dim)' }}>
-                    Carregando clientes devedores...
+                  <td colSpan={8}>
+                    <EmptyState title="Carregando vendas..." />
                   </td>
                 </tr>
               ) : filteredVendas.length === 0 ? (
                 <tr>
-                  <td colSpan={10} style={{ textAlign: 'center', padding: '4rem 1rem' }}>
-                    <div style={{ color: 'var(--text-muted)', marginBottom: '10px', fontSize: '0.95rem' }}>
-                      Nenhuma venda encontrada para os filtros atuais.
-                    </div>
-                    <button
-                      className="btn btn-primary btn-sm"
-                      onClick={() => onOpenNovaVendaModal()}
-                      style={{ marginTop: '0.5rem' }}
-                    >
-                      <PlusCircle size={14} /> Cadastrar Nova Venda
-                    </button>
+                  <td colSpan={8}>
+                    <EmptyState
+                      title="Nenhuma venda encontrada"
+                      text="Ajuste a busca ou os filtros, ou cadastre uma nova venda."
+                      action={
+                        <button className="btn btn-primary btn-sm" onClick={() => onOpenNovaVendaModal()}>
+                          <Plus size={14} /> Nova venda
+                        </button>
+                      }
+                    />
                   </td>
                 </tr>
               ) : (
-                filteredVendas.map((v, idx) => {
-                  const isParcelado = v.total_parcelas && v.total_parcelas > 1;
+                filteredVendas.map((v) => {
+                  const isParcelado = Boolean(v.total_parcelas && v.total_parcelas > 1);
                   const valorTotalCalc = v.valor_total || Number(v.valor) * (v.total_parcelas || 1);
                   const isVencido = v.status_mes_atual === 'vencido';
-                  const isPago = v.status_mes_atual === 'pago';
+                  const isQuitada = isParcelado && Boolean(v.parcela_atual && v.parcela_atual >= v.total_parcelas!);
 
                   return (
                     <tr
                       key={v.id}
-                      className={isVencido ? 'row-vencido' : isPago ? 'row-pago' : ''}
-                      style={{ opacity: v.ativo ? 1 : 0.6 }}
+                      className={isVencido ? 'row-vencido' : ''}
+                      style={{ opacity: v.ativo ? 1 : 0.55 }}
                     >
-                      <td style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.76rem', fontFamily: 'monospace' }}>
-                        {idx + 1}
-                      </td>
-
                       <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <span style={{ fontWeight: 600, color: '#fff', fontSize: '0.9rem' }}>
-                            {v.cliente?.nome || 'Cliente Desconhecido'}
-                          </span>
+                        <div className="cell-inline">
+                          <span className="cell-title">{v.cliente?.nome || 'Cliente desconhecido'}</span>
                           {v.cliente && (
                             <button
                               type="button"
+                              className="icon-btn-inline"
                               onClick={() => onEditCliente(v.cliente!)}
                               title="Editar dados do cliente"
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'var(--text-dim)',
-                                cursor: 'pointer',
-                                padding: '2px 4px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                borderRadius: '4px',
-                              }}
+                              aria-label="Editar dados do cliente"
                             >
                               <Edit2 size={12} />
                             </button>
                           )}
                         </div>
-                      </td>
-
-                      <td>
-                        {v.cliente?.whatsapp ? (
+                        {v.cliente?.whatsapp && (
                           <a
                             href={`https://wa.me/${v.cliente.whatsapp}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="whatsapp-pill-btn"
-                            title="Abrir WhatsApp"
+                            className="cell-link"
+                            title="Abrir conversa no WhatsApp"
                           >
                             <Phone size={11} />
-                            <span>{formatFullWhatsApp(v.cliente.whatsapp)}</span>
-                            <ExternalLink size={10} style={{ opacity: 0.7 }} />
+                            {formatFullWhatsApp(v.cliente.whatsapp)}
                           </a>
-                        ) : (
-                          <span style={{ color: 'var(--text-dim)' }}>-</span>
                         )}
                       </td>
 
                       <td>
-                        <div style={{ fontWeight: 600, color: '#f3f4f6', fontSize: '0.86rem' }}>
-                          {v.descricao}
-                        </div>
+                        {v.descricao}
                         {!v.ativo && (
-                          <span style={{ fontSize: '0.7rem', color: 'var(--danger)', fontWeight: 500 }}>
-                            {isParcelado && v.parcela_atual && v.parcela_atual >= v.total_parcelas!
-                              ? 'Totalmente Quitado'
-                              : 'Cobrança Pausada'}
-                          </span>
+                          <span className="cell-sub">{isQuitada ? 'Totalmente quitada' : 'Cobrança pausada'}</span>
                         )}
                       </td>
 
                       <td style={{ textAlign: 'center' }}>
                         {isParcelado ? (
-                          <span
-                            className="badge badge-avisado"
-                            style={{ fontSize: '0.74rem', padding: '3px 8px', fontWeight: 600, whiteSpace: 'nowrap' }}
-                          >
-                            {v.parcela_atual || 1} / {v.total_parcelas}x
+                          <span className="badge" title={`Parcela ${v.parcela_atual || 1} de ${v.total_parcelas}`}>
+                            {v.parcela_atual || 1}/{v.total_parcelas}
                           </span>
                         ) : (
-                          <span
-                            className="badge"
-                            style={{
-                              fontSize: '0.74rem',
-                              padding: '3px 8px',
-                              background: 'rgba(255, 255, 255, 0.05)',
-                              color: 'var(--text-muted)',
-                              border: '1px solid var(--border-subtle)',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            1x (À vista)
-                          </span>
+                          <span style={{ color: 'var(--text-dim)' }}>À vista</span>
                         )}
                       </td>
 
-                      <td
-                        style={{
-                          textAlign: 'right',
-                          fontWeight: 700,
-                          color: '#34d399',
-                          fontSize: '0.94rem',
-                          whiteSpace: 'nowrap',
-                          fontVariantNumeric: 'tabular-nums',
-                        }}
-                      >
-                        R$ {Number(v.valor).toFixed(2).replace('.', ',')}
+                      <td className="num cell-title">{formatBRL(v.valor)}</td>
+
+                      <td className="num col-optional" style={{ color: 'var(--text-muted)' }}>
+                        {formatBRL(valorTotalCalc)}
                       </td>
 
-                      <td
-                        style={{
-                          textAlign: 'right',
-                          color: 'var(--text-main)',
-                          fontSize: '0.86rem',
-                          whiteSpace: 'nowrap',
-                          fontVariantNumeric: 'tabular-nums',
-                        }}
-                      >
-                        R$ {Number(valorTotalCalc).toFixed(2).replace('.', ',')}
-                      </td>
-
-                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            fontSize: '0.84rem',
-                            color: isVencido ? '#f87171' : 'var(--text-main)',
-                            fontWeight: isVencido ? 600 : 400,
-                          }}
-                        >
-                          <Calendar size={13} color={isVencido ? '#ef4444' : 'var(--text-dim)'} />
-                          {formatDate(v.data_vencimento_atual)}
+                      <td>
+                        <span className={`date-cell ${isVencido ? 'is-overdue' : ''}`}>
+                          <Calendar size={13} />
+                          {formatDateBR(v.data_vencimento_atual)}
                         </span>
                       </td>
 
-                      <td style={{ textAlign: 'center' }}>
-                        {getStatusBadge(v.status_mes_atual)}
-                      </td>
+                      <td>{getStatusBadge(v.status_mes_atual)}</td>
 
-                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                      <td style={{ textAlign: 'right' }}>
+                        <div className="cell-actions">
                           {v.ativo && v.status_mes_atual !== 'pago' && (
                             <button
-                              className="btn btn-primary btn-sm"
-                              style={{ padding: '4px 10px', fontSize: '0.76rem', gap: '4px', fontWeight: 600 }}
+                              className="btn btn-pay btn-sm"
                               onClick={() => handleMarkAsPaid(v)}
                               disabled={payingVendaId === v.id}
-                              title="Confirmar recebimento do pagamento"
+                              title="Confirmar que o cliente pagou"
                             >
-                              <Check size={13} />
-                              {payingVendaId === v.id ? 'Salvando...' : 'Marcar Pago'}
+                              <Check size={14} />
+                              {payingVendaId === v.id ? 'Salvando...' : 'Marcar pago'}
                             </button>
                           )}
 
@@ -743,18 +539,20 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                             type="button"
                             className="table-action-btn"
                             onClick={() => onOpenHistoricoModal(v)}
-                            title="Ver histórico de mensagens WhatsApp"
+                            title="Histórico de mensagens"
+                            aria-label="Histórico de mensagens"
                           >
-                            <History size={14} />
+                            <History size={15} />
                           </button>
 
                           <button
                             type="button"
                             className="table-action-btn"
                             onClick={() => onEditVenda(v)}
-                            title="Editar dados da venda"
+                            title="Editar venda"
+                            aria-label="Editar venda"
                           >
-                            <Edit2 size={14} />
+                            <Edit2 size={15} />
                           </button>
 
                           <button
@@ -762,12 +560,9 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                             className="table-action-btn"
                             onClick={() => handleToggleVendaAtivo(v)}
                             title={v.ativo ? 'Pausar cobrança' : 'Reativar cobrança'}
+                            aria-label={v.ativo ? 'Pausar cobrança' : 'Reativar cobrança'}
                           >
-                            {v.ativo ? (
-                              <ToggleRight size={15} color="var(--primary)" />
-                            ) : (
-                              <ToggleLeft size={15} color="var(--text-dim)" />
-                            )}
+                            {v.ativo ? <Pause size={15} /> : <Play size={15} />}
                           </button>
                         </div>
                       </td>
@@ -780,254 +575,142 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
             {filteredVendas.length > 0 && (
               <tfoot>
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'left', color: 'var(--text-muted)' }}>
-                    <strong style={{ color: '#fff' }}>VALOR TOTAL CONSOLIDADO</strong> ({filteredVendas.length} registros exibidos):
+                  <td colSpan={3} style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
+                    Total de {filteredVendas.length} {filteredVendas.length === 1 ? 'venda' : 'vendas'}
                   </td>
-                  <td
-                    style={{
-                      textAlign: 'right',
-                      color: '#34d399',
-                      fontSize: '1rem',
-                      fontWeight: 700,
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  >
-                    R${' '}
-                    {filteredVendas
-                      .reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0)
-                      .toFixed(2)
-                      .replace('.', ',')}
+                  <td className="num">{formatBRL(somaValorFiltrado)}</td>
+                  <td className="num col-optional" style={{ color: 'var(--text-muted)' }}>
+                    {formatBRL(somaTotalFiltrado)}
                   </td>
-                  <td
-                    style={{
-                      textAlign: 'right',
-                      color: '#fff',
-                      fontSize: '0.94rem',
-                      fontWeight: 700,
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  >
-                    R${' '}
-                    {filteredVendas
-                      .reduce(
-                        (acc, curr) =>
-                          acc +
-                          (Number(curr.valor_total) ||
-                            Number(curr.valor) * (curr.total_parcelas || 1)),
-                        0
-                      )
-                      .toFixed(2)
-                      .replace('.', ',')}
-                  </td>
-                  <td colSpan={3} style={{ textAlign: 'right', color: 'var(--text-dim)', fontSize: '0.78rem' }}>
-                    Calculado em tempo real
-                  </td>
+                  <td colSpan={3}></td>
                 </tr>
               </tfoot>
             )}
           </table>
         </div>
 
-        {/* Visualização em Cartões Inteligentes para Celular / Mobile View */}
+        {/* Cartões (celular) */}
         <div className="mobile-cards-view">
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-dim)' }}>
-              Carregando clientes devedores...
-            </div>
+            <EmptyState title="Carregando vendas..." />
           ) : filteredVendas.length === 0 ? (
-            <div
-              style={{
-                textAlign: 'center',
-                padding: '2.5rem 1rem',
-                background: 'var(--bg-card)',
-                borderRadius: '12px',
-                border: '1px solid var(--border-subtle)',
-              }}
-            >
-              <div style={{ color: 'var(--text-muted)', marginBottom: '10px', fontSize: '0.9rem' }}>
-                Nenhuma venda encontrada para os filtros atuais.
-              </div>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => onOpenNovaVendaModal()}
-              >
-                <PlusCircle size={14} /> Cadastrar Nova Venda
-              </button>
-            </div>
+            <EmptyState
+              title="Nenhuma venda encontrada"
+              text="Ajuste a busca ou os filtros, ou cadastre uma nova venda."
+              action={
+                <button className="btn btn-primary" onClick={() => onOpenNovaVendaModal()}>
+                  <Plus size={16} /> Nova venda
+                </button>
+              }
+            />
           ) : (
             <>
               {filteredVendas.map((v, idx) => {
-                const isParcelado = v.total_parcelas && v.total_parcelas > 1;
+                const isParcelado = Boolean(v.total_parcelas && v.total_parcelas > 1);
                 const valorTotalCalc = v.valor_total || Number(v.valor) * (v.total_parcelas || 1);
                 const isVencido = v.status_mes_atual === 'vencido';
                 const isPago = v.status_mes_atual === 'pago';
-                const isAvisado = v.status_mes_atual === 'avisado_3d' || v.status_mes_atual === 'avisado_1d';
+                const isAvisado = v.status_mes_atual.startsWith('avisado');
 
                 return (
                   <div
                     key={v.id}
                     className={`mobile-record-card ${
-                      isVencido
-                        ? 'card-vencido'
-                        : isPago
-                        ? 'card-pago'
-                        : isAvisado
-                        ? 'card-avisado'
-                        : 'card-pendente'
+                      isVencido ? 'card-vencido' : isPago ? 'card-pago' : isAvisado ? 'card-avisado' : ''
                     }`}
-                    style={{ opacity: v.ativo ? 1 : 0.65 }}
+                    style={{ opacity: v.ativo ? 1 : 0.6 }}
                   >
-                    {/* Header do Card Mobile: Nome do Cliente + Status */}
+                    {/* Quem e o quê */}
                     <div className="mobile-card-header">
                       <div className="mobile-card-title-group">
-                        <div className="client-avatar-badge">
+                        <div className="client-avatar-badge" aria-hidden="true">
                           {v.cliente?.nome ? v.cliente.nome.slice(0, 2).toUpperCase() : `#${idx + 1}`}
                         </div>
                         <div style={{ minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <span className="mobile-card-name">
-                              {v.cliente?.nome || 'Cliente Desconhecido'}
-                            </span>
+                          <div className="cell-inline">
+                            <span className="mobile-card-name">{v.cliente?.nome || 'Cliente desconhecido'}</span>
                             {v.cliente && (
                               <button
                                 type="button"
                                 onClick={() => onEditCliente(v.cliente!)}
                                 className="mobile-icon-btn"
                                 title="Editar dados do cliente"
+                                aria-label="Editar dados do cliente"
                               >
-                                <Edit2 size={12} />
+                                <Edit2 size={13} />
                               </button>
                             )}
                           </div>
-                          <div style={{ fontSize: '0.75rem', color: '#f3f4f6', fontWeight: 500, marginTop: '2px' }}>
-                            {v.descricao}
-                          </div>
+                          <div className="list-row-sub">{v.descricao}</div>
                         </div>
                       </div>
 
-                      <div>{getStatusBadge(v.status_mes_atual)}</div>
+                      {getStatusBadge(v.status_mes_atual)}
                     </div>
 
-                    {/* Linha de Contato e Parcelamento */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      {v.cliente?.whatsapp ? (
-                        <a
-                          href={`https://wa.me/${v.cliente.whatsapp}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="whatsapp-pill-btn"
-                          style={{ fontSize: '0.76rem', padding: '3px 8px' }}
-                        >
-                          <Phone size={11} />
-                          <span>{formatFullWhatsApp(v.cliente.whatsapp)}</span>
-                          <ExternalLink size={10} style={{ opacity: 0.7 }} />
-                        </a>
-                      ) : (
-                        <span style={{ fontSize: '0.74rem', color: 'var(--text-dim)' }}>Sem WhatsApp</span>
-                      )}
-
-                      {isParcelado ? (
-                        <span className="badge badge-avisado" style={{ fontSize: '0.72rem', padding: '2px 8px' }}>
-                          Parcela {v.parcela_atual || 1} de {v.total_parcelas}x
-                        </span>
-                      ) : (
-                        <span
-                          className="badge"
-                          style={{
-                            fontSize: '0.72rem',
-                            padding: '2px 8px',
-                            background: 'rgba(255,255,255,0.06)',
-                            color: 'var(--text-muted)',
-                            border: '1px solid var(--border-subtle)',
-                          }}
-                        >
-                          1x (À vista)
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Caixa Financeira Destacada */}
+                    {/* Quanto e quando */}
                     <div className="mobile-card-body">
                       <div className="mobile-card-finance-row">
                         <div>
                           <div className="mobile-card-val-label">
-                            {isParcelado ? 'Valor da Parcela' : 'Valor da Dívida'}
+                            {isParcelado ? `Parcela ${v.parcela_atual || 1} de ${v.total_parcelas}` : 'Valor'}
                           </div>
-                          <div
-                            className="mobile-card-val-main"
-                            style={{ color: isVencido ? '#f87171' : isPago ? '#34d399' : '#38bdf8' }}
-                          >
-                            R$ {Number(v.valor).toFixed(2).replace('.', ',')}
-                          </div>
+                          <div className="mobile-card-val-main">{formatBRL(v.valor)}</div>
                         </div>
 
                         <div style={{ textAlign: 'right' }}>
-                          <div className="mobile-card-val-label">Valor Total</div>
-                          <div
-                            style={{
-                              fontSize: '0.92rem',
-                              fontWeight: 600,
-                              color: '#fff',
-                              fontVariantNumeric: 'tabular-nums',
-                            }}
-                          >
-                            R$ {Number(valorTotalCalc).toFixed(2).replace('.', ',')}
-                          </div>
+                          <div className="mobile-card-val-label">Vencimento</div>
+                          <span className={`date-cell ${isVencido ? 'is-overdue' : ''}`}>
+                            <Calendar size={13} />
+                            {formatDateBR(v.data_vencimento_atual)}
+                          </span>
                         </div>
                       </div>
 
                       <div className="mobile-card-meta-grid">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <Calendar size={13} color={isVencido ? '#ef4444' : 'var(--text-dim)'} />
-                          <span
-                            style={{
-                              color: isVencido ? '#f87171' : 'var(--text-main)',
-                              fontWeight: isVencido ? 600 : 400,
-                            }}
+                        {v.cliente?.whatsapp ? (
+                          <a
+                            href={`https://wa.me/${v.cliente.whatsapp}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="cell-link"
                           >
-                            Vence: {formatDate(v.data_vencimento_atual)}
-                          </span>
-                        </div>
+                            <Phone size={12} />
+                            {formatFullWhatsApp(v.cliente.whatsapp)}
+                            <ExternalLink size={10} />
+                          </a>
+                        ) : (
+                          <span>Sem WhatsApp</span>
+                        )}
 
-                        <div style={{ textAlign: 'right' }}>
-                          {!v.ativo ? (
-                            <span style={{ color: 'var(--danger)', fontSize: '0.72rem', fontWeight: 600 }}>
-                              ● Pausada
-                            </span>
-                          ) : (
-                            <span style={{ color: 'var(--primary)', fontSize: '0.72rem' }}>
-                              ● Cobrança Ativa
-                            </span>
-                          )}
-                        </div>
+                        <span>
+                          {!v.ativo ? 'Cobrança pausada' : isParcelado ? `Total ${formatBRL(valorTotalCalc)}` : 'À vista'}
+                        </span>
                       </div>
                     </div>
 
-                    {/* Barra de Ações Rápidas */}
+                    {/* Ações */}
                     <div className="mobile-card-actions">
-                      {v.ativo && v.status_mes_atual !== 'pago' ? (
+                      {v.ativo && !isPago ? (
                         <button
-                          className="btn btn-primary btn-sm"
-                          style={{ flex: 1, padding: '7px 12px', fontSize: '0.8rem', fontWeight: 600 }}
+                          className="btn btn-pay"
+                          style={{ flex: 1 }}
                           onClick={() => handleMarkAsPaid(v)}
                           disabled={payingVendaId === v.id}
                         >
-                          <Check size={14} />
-                          {payingVendaId === v.id ? 'Salvando...' : 'Marcar Pago'}
+                          <Check size={16} />
+                          {payingVendaId === v.id ? 'Salvando...' : 'Marcar pago'}
                         </button>
                       ) : (
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            color: '#34d399',
-                            fontSize: '0.78rem',
-                            fontWeight: 600,
-                          }}
-                        >
-                          <CheckCircle2 size={16} /> Pagamento Confirmado
-                        </div>
+                        <span className="figure-label" style={{ flex: 1 }}>
+                          {isPago ? (
+                            <>
+                              <CheckCircle2 size={16} color="var(--success)" /> Pagamento confirmado
+                            </>
+                          ) : (
+                            'Cobrança pausada'
+                          )}
+                        </span>
                       )}
 
                       <div style={{ display: 'flex', gap: '6px' }}>
@@ -1035,20 +718,20 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                           type="button"
                           className="table-action-btn"
                           onClick={() => onOpenHistoricoModal(v)}
-                          title="Ver histórico de mensagens WhatsApp"
-                          style={{ padding: '6px 9px' }}
+                          title="Histórico de mensagens"
+                          aria-label="Histórico de mensagens"
                         >
-                          <History size={14} />
+                          <History size={16} />
                         </button>
 
                         <button
                           type="button"
                           className="table-action-btn"
                           onClick={() => onEditVenda(v)}
-                          title="Editar dados da venda"
-                          style={{ padding: '6px 9px' }}
+                          title="Editar venda"
+                          aria-label="Editar venda"
                         >
-                          <Edit2 size={14} />
+                          <Edit2 size={16} />
                         </button>
 
                         <button
@@ -1056,13 +739,9 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                           className="table-action-btn"
                           onClick={() => handleToggleVendaAtivo(v)}
                           title={v.ativo ? 'Pausar cobrança' : 'Reativar cobrança'}
-                          style={{ padding: '6px 9px' }}
+                          aria-label={v.ativo ? 'Pausar cobrança' : 'Reativar cobrança'}
                         >
-                          {v.ativo ? (
-                            <ToggleRight size={16} color="var(--primary)" />
-                          ) : (
-                            <ToggleLeft size={16} color="var(--text-dim)" />
-                          )}
+                          {v.ativo ? <Pause size={16} /> : <Play size={16} />}
                         </button>
                       </div>
                     </div>
@@ -1070,50 +749,18 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                 );
               })}
 
-              {/* Rodapé Resumo Mobile */}
+              {/* Resumo */}
               <div className="mobile-summary-footer">
                 <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
-                    Total em Aberto ({filteredVendas.length} cobranças):
+                  <div className="mobile-card-val-label">
+                    Total de {filteredVendas.length} {filteredVendas.length === 1 ? 'venda' : 'vendas'}
                   </div>
-                  <div
-                    style={{
-                      fontSize: '1.25rem',
-                      fontWeight: 800,
-                      color: '#34d399',
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  >
-                    R${' '}
-                    {filteredVendas
-                      .reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0)
-                      .toFixed(2)
-                      .replace('.', ',')}
-                  </div>
+                  <div className="figure-value">{formatBRL(somaValorFiltrado)}</div>
                 </div>
 
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>Valor Consolidado:</div>
-                  <div
-                    style={{
-                      fontSize: '0.95rem',
-                      fontWeight: 700,
-                      color: '#fff',
-                      fontVariantNumeric: 'tabular-nums',
-                    }}
-                  >
-                    R${' '}
-                    {filteredVendas
-                      .reduce(
-                        (acc, curr) =>
-                          acc +
-                          (Number(curr.valor_total) ||
-                            Number(curr.valor) * (curr.total_parcelas || 1)),
-                        0
-                      )
-                      .toFixed(2)
-                      .replace('.', ',')}
-                  </div>
+                  <div className="mobile-card-val-label">Total das vendas</div>
+                  <div style={{ fontWeight: 600 }}>{formatBRL(somaTotalFiltrado)}</div>
                 </div>
               </div>
             </>

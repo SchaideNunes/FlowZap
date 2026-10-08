@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Bell,
   Clock,
   AlertTriangle,
   Send,
   CheckCircle2,
   Calendar,
-  ExternalLink,
   RefreshCw,
   MessageSquare,
   Check,
@@ -14,7 +12,6 @@ import {
   Phone,
   ChevronDown,
   ChevronUp,
-  CheckCircle,
 } from 'lucide-react';
 import {
   CentralNotificacoesData,
@@ -28,6 +25,10 @@ import { api } from '../services/api.js';
 import { formatFullWhatsApp } from '../utils/phone.js';
 import { extractErrorMessage } from '../utils/error.js';
 import { summarizeSede } from '../utils/sede.js';
+import { formatBRL } from '../utils/format.js';
+import { PageHeader } from '../components/ui/PageHeader.js';
+import { StatTile, StatTone } from '../components/ui/StatTile.js';
+import { EmptyState } from '../components/ui/EmptyState.js';
 
 interface NotificacoesViewProps {
   whatsAppInfo: WhatsAppStatus;
@@ -135,7 +136,7 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
 
   const handleMarkAsPaid = async (vendaId: number, nome: string, valor: number) => {
     const confirm = window.confirm(
-      `Confirmar recebimento do pagamento de "${nome}" no valor de R$ ${valor.toFixed(2).replace('.', ',')}?`
+      `Confirmar recebimento do pagamento de "${nome}" no valor de ${formatBRL(valor)}?`
     );
     if (!confirm) return;
 
@@ -152,78 +153,66 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
     }
   };
 
+  // Tipo do aviso: ícone + rótulo
   const getTipoBadge = (tipo: string) => {
     switch (tipo) {
       case 'lembrete_3d':
         return (
-          <span className="badge badge-avisado" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }}>
-            <Clock size={12} /> Lembrete (3 dias antes)
+          <span className="badge badge-avisado">
+            <Clock size={12} /> Lembrete · 3 dias
           </span>
         );
       case 'lembrete_2d':
         return (
-          <span className="badge badge-avisado" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }}>
-            <Clock size={12} /> Lembrete (2 dias antes)
+          <span className="badge badge-avisado">
+            <Clock size={12} /> Lembrete · 2 dias
           </span>
         );
       case 'lembrete_1d':
         return (
-          <span
-            className="badge"
-            style={{
-              whiteSpace: 'nowrap',
-              padding: '4px 10px',
-              background: 'rgba(245, 158, 11, 0.12)',
-              color: '#fbbf24',
-              border: '1px solid rgba(245, 158, 11, 0.25)',
-            }}
-          >
-            <AlertTriangle size={12} /> Lembrete (Vence Amanhã)
+          <span className="badge badge-avisado">
+            <Clock size={12} /> Lembrete · véspera
           </span>
         );
       case 'vencido':
         return (
-          <span className="badge badge-vencido" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }}>
-            <AlertTriangle size={12} /> Vence Hoje / Vencido
+          <span className="badge badge-vencido">
+            <AlertTriangle size={12} /> Aviso de vencimento
           </span>
         );
       default:
-        return (
-          <span className="badge badge-pendente" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }}>
-            Lembrete
-          </span>
-        );
+        return <span className="badge">Lembrete</span>;
     }
   };
 
   const getDelayBadge = (dias: number) => {
     if (dias === 0) {
       return (
-        <span className="badge badge-avisado" style={{ whiteSpace: 'nowrap' }}>
-          Vence Hoje
-        </span>
-      );
-    }
-    if (dias <= 3) {
-      return (
-        <span
-          className="badge"
-          style={{
-            background: 'rgba(245, 158, 11, 0.15)',
-            color: '#fbbf24',
-            border: '1px solid rgba(245, 158, 11, 0.3)',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {dias} {dias === 1 ? 'dia' : 'dias'} de atraso
+        <span className="badge badge-avisado">
+          <span className="status-dot dot-warning" aria-hidden="true" />
+          Vence hoje
         </span>
       );
     }
     return (
-      <span className="badge badge-vencido" style={{ whiteSpace: 'nowrap' }}>
-        {dias} dias de atraso (Atenção)
+      <span className={`badge ${dias <= 3 ? 'badge-avisado' : 'badge-vencido'}`}>
+        <span className={`status-dot ${dias <= 3 ? 'dot-warning' : 'dot-danger'}`} aria-hidden="true" />
+        {dias} {dias === 1 ? 'dia' : 'dias'} de atraso
       </span>
     );
+  };
+
+  const getUltimoEnvioLabel = (tipo: string) => {
+    switch (tipo) {
+      case 'vencido':
+        return 'Aviso de vencimento';
+      case 'lembrete_1d':
+        return 'Lembrete da véspera';
+      case 'lembrete_2d':
+        return 'Lembrete de 2 dias';
+      default:
+        return 'Lembrete de 3 dias';
+    }
   };
 
   const formatDateTime = (isoStr?: string) => {
@@ -242,180 +231,99 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
     setExpandedMessageId((prev) => (prev === id ? null : id));
   };
 
+  // Nome do cliente com o telefone logo abaixo (abre a conversa no WhatsApp)
+  const renderCliente = (nome: string, whatsapp: string, href: string, title: string) => (
+    <div className="cell-stack">
+      <span className="cell-title">{nome}</span>
+      {whatsapp && (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="cell-link" title={title}>
+          <Phone size={11} />
+          {formatFullWhatsApp(whatsapp)}
+        </a>
+      )}
+    </div>
+  );
+
   const totalEnviados = data.enviadosRecentes?.length || 0;
   const totalPagosAposEnvio = data.resumo.totalPagosAposEnvio || 0;
 
+  const sedeTone: Record<string, StatTone> = { ok: 'success', warn: 'warning', off: 'danger', unknown: 'neutral' };
+  const conexao = isRemotePanel
+    ? { label: 'Máquina-sede', value: sede.short, tone: sedeTone[sede.tone], hint: 'Os envios saem pelo computador da loja' }
+    : whatsAppStatus === 'open'
+      ? { label: 'WhatsApp', value: 'Conectado', tone: 'success' as StatTone, hint: 'Pronto para enviar' }
+      : whatsAppStatus === 'connecting'
+        ? { label: 'WhatsApp', value: 'Conectando...', tone: 'warning' as StatTone, hint: 'Aguarde a conexão' }
+        : { label: 'WhatsApp', value: 'Desconectado', tone: 'danger' as StatTone, hint: 'Toque para conectar' };
+
   return (
     <div>
-      {/* Top Header */}
-      <div className="view-header">
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div
-              style={{
-                width: '38px',
-                height: '38px',
-                borderRadius: '8px',
-                background: 'rgba(59, 130, 246, 0.12)',
-                border: '1px solid rgba(59, 130, 246, 0.25)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Bell size={22} color="#3b82f6" />
-            </div>
-            <div>
-              <h2 style={{ fontSize: '1.55rem', fontWeight: 700, letterSpacing: '-0.02em' }}>
-                Central de Notificações & Cobranças
-              </h2>
-            </div>
-          </div>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '4px' }}>
-            Acompanhe quem será notificado hoje, os números disparados no último lote e controle os pagamentos.
-          </p>
-        </div>
+      <PageHeader
+        title="Notificações"
+        subtitle="Quem será avisado hoje, o que já foi enviado e quem está em atraso."
+        actions={
+          <>
+            <button className="btn btn-secondary btn-sm" onClick={() => fetchCentralData()} disabled={loading}>
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              Atualizar
+            </button>
 
-        <div className="view-header-actions">
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => fetchCentralData()}
-            disabled={loading}
-            title="Recarregar dados"
-          >
-            <RefreshCw size={15} className={loading ? 'spin' : ''} /> Atualizar
-          </button>
-
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={handleDispatchToday}
-            disabled={isRemotePanel || dispatching || data.agendadosHoje.length === 0}
-            title={isRemotePanel ? 'Os disparos saem pela máquina-sede' : undefined}
-            style={{ fontWeight: 600, padding: '0.5rem 1.15rem' }}
-          >
-            <Send size={15} />
-            {dispatching
-              ? 'Enfileirando...'
-              : `Disparar Notificações de Hoje (${data.agendadosHoje.length})`}
-          </button>
-        </div>
-      </div>
+            {!isRemotePanel && (
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleDispatchToday}
+                disabled={dispatching || data.agendadosHoje.length === 0}
+                title={data.agendadosHoje.length === 0 ? 'Não há avisos para enviar hoje' : undefined}
+              >
+                <Send size={15} />
+                {dispatching ? 'Enfileirando...' : `Disparar avisos de hoje (${data.agendadosHoje.length})`}
+              </button>
+            )}
+          </>
+        }
+      />
 
       {feedbackMsg && (
-        <div
-          style={{
-            background: 'rgba(16, 185, 129, 0.12)',
-            border: '1px solid var(--primary)',
-            color: '#34d399',
-            padding: '12px 18px',
-            borderRadius: '10px',
-            marginBottom: '1.25rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            fontSize: '0.9rem',
-          }}
-        >
-          <CheckCircle2 size={19} />
+        <div className="alert alert-success" role="status">
+          <CheckCircle2 size={18} />
           {feedbackMsg}
         </div>
       )}
 
-      {/* Cards de KPIs Rápidos */}
-      <div className="grid-cards" style={{ marginBottom: '1.5rem' }}>
-        <div className="card stat-card" style={{ padding: '1.1rem 1.25rem', borderLeft: '3px solid #3b82f6' }}>
-          <div className="stat-info">
-            <span className="stat-label">NOTIFICAÇÕES PARA HOJE</span>
-            <span className="stat-value" style={{ color: '#60a5fa', fontSize: '1.5rem' }}>
-              {data.resumo.totalHoje} {data.resumo.totalHoje === 1 ? 'cliente' : 'clientes'}
-            </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-              R$ {data.resumo.valorHoje.toFixed(2).replace('.', ',')} a receber hoje
-            </span>
-          </div>
-          <div className="stat-icon" style={{ background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
-            <Clock size={22} color="#3b82f6" />
-          </div>
-        </div>
-
-        <div className="card stat-card" style={{ padding: '1.1rem 1.25rem', borderLeft: '3px solid #10b981' }}>
-          <div className="stat-info">
-            <span className="stat-label">ÚLTIMO DISPARO (ENVIADOS)</span>
-            <span className="stat-value" style={{ color: '#34d399', fontSize: '1.5rem' }}>
-              {totalEnviados} {totalEnviados === 1 ? 'mensagem' : 'mensagens'}
-            </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-              <strong style={{ color: '#34d399' }}>{totalPagosAposEnvio}</strong> já confirmaram pagamento
-            </span>
-          </div>
-          <div className="stat-icon" style={{ background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
-            <Send size={22} color="#10b981" />
-          </div>
-        </div>
-
-        <div className="card stat-card" style={{ padding: '1.1rem 1.25rem', borderLeft: '3px solid #ef4444' }}>
-          <div className="stat-info">
-            <span className="stat-label">EM ATRASO (COBRANÇA ATIVA)</span>
-            <span className="stat-value" style={{ color: '#f87171', fontSize: '1.5rem' }}>
-              {data.resumo.totalAtrasados} {data.resumo.totalAtrasados === 1 ? 'venda' : 'vendas'}
-            </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-              R$ {data.resumo.valorAtrasado.toFixed(2).replace('.', ',')} vencidos em aberto
-            </span>
-          </div>
-          <div className="stat-icon" style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
-            <AlertTriangle size={22} color="#ef4444" />
-          </div>
-        </div>
-
-        <div className="card stat-card" style={{ padding: '1.1rem 1.25rem', borderLeft: '3px solid #8b5cf6' }}>
-          <div className="stat-info">
-            <span className="stat-label">{isRemotePanel ? 'MÁQUINA-SEDE' : 'CONEXÃO WHATSAPP'}</span>
-            <span className="stat-value" style={{ fontSize: '1.35rem' }}>
-              {isRemotePanel ? (
-                <span
-                  style={{
-                    color: sede.tone === 'ok' ? '#34d399' : sede.tone === 'warn' ? '#fbbf24' : sede.tone === 'off' ? '#f87171' : 'var(--text-muted)',
-                    fontSize: '1.25rem',
-                  }}
-                >
-                  {sede.short}
-                </span>
-              ) : whatsAppStatus === 'open' ? (
-                <span style={{ color: '#34d399', fontSize: '1.25rem' }}>Conectado</span>
-              ) : whatsAppStatus === 'connecting' ? (
-                <span style={{ color: '#fbbf24', fontSize: '1.25rem' }}>Conectando...</span>
-              ) : (
-                <span style={{ color: '#f87171', fontSize: '1.25rem' }}>Desconectado</span>
-              )}
-            </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-              {isRemotePanel
-                ? 'Envios saem pelo computador da loja'
-                : whatsAppStatus === 'open'
-                  ? 'Pronto para disparos'
-                  : 'Clique para conectar'}
-            </span>
-          </div>
-          <div
-            className="stat-icon"
-            style={{
-              background: 'rgba(139, 92, 246, 0.12)',
-              border: '1px solid rgba(139, 92, 246, 0.25)',
-              cursor: isRemotePanel ? 'default' : 'pointer',
-            }}
-            onClick={isRemotePanel ? undefined : onOpenWhatsAppModal}
-            title={isRemotePanel ? sede.detail : undefined}
-          >
-            <Phone size={22} color="#a78bfa" />
-          </div>
-        </div>
+      {/* Indicadores (clicáveis: abrem a lista correspondente) */}
+      <div className="grid-cards">
+        <StatTile
+          label="Para enviar hoje"
+          value={data.resumo.totalHoje}
+          hint={`${formatBRL(data.resumo.valorHoje)} em cobranças`}
+          tone={data.resumo.totalHoje > 0 ? 'warning' : 'neutral'}
+          onClick={() => setActiveTab('hoje')}
+        />
+        <StatTile
+          label="Enviadas"
+          value={totalEnviados}
+          hint={`${totalPagosAposEnvio} ${totalPagosAposEnvio === 1 ? 'já pagou' : 'já pagaram'}`}
+          onClick={() => setActiveTab('enviados')}
+        />
+        <StatTile
+          label="Em atraso"
+          value={data.resumo.totalAtrasados}
+          hint={`${formatBRL(data.resumo.valorAtrasado)} em aberto`}
+          tone={data.resumo.totalAtrasados > 0 ? 'danger' : 'neutral'}
+          onClick={() => setActiveTab('atrasados')}
+        />
+        <StatTile
+          label={conexao.label}
+          value={conexao.value}
+          hint={conexao.hint}
+          tone={conexao.tone}
+          onClick={isRemotePanel ? undefined : onOpenWhatsAppModal}
+          title={isRemotePanel ? sede.detail : undefined}
+        />
       </div>
 
-      {/* Wrapper Principal de Notificações */}
       <div className="excel-wrapper">
-        {/* Seletor de Abas da Central */}
-        <div className="excel-toolbar" style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+        <div className="excel-toolbar">
           <div className="excel-filters">
             <button
               type="button"
@@ -423,7 +331,7 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
               onClick={() => setActiveTab('hoje')}
             >
               <Calendar size={14} />
-              <span>Notificações de Hoje</span>
+              <span>Para enviar hoje</span>
               <span className="excel-filter-count">{data.agendadosHoje.length}</span>
             </button>
 
@@ -432,11 +340,9 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
               className={`excel-filter-btn ${activeTab === 'enviados' ? 'active' : ''}`}
               onClick={() => setActiveTab('enviados')}
             >
-              <Send size={14} color="#34d399" />
-              <span>Enviados no Último Disparo</span>
-              <span className="excel-filter-count" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#34d399' }}>
-                {totalEnviados}
-              </span>
+              <Send size={14} />
+              <span>Enviadas</span>
+              <span className="excel-filter-count">{totalEnviados}</span>
             </button>
 
             <button
@@ -444,164 +350,89 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
               className={`excel-filter-btn ${activeTab === 'atrasados' ? 'active' : ''}`}
               onClick={() => setActiveTab('atrasados')}
             >
-              <AlertTriangle size={14} color={data.emAtraso.length > 0 ? '#f87171' : undefined} />
-              <span>Clientes em Atraso</span>
-              <span
-                className="excel-filter-count"
-                style={{ color: data.emAtraso.length > 0 ? '#f87171' : undefined }}
-              >
+              <AlertTriangle size={14} />
+              <span>Em atraso</span>
+              <span className={`excel-filter-count ${data.emAtraso.length > 0 ? 'has-alert' : ''}`}>
                 {data.emAtraso.length}
               </span>
             </button>
           </div>
 
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>
+          <div className="toolbar-meta">
             {activeTab === 'hoje'
-              ? 'Lembretes programados pela régua automática para envio hoje.'
+              ? 'Avisos que a régua automática programou para hoje.'
               : activeTab === 'enviados'
-              ? 'Controle dos números notificados: acompanhe quem já pagou e dê baixa rápida.'
-              : 'Clientes com parcelas vencidas que exigem atenção na cobrança.'}
+                ? 'Mensagens já enviadas: acompanhe quem pagou e dê baixa.'
+                : 'Parcelas vencidas que ainda não foram pagas.'}
           </div>
         </div>
 
-        {/* Conteúdo da Aba 1: Agendados para Hoje */}
+        {/* Aba 1: para enviar hoje */}
         {activeTab === 'hoje' && (
           <div className="excel-table-container">
-            <table className="excel-table">
+            <table className="excel-table stack-table">
               <thead>
                 <tr>
-                  <th style={{ width: '48px', textAlign: 'center' }}>#</th>
-                  <th style={{ minWidth: '180px' }}>Cliente</th>
-                  <th style={{ minWidth: '180px' }}>WhatsApp</th>
-                  <th style={{ minWidth: '220px' }}>Venda / Aparelho</th>
-                  <th style={{ minWidth: '140px', textAlign: 'center' }}>Tipo do Aviso</th>
-                  <th style={{ minWidth: '120px', textAlign: 'right' }}>Valor</th>
-                  <th style={{ minWidth: '120px', textAlign: 'center' }}>Vencimento</th>
-                  <th style={{ minWidth: '280px' }}>Mensagem Formatada</th>
-                  <th style={{ minWidth: '180px', textAlign: 'center' }}>Ações Rápidas</th>
+                  <th>Cliente</th>
+                  <th>Venda</th>
+                  <th>Aviso</th>
+                  <th className="num">Valor</th>
+                  <th>Vencimento</th>
+                  <th>Mensagem</th>
+                  <th style={{ textAlign: 'right' }}>Ações</th>
                 </tr>
               </thead>
 
               <tbody>
                 {loading ? (
-                  <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '3.5rem', color: 'var(--text-dim)' }}>
-                      Carregando notificações agendadas...
+                  <tr className="is-plain">
+                    <td colSpan={7} className="stack-full">
+                      <EmptyState title="Carregando avisos de hoje..." />
                     </td>
                   </tr>
                 ) : data.agendadosHoje.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '4rem 1rem' }}>
-                      <CheckCircle2 size={36} color="var(--primary)" style={{ margin: '0 auto 12px auto' }} />
-                      <div style={{ color: '#fff', fontWeight: 600, fontSize: '1rem', marginBottom: '4px' }}>
-                        Nenhuma notificação pendente para envio hoje!
-                      </div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                        Todos os clientes do ciclo já foram avisados ou os vencimentos estão agendados para outros dias.
-                      </div>
+                  <tr className="is-plain">
+                    <td colSpan={7} className="stack-full">
+                      <EmptyState
+                        icon={<CheckCircle2 size={32} />}
+                        title="Nenhum aviso para enviar hoje"
+                        text="Os clientes do período já foram avisados, ou os próximos vencimentos ainda estão fora da janela de 3 dias."
+                      />
                     </td>
                   </tr>
                 ) : (
-                  data.agendadosHoje.map((item: ReminderPreviewItem, idx: number) => {
+                  data.agendadosHoje.map((item: ReminderPreviewItem) => {
                     const msgKey = `hoje-${item.vendaId}`;
                     const isExpanded = expandedMessageId === msgKey;
-                    const encodedMsg = encodeURIComponent(item.mensagem);
+                    const waLink = `https://wa.me/${item.whatsapp}?text=${encodeURIComponent(item.mensagem)}`;
 
                     return (
                       <tr key={item.vendaId}>
-                        <td style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.76rem', fontFamily: 'monospace' }}>
-                          {idx + 1}
+                        <td data-label="Cliente">
+                          {renderCliente(item.clienteNome, item.whatsapp, waLink, 'Abrir o WhatsApp com a mensagem pronta')}
                         </td>
 
-                        <td style={{ whiteSpace: 'nowrap', fontWeight: 600, color: '#fff' }}>
-                          {item.clienteNome}
+                        <td data-label="Venda">{item.descricao || 'Cobrança'}</td>
+
+                        <td data-label="Aviso">{getTipoBadge(item.tipo)}</td>
+
+                        <td data-label="Valor" className="num cell-title">
+                          {formatBRL(item.valor)}
                         </td>
 
-                        <td>
-                          {item.whatsapp ? (
-                            <a
-                              href={`https://wa.me/${item.whatsapp}?text=${encodedMsg}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="whatsapp-pill-btn"
-                              title="Abrir no WhatsApp com mensagem preenchida"
-                            >
-                              <Phone size={11} />
-                              <span>{formatFullWhatsApp(item.whatsapp)}</span>
-                              <ExternalLink size={10} style={{ opacity: 0.7 }} />
-                            </a>
-                          ) : (
-                            <span style={{ color: 'var(--text-dim)' }}>-</span>
-                          )}
-                        </td>
-
-                        <td>
-                          <div style={{ fontWeight: 600, color: '#f3f4f6' }}>{item.descricao || 'Cobrança'}</div>
-                        </td>
-
-                        <td style={{ textAlign: 'center' }}>
-                          {getTipoBadge(item.tipo)}
-                        </td>
-
-                        <td
-                          style={{
-                            textAlign: 'right',
-                            fontWeight: 700,
-                            color: '#34d399',
-                            fontSize: '0.9rem',
-                            whiteSpace: 'nowrap',
-                            fontVariantNumeric: 'tabular-nums',
-                          }}
-                        >
-                          R$ {Number(item.valor).toFixed(2).replace('.', ',')}
-                        </td>
-
-                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.82rem' }}>
-                            <Calendar size={13} color="var(--text-dim)" />
+                        <td data-label="Vencimento">
+                          <span className="date-cell">
+                            <Calendar size={13} />
                             {item.dataVencimento}
                           </span>
                         </td>
 
-                        {/* Mensagem com Expansão */}
-                        <td>
-                          <div
-                            style={{
-                              background: 'rgba(0, 0, 0, 0.25)',
-                              border: '1px solid rgba(255, 255, 255, 0.06)',
-                              padding: '6px 10px',
-                              borderRadius: '6px',
-                              fontSize: '0.78rem',
-                              color: 'var(--text-muted)',
-                              lineHeight: 1.4,
-                              maxWidth: '380px',
-                            }}
-                          >
-                            <div
-                              style={{
-                                whiteSpace: isExpanded ? 'pre-wrap' : 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                              }}
-                            >
+                        <td className="stack-full">
+                          <div className="message-preview">
+                            <div className={`message-preview-text ${isExpanded ? 'is-expanded' : ''}`}>
                               {item.mensagem}
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => toggleExpand(msgKey)}
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'var(--primary)',
-                                fontSize: '0.72rem',
-                                cursor: 'pointer',
-                                padding: 0,
-                                marginTop: '4px',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '3px',
-                              }}
-                            >
+                            <button type="button" className="link-btn" onClick={() => toggleExpand(msgKey)}>
                               {isExpanded ? (
                                 <>
                                   Recolher <ChevronUp size={11} />
@@ -615,28 +446,25 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
                           </div>
                         </td>
 
-                        {/* Ações */}
-                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <td className="stack-full" style={{ textAlign: 'right' }}>
+                          <div className="cell-actions">
                             <a
-                              href={`https://wa.me/${item.whatsapp}?text=${encodedMsg}`}
+                              href={waLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="btn btn-primary btn-sm"
-                              style={{ padding: '4px 10px', fontSize: '0.75rem', textDecoration: 'none' }}
-                              title="Enviar mensagem agora pelo WhatsApp"
+                              className="btn btn-secondary btn-sm"
+                              title="Abrir o WhatsApp com a mensagem pronta"
                             >
-                              <MessageSquare size={13} /> Enviar
+                              <MessageSquare size={14} /> Enviar
                             </a>
 
                             <button
-                              className="btn btn-secondary btn-sm"
-                              style={{ padding: '4px 8px', fontSize: '0.75rem' }}
+                              className="btn btn-pay btn-sm"
                               onClick={() => handleMarkAsPaid(item.vendaId, item.clienteNome, Number(item.valor))}
                               disabled={payingVendaId === item.vendaId}
-                              title="Marcar como pago (recebido no balcão)"
+                              title="O cliente já pagou (ex.: no balcão)"
                             >
-                              <Check size={13} color="var(--primary)" />
+                              <Check size={14} />
                               {payingVendaId === item.vendaId ? 'Salvando...' : 'Pago'}
                             </button>
                           </div>
@@ -650,156 +478,130 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
           </div>
         )}
 
-        {/* Conteúdo da Aba 2: Enviados no Último Disparo */}
+        {/* Aba 2: enviadas */}
         {activeTab === 'enviados' && (
           <div className="excel-table-container">
-            <table className="excel-table">
+            <table className="excel-table stack-table">
               <thead>
                 <tr>
-                  <th style={{ width: '48px', textAlign: 'center' }}>#</th>
-                  <th style={{ minWidth: '180px' }}>Cliente</th>
-                  <th style={{ minWidth: '180px' }}>WhatsApp Notificado</th>
-                  <th style={{ minWidth: '200px' }}>Venda / Aparelho</th>
-                  <th style={{ minWidth: '120px', textAlign: 'right' }}>Valor Parcela</th>
-                  <th style={{ minWidth: '160px', textAlign: 'center' }}>Data & Hora do Envio</th>
-                  <th style={{ minWidth: '140px', textAlign: 'center' }}>Aviso Disparado</th>
-                  <th style={{ minWidth: '130px', textAlign: 'center' }}>Status Pagamento</th>
-                  <th style={{ minWidth: '220px', textAlign: 'center' }}>Controle & Baixa Rápida</th>
+                  <th>Cliente</th>
+                  <th>Venda</th>
+                  <th className="num">Valor</th>
+                  <th>Enviado em</th>
+                  <th>Aviso</th>
+                  <th>Pagamento</th>
+                  <th style={{ textAlign: 'right' }}>Ações</th>
                 </tr>
               </thead>
 
               <tbody>
                 {loading ? (
-                  <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '3.5rem', color: 'var(--text-dim)' }}>
-                      Carregando histórico de notificações enviadas...
+                  <tr className="is-plain">
+                    <td colSpan={7} className="stack-full">
+                      <EmptyState title="Carregando mensagens enviadas..." />
                     </td>
                   </tr>
                 ) : !data.enviadosRecentes || data.enviadosRecentes.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '4rem 1rem' }}>
-                      <Send size={36} color="var(--text-dim)" style={{ margin: '0 auto 12px auto' }} />
-                      <div style={{ color: '#fff', fontWeight: 600, fontSize: '1rem', marginBottom: '4px' }}>
-                        Nenhum disparo registrado recentemente
-                      </div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                        Assim que você disparar as notificações do dia, os clientes notificados aparecerão nesta lista para controle de pagamento.
-                      </div>
+                  <tr className="is-plain">
+                    <td colSpan={7} className="stack-full">
+                      <EmptyState
+                        icon={<Send size={32} />}
+                        title="Nenhuma mensagem enviada ainda"
+                        text="Depois do primeiro disparo, os clientes avisados aparecem aqui para você acompanhar os pagamentos."
+                      />
                     </td>
                   </tr>
                 ) : (
-                  data.enviadosRecentes.map((item: EnviadoItem, idx: number) => {
+                  data.enviadosRecentes.map((item: EnviadoItem) => {
                     const isPago = item.statusMesAtual === 'pago';
                     const msgKey = `env-${item.id}`;
                     const isExpanded = expandedMessageId === msgKey;
+                    const waLink = `https://wa.me/${item.whatsapp}`;
 
                     return (
-                      <tr key={item.id} className={isPago ? 'row-pago' : ''}>
-                        <td style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.76rem', fontFamily: 'monospace' }}>
-                          {idx + 1}
-                        </td>
+                      <React.Fragment key={item.id}>
+                        <tr>
+                          <td data-label="Cliente">
+                            {renderCliente(item.clienteNome, item.whatsapp, waLink, 'Abrir a conversa no WhatsApp')}
+                          </td>
 
-                        <td style={{ whiteSpace: 'nowrap', fontWeight: 600, color: '#fff' }}>
-                          {item.clienteNome}
-                        </td>
+                          <td data-label="Venda">{item.descricao || 'Cobrança'}</td>
 
-                        <td>
-                          {item.whatsapp ? (
-                            <a
-                              href={`https://wa.me/${item.whatsapp}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="whatsapp-pill-btn"
-                              title="Abrir conversa no WhatsApp Web"
-                            >
-                              <Phone size={11} />
-                              <span>{formatFullWhatsApp(item.whatsapp)}</span>
-                              <ExternalLink size={10} style={{ opacity: 0.7 }} />
-                            </a>
-                          ) : (
-                            <span style={{ color: 'var(--text-dim)' }}>-</span>
-                          )}
-                        </td>
+                          <td data-label="Valor" className="num cell-title">
+                            {formatBRL(item.valor)}
+                          </td>
 
-                        <td>
-                          <div style={{ fontWeight: 600, color: '#f3f4f6' }}>{item.descricao || 'Cobrança'}</div>
-                        </td>
+                          <td data-label="Enviado em" style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                            {formatDateTime(item.dataEnvio)}
+                          </td>
 
-                        <td
-                          style={{
-                            textAlign: 'right',
-                            fontWeight: 700,
-                            color: isPago ? '#34d399' : '#fff',
-                            fontSize: '0.9rem',
-                            whiteSpace: 'nowrap',
-                            fontVariantNumeric: 'tabular-nums',
-                          }}
-                        >
-                          R$ {Number(item.valor).toFixed(2).replace('.', ',')}
-                        </td>
+                          <td data-label="Aviso">{getTipoBadge(item.tipo)}</td>
 
-                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap', fontSize: '0.8rem', color: 'var(--text-dim)' }}>
-                          {formatDateTime(item.dataEnvio)}
-                        </td>
-
-                        <td style={{ textAlign: 'center' }}>
-                          {getTipoBadge(item.tipo)}
-                        </td>
-
-                        {/* Status de Pagamento */}
-                        <td style={{ textAlign: 'center' }}>
-                          {isPago ? (
-                            <span className="badge badge-pago" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }}>
-                              <Check size={11} /> Pago
-                            </span>
-                          ) : (
-                            <span className="badge badge-avisado" style={{ whiteSpace: 'nowrap', padding: '4px 10px' }}>
-                              Aguardando
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Ações de Controle & Baixa */}
-                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                            {!isPago ? (
-                              <button
-                                className="btn btn-primary btn-sm"
-                                style={{ padding: '4px 10px', fontSize: '0.76rem', fontWeight: 600 }}
-                                onClick={() => handleMarkAsPaid(item.vendaId, item.clienteNome, Number(item.valor))}
-                                disabled={payingVendaId === item.vendaId}
-                                title="Confirmar pagamento recebido do cliente"
-                              >
-                                <Check size={12} />
-                                {payingVendaId === item.vendaId ? 'Salvando...' : 'Marcar Pago'}
-                              </button>
+                          <td data-label="Pagamento">
+                            {isPago ? (
+                              <span className="badge badge-pago">
+                                <span className="status-dot dot-success" aria-hidden="true" />
+                                Pago
+                              </span>
                             ) : (
-                              <span style={{ fontSize: '0.78rem', color: '#34d399', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                <CheckCircle size={13} /> Quitado
+                              <span className="badge badge-pendente">
+                                <span className="status-dot dot-neutral" aria-hidden="true" />
+                                Aguardando
                               </span>
                             )}
+                          </td>
 
-                            <a
-                              href={`https://wa.me/${item.whatsapp}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="table-action-btn"
-                              title="Continuar conversa no WhatsApp"
-                            >
-                              <MessageSquare size={13} color="var(--primary)" />
-                            </a>
+                          <td className="stack-full" style={{ textAlign: 'right' }}>
+                            <div className="cell-actions">
+                              {!isPago && (
+                                <button
+                                  className="btn btn-pay btn-sm"
+                                  onClick={() => handleMarkAsPaid(item.vendaId, item.clienteNome, Number(item.valor))}
+                                  disabled={payingVendaId === item.vendaId}
+                                  title="Confirmar que o cliente pagou"
+                                >
+                                  <Check size={14} />
+                                  {payingVendaId === item.vendaId ? 'Salvando...' : 'Marcar pago'}
+                                </button>
+                              )}
 
-                            <button
-                              type="button"
-                              className="table-action-btn"
-                              onClick={() => toggleExpand(msgKey)}
-                              title={isExpanded ? 'Ocultar mensagem enviada' : 'Ver mensagem enviada'}
-                            >
-                              {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                              <a
+                                href={waLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="table-action-btn"
+                                title="Abrir a conversa no WhatsApp"
+                                aria-label="Abrir a conversa no WhatsApp"
+                              >
+                                <MessageSquare size={15} />
+                              </a>
+
+                              <button
+                                type="button"
+                                className="table-action-btn"
+                                onClick={() => toggleExpand(msgKey)}
+                                title={isExpanded ? 'Ocultar a mensagem enviada' : 'Ver a mensagem enviada'}
+                                aria-label={isExpanded ? 'Ocultar a mensagem enviada' : 'Ver a mensagem enviada'}
+                                aria-expanded={isExpanded}
+                              >
+                                {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={7} className="stack-full">
+                              <div className="message-preview" style={{ maxWidth: 'none' }}>
+                                <div className="message-preview-text is-expanded">
+                                  {item.mensagem || 'O texto desta mensagem não foi registrado.'}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })
                 )}
@@ -808,46 +610,42 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
           </div>
         )}
 
-        {/* Conteúdo da Aba 3: Em Atraso */}
+        {/* Aba 3: em atraso */}
         {activeTab === 'atrasados' && (
           <div className="excel-table-container">
-            <table className="excel-table">
+            <table className="excel-table stack-table">
               <thead>
                 <tr>
-                  <th style={{ width: '48px', textAlign: 'center' }}>#</th>
-                  <th style={{ minWidth: '180px' }}>Cliente</th>
-                  <th style={{ minWidth: '180px' }}>WhatsApp</th>
-                  <th style={{ minWidth: '220px' }}>Venda / Aparelho</th>
-                  <th style={{ minWidth: '140px', textAlign: 'center' }}>Atraso</th>
-                  <th style={{ minWidth: '120px', textAlign: 'right' }}>Valor em Atraso</th>
-                  <th style={{ minWidth: '120px', textAlign: 'center' }}>Vencimento</th>
-                  <th style={{ minWidth: '160px', textAlign: 'center' }}>Último Envio</th>
-                  <th style={{ minWidth: '210px', textAlign: 'center' }}>Ações Rápidas</th>
+                  <th>Cliente</th>
+                  <th>Venda</th>
+                  <th>Atraso</th>
+                  <th className="num">Valor</th>
+                  <th>Vencimento</th>
+                  <th>Último aviso</th>
+                  <th style={{ textAlign: 'right' }}>Ações</th>
                 </tr>
               </thead>
 
               <tbody>
                 {loading ? (
-                  <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '3.5rem', color: 'var(--text-dim)' }}>
-                      Carregando clientes em atraso...
+                  <tr className="is-plain">
+                    <td colSpan={7} className="stack-full">
+                      <EmptyState title="Carregando clientes em atraso..." />
                     </td>
                   </tr>
                 ) : data.emAtraso.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', padding: '4rem 1rem' }}>
-                      <CheckCircle2 size={36} color="var(--primary)" style={{ margin: '0 auto 12px auto' }} />
-                      <div style={{ color: '#fff', fontWeight: 600, fontSize: '1rem', marginBottom: '4px' }}>
-                        Nenhum cliente em atraso no momento!
-                      </div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                        Excelente! Todos os pagamentos e faturas estão em dia.
-                      </div>
+                  <tr className="is-plain">
+                    <td colSpan={7} className="stack-full">
+                      <EmptyState
+                        icon={<CheckCircle2 size={32} />}
+                        title="Nenhum cliente em atraso"
+                        text="Todos os pagamentos estão em dia."
+                      />
                     </td>
                   </tr>
                 ) : (
-                  data.emAtraso.map((item: OverdueReminderItem, idx: number) => {
-                    const encodedMsg = encodeURIComponent(item.mensagemCobranca);
+                  data.emAtraso.map((item: OverdueReminderItem) => {
+                    const waLink = `https://wa.me/${item.whatsapp}?text=${encodeURIComponent(item.mensagemCobranca)}`;
                     const mockVenda: Venda = {
                       id: item.vendaId,
                       cliente_id: item.clienteId,
@@ -861,125 +659,79 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
 
                     return (
                       <tr key={item.vendaId} className="row-vencido">
-                        <td style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: '0.76rem', fontFamily: 'monospace' }}>
-                          {idx + 1}
+                        <td data-label="Cliente">
+                          {renderCliente(item.clienteNome, item.whatsapp, waLink, 'Abrir o WhatsApp com a cobrança pronta')}
                         </td>
 
-                        <td style={{ whiteSpace: 'nowrap', fontWeight: 600, color: '#fff' }}>
-                          {item.clienteNome}
+                        <td data-label="Venda">
+                          <div className="cell-stack">
+                            <span>{item.descricao}</span>
+                            {item.totalParcelas && item.totalParcelas > 1 && (
+                              <span className="cell-sub">
+                                Parcela {item.parcelaAtual || 1} de {item.totalParcelas}
+                              </span>
+                            )}
+                          </div>
                         </td>
 
-                        <td>
-                          {item.whatsapp ? (
-                            <a
-                              href={`https://wa.me/${item.whatsapp}?text=${encodedMsg}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="whatsapp-pill-btn"
-                              title="Abrir WhatsApp com cobrança de atraso"
-                            >
-                              <Phone size={11} />
-                              <span>{formatFullWhatsApp(item.whatsapp)}</span>
-                              <ExternalLink size={10} style={{ opacity: 0.7 }} />
-                            </a>
-                          ) : (
-                            <span style={{ color: 'var(--text-dim)' }}>-</span>
-                          )}
+                        <td data-label="Atraso">{getDelayBadge(item.diasAtraso)}</td>
+
+                        <td data-label="Valor" className="num cell-title">
+                          {formatBRL(item.valor)}
                         </td>
 
-                        <td>
-                          <div style={{ fontWeight: 600, color: '#f3f4f6' }}>{item.descricao}</div>
-                          {item.totalParcelas && item.totalParcelas > 1 && (
-                            <span style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
-                              Parcela {item.parcelaAtual || 1} de {item.totalParcelas}
-                            </span>
-                          )}
-                        </td>
-
-                        <td style={{ textAlign: 'center' }}>
-                          {getDelayBadge(item.diasAtraso)}
-                        </td>
-
-                        <td
-                          style={{
-                            textAlign: 'right',
-                            fontWeight: 700,
-                            color: '#f87171',
-                            fontSize: '0.9rem',
-                            whiteSpace: 'nowrap',
-                            fontVariantNumeric: 'tabular-nums',
-                          }}
-                        >
-                          R$ {Number(item.valor).toFixed(2).replace('.', ',')}
-                        </td>
-
-                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.82rem', color: '#f87171', fontWeight: 600 }}>
-                            <Calendar size={13} color="#ef4444" />
+                        <td data-label="Vencimento">
+                          <span className="date-cell is-overdue">
+                            <Calendar size={13} />
                             {item.dataVencimento}
                           </span>
                         </td>
 
-                        <td style={{ textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-dim)' }}>
+                        <td data-label="Último aviso">
                           {item.ultimoEnvio ? (
-                            <div>
-                              <span style={{ color: '#38bdf8', fontWeight: 500 }}>
-                                {item.ultimoEnvio.tipo === 'vencido'
-                                  ? 'Aviso Vencido'
-                                  : item.ultimoEnvio.tipo === 'lembrete_1d'
-                                  ? 'Lembrete (1d)'
-                                  : item.ultimoEnvio.tipo === 'lembrete_2d'
-                                  ? 'Lembrete (2d)'
-                                  : 'Lembrete (3d)'}
-                              </span>
+                            <div className="cell-stack">
+                              <span>{getUltimoEnvioLabel(item.ultimoEnvio.tipo)}</span>
                               {item.ultimoEnvio.dataEnvio && (
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                <span className="cell-sub">
                                   {new Date(item.ultimoEnvio.dataEnvio).toLocaleDateString('pt-BR')}
-                                </div>
+                                </span>
                               )}
                             </div>
                           ) : (
-                            <span>Ainda não enviado</span>
+                            <span style={{ color: 'var(--text-dim)' }}>Ainda não enviado</span>
                           )}
                         </td>
 
-                        {/* Ações */}
-                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                        <td className="stack-full" style={{ textAlign: 'right' }}>
+                          <div className="cell-actions">
                             <a
-                              href={`https://wa.me/${item.whatsapp}?text=${encodedMsg}`}
+                              href={waLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="btn btn-primary btn-sm"
-                              style={{
-                                padding: '4px 10px',
-                                fontSize: '0.75rem',
-                                textDecoration: 'none',
-                                background: '#dc2626',
-                                borderColor: '#ef4444',
-                              }}
-                              title="Cobrar agora no WhatsApp"
+                              className="btn btn-secondary btn-sm"
+                              title="Abrir o WhatsApp com a cobrança pronta"
                             >
-                              <MessageSquare size={13} /> Cobrar
+                              <MessageSquare size={14} /> Cobrar
                             </a>
 
                             <button
-                              className="table-action-btn"
-                              onClick={() => onOpenHistoricoModal(mockVenda)}
-                              title="Ver histórico de mensagens enviadas"
+                              className="btn btn-pay btn-sm"
+                              onClick={() => handleMarkAsPaid(item.vendaId, item.clienteNome, Number(item.valor))}
+                              disabled={payingVendaId === item.vendaId}
+                              title="Confirmar que o cliente pagou"
                             >
-                              <History size={14} />
+                              <Check size={14} />
+                              {payingVendaId === item.vendaId ? 'Salvando...' : 'Pago'}
                             </button>
 
                             <button
-                              className="btn btn-secondary btn-sm"
-                              style={{ padding: '4px 8px', fontSize: '0.75rem' }}
-                              onClick={() => handleMarkAsPaid(item.vendaId, item.clienteNome, Number(item.valor))}
-                              disabled={payingVendaId === item.vendaId}
-                              title="Marcar pagamento recebido"
+                              type="button"
+                              className="table-action-btn"
+                              onClick={() => onOpenHistoricoModal(mockVenda)}
+                              title="Histórico de mensagens"
+                              aria-label="Histórico de mensagens"
                             >
-                              <Check size={13} color="var(--primary)" />
-                              {payingVendaId === item.vendaId ? 'Salvando...' : 'Pago'}
+                              <History size={15} />
                             </button>
                           </div>
                         </td>

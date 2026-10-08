@@ -1,21 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Send,
-  Users,
-  CheckCircle,
-  AlertCircle,
-  Clock,
-  DollarSign,
-  TrendingUp,
-  Smartphone,
-  PlusCircle,
-  RefreshCw,
-  Building2,
-  ArrowRight,
-} from 'lucide-react';
+import { Send, RefreshCw, UserPlus, Plus, Smartphone, ArrowRight } from 'lucide-react';
 import { DashboardMetrics, WhatsAppStatus, ContaPagar } from '../types/index.js';
 import { api } from '../services/api.js';
-import { summarizeSede, SEDE_BADGE_CLASS } from '../utils/sede.js';
+import { summarizeSede, SEDE_BADGE_CLASS, SEDE_DOT_CLASS } from '../utils/sede.js';
+import { formatBRL, formatDateBR } from '../utils/format.js';
+import { PageHeader } from '../components/ui/PageHeader.js';
+import { StatTile } from '../components/ui/StatTile.js';
 
 interface DashboardProps {
   whatsAppInfo: WhatsAppStatus;
@@ -37,6 +27,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onNavigateToContasPagar,
 }) => {
   const whatsAppStatus = whatsAppInfo.state;
+  const isConnected = whatsAppStatus === 'open';
   // Painel online (ex.: Vercel): não envia mensagens, só mostra o estado da máquina-sede
   const isRemotePanel = whatsAppInfo.available === false;
   const sede = summarizeSede(whatsAppInfo);
@@ -73,455 +64,293 @@ export const Dashboard: React.FC<DashboardProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-  const formatBRL = (val: number) => {
-    return Number(val || 0).toLocaleString('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-    });
-  };
-
-  // Cálculos de Quem Devemos
-  const totalQueDevemosPendente = contasPagar
-    .filter((c) => !c.pago)
-    .reduce((sum, c) => sum + (Number(c.valor) || 0), 0);
-
+  // Quem devemos
+  const contasPendentes = contasPagar.filter((c) => !c.pago);
+  const totalQueDevemosPendente = contasPendentes.reduce((sum, c) => sum + (Number(c.valor) || 0), 0);
   const totalQueDevemosPago = contasPagar
     .filter((c) => c.pago)
     .reduce((sum, c) => sum + (Number(c.valor) || 0), 0);
 
-  const countCredoresPendentes = contasPagar.filter((c) => !c.pago).length;
-
-  // Balanço Líquido Projetado: Total Previsto a Receber - Total a Pagar para Credores
+  // Saldo previsto: total a receber no ciclo menos o que está em aberto com credores
   const saldoLiquidoPrevisto = metrics.valorTotalMensal - totalQueDevemosPendente;
+  const saldoPositivo = saldoLiquidoPrevisto >= 0;
 
-  const formatDate = (dateStr?: string | null) => {
-    if (!dateStr) return '-';
-    const [y, m, d] = dateStr.split('T')[0].split('-');
-    return `${d}/${m}/${y}`;
-  };
+  const percentualRecebido =
+    metrics.valorTotalMensal > 0
+      ? Math.min(100, Math.round((metrics.valorTotalRecebido / metrics.valorTotalMensal) * 100))
+      : 0;
 
   return (
     <div>
-      {/* Header com Saudações e Ações */}
-      <div className="view-header" style={{ marginBottom: '1.75rem' }}>
-        <div>
-          <h2 style={{ fontSize: '1.75rem', marginBottom: '0.25rem' }}>Visão Geral de Cobranças & Finanças</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-            Acompanhe o faturamento recorrente, contas a pagar a fornecedores e status dos disparos de WhatsApp.
-          </p>
-        </div>
+      <PageHeader
+        title="Visão geral"
+        subtitle="Cobranças, contas a pagar e envios de WhatsApp."
+        actions={
+          <>
+            <button className="btn btn-secondary btn-sm" onClick={fetchData} disabled={loading}>
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              Atualizar
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={onOpenNovoClienteModal}>
+              <UserPlus size={14} />
+              Novo cliente
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={onOpenNovaVendaModal}>
+              <Plus size={15} />
+              Nova cobrança
+            </button>
+          </>
+        }
+      />
 
-        <div className="view-header-actions">
-          <button className="btn btn-secondary btn-sm" onClick={fetchData} disabled={loading}>
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            Atualizar
-          </button>
-          <button className="btn btn-secondary btn-sm" onClick={onOpenNovoClienteModal}>
-            <PlusCircle size={14} />
-            Novo Cliente
-          </button>
-          <button className="btn btn-primary btn-sm" onClick={onOpenNovaVendaModal}>
-            <DollarSign size={14} />
-            Nova Cobrança
-          </button>
-        </div>
-      </div>
-
-      {/* Banner Principal: Disparo de Cobranças de Hoje */}
-      <div
-        className="card"
-        style={{
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(17, 24, 39, 0.95) 100%)',
-          borderColor: 'rgba(16, 185, 129, 0.3)',
-          padding: '1.5rem',
-          marginBottom: '1.75rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '1.25rem',
-        }}
-      >
-        <div style={{ maxWidth: '640px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.35rem' }}>
+      {/* Ação do dia: disparo das cobranças */}
+      <section className="card action-card">
+        <div className="action-card-body">
+          <div className="card-eyebrow">
             {isRemotePanel ? (
-              <span className={`badge ${SEDE_BADGE_CLASS[sede.tone]}`}>{sede.label}</span>
+              <>
+                <span className={`status-dot ${SEDE_DOT_CLASS[sede.tone]}`} aria-hidden="true" />
+                {sede.label}
+              </>
             ) : (
-              <span className="badge badge-pago">Motor de Automação Ativo</span>
+              <>
+                <span className={`status-dot ${isConnected ? 'online' : 'offline'}`} aria-hidden="true" />
+                {isConnected ? 'WhatsApp conectado' : 'WhatsApp desconectado'} · envio automático todo dia às 09:00
+              </>
             )}
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-              Cron automático roda diariamente às 09:00 na sede
-            </span>
           </div>
-          <h3 style={{ fontSize: '1.35rem', marginBottom: '0.4rem', color: '#fff' }}>
-            {isRemotePanel ? 'Disparos de Cobranças' : 'Disparo Manual de Cobranças'}
-          </h3>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', lineHeight: '1.4' }}>
+          <h2 className="action-card-title">
+            {isRemotePanel ? 'Os envios saem pelo computador da loja' : 'Cobranças de hoje'}
+          </h2>
+          <p className="panel-text">
             {isRemotePanel
-              ? `Os lembretes saem automaticamente do computador da loja. ${sede.detail} Para disparar manualmente, abra o sistema na máquina-sede.`
-              : 'O computador esteve desligado no horário agendado ou deseja disparar os lembretes do dia agora? Visualize a lista de clientes antes de autorizar o envio seguro.'}
+              ? `${sede.detail} Para disparar manualmente, abra o sistema na máquina-sede.`
+              : isConnected
+                ? 'Veja quem será avisado antes de confirmar o envio. Útil quando o computador esteve desligado às 09:00 ou para adiantar os lembretes do dia.'
+                : 'Conecte o WhatsApp da loja para que os lembretes voltem a ser enviados.'}
           </p>
         </div>
 
         {!isRemotePanel && (
           <div className="dashboard-banner-action">
-            <button
-              className="btn btn-primary btn-lg"
-              onClick={onOpenDisparoModal}
-              style={{
-                boxShadow: '0 6px 20px rgba(16, 185, 129, 0.35)',
-                fontWeight: 600,
-              }}
-            >
-              <Send size={18} />
-              Disparar cobranças de hoje
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Grid de Cards de Estatísticas das Cobranças */}
-      <div className="grid-cards" style={{ marginBottom: '1.75rem' }}>
-        {/* Total Pendentes */}
-        <div className="card stat-card">
-          <div className="stat-info">
-            <span className="stat-label">Pendentes no Mês</span>
-            <span className="stat-value">{metrics.totalPendentes}</span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-              Aguardando ciclo de aviso
-            </span>
-          </div>
-          <div className="stat-icon" style={{ background: 'var(--accent-blue-light)', color: 'var(--accent-blue)' }}>
-            <Clock size={22} />
-          </div>
-        </div>
-
-        {/* Avisados (3d ou 1d) */}
-        <div className="card stat-card">
-          <div className="stat-info">
-            <span className="stat-label">Lembretes Enviados</span>
-            <span className="stat-value">{metrics.totalAvisados}</span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-              Avisados 3d ou 1d antes
-            </span>
-          </div>
-          <div className="stat-icon" style={{ background: 'var(--warning-light)', color: 'var(--warning)' }}>
-            <Send size={22} />
-          </div>
-        </div>
-
-        {/* Vencidos */}
-        <div className="card stat-card">
-          <div className="stat-info">
-            <span className="stat-label">Vencidos em Aberto</span>
-            <span className="stat-value" style={{ color: metrics.totalVencidos > 0 ? '#f87171' : '#fff' }}>
-              {metrics.totalVencidos}
-            </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-              Requer atenção ou contato
-            </span>
-          </div>
-          <div className="stat-icon" style={{ background: 'var(--danger-light)', color: 'var(--danger)' }}>
-            <AlertCircle size={22} />
-          </div>
-        </div>
-
-        {/* Pagos no Mês */}
-        <div className="card stat-card">
-          <div className="stat-info">
-            <span className="stat-label">Pagamentos Confirmados</span>
-            <span className="stat-value" style={{ color: '#34d399' }}>
-              {metrics.totalPagos}
-            </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-              Ciclos renovados (+1 mês)
-            </span>
-          </div>
-          <div className="stat-icon" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>
-            <CheckCircle size={22} />
-          </div>
-        </div>
-      </div>
-
-      {/* SEÇÃO FINANCEIRA: FATURAMENTO + QUEM DEVEMOS + BALANÇO LÍQUIDO */}
-      <div className="dashboard-finance-grid">
-        {/* CARD 1: Faturamento Mensal a Receber */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <TrendingUp size={20} color="var(--primary)" />
-                <h4 style={{ fontSize: '1.05rem' }}>Faturamento Recorrente</h4>
-              </div>
-              <span className="badge badge-pago">A Receber</span>
-            </div>
-
-            <div className="stat-split-row">
-              <div style={{ background: 'var(--bg-main)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Total Previsto</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#fff' }}>
-                  {formatBRL(metrics.valorTotalMensal)}
-                </div>
-              </div>
-
-              <div style={{ background: 'var(--bg-main)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Já Recebido</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#34d399' }}>
-                  {formatBRL(metrics.valorTotalRecebido)}
-                </div>
-              </div>
-            </div>
-
-            {/* Barra de Progresso */}
-            {metrics.valorTotalMensal > 0 && (
-              <div style={{ marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
-                  <span>Progresso recebimento</span>
-                  <span>
-                    {Math.round((metrics.valorTotalRecebido / metrics.valorTotalMensal) * 100)}%
-                  </span>
-                </div>
-                <div style={{ height: '7px', background: 'var(--bg-input)', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div
-                    style={{
-                      height: '100%',
-                      width: `${Math.min(100, Math.round((metrics.valorTotalRecebido / metrics.valorTotalMensal) * 100))}%`,
-                      background: 'var(--primary)',
-                      borderRadius: '4px',
-                    }}
-                  />
-                </div>
-              </div>
+            {isConnected ? (
+              <button className="btn btn-primary btn-lg" onClick={onOpenDisparoModal}>
+                <Send size={18} />
+                Disparar cobranças de hoje
+              </button>
+            ) : (
+              <button className="btn btn-primary btn-lg" onClick={onOpenWhatsAppModal}>
+                <Smartphone size={18} />
+                Conectar WhatsApp
+              </button>
             )}
           </div>
+        )}
+      </section>
 
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={onNavigateToClientes}
-            style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}
-          >
-            <Users size={14} /> Ver Clientes Devedores
-          </button>
-        </div>
-
-        {/* CARD 2: Quem Devemos (Contas a Pagar / Fornecedores) */}
-        <div
-          className="card"
-          style={{
-            borderLeft: '3px solid #f43f5e',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Building2 size={20} color="#f43f5e" />
-                <h4 style={{ fontSize: '1.05rem' }}>Quem Devemos (Contas a Pagar)</h4>
-              </div>
-              <span className="badge badge-vencido">A Pagar</span>
-            </div>
-
-            <div className="stat-split-row">
-              <div style={{ background: 'var(--bg-main)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Total a Pagar</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#fb7185' }}>
-                  {formatBRL(totalQueDevemosPendente)}
-                </div>
-              </div>
-
-              <div style={{ background: 'var(--bg-main)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '4px' }}>Já Quitado</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#34d399' }}>
-                  {formatBRL(totalQueDevemosPago)}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              {countCredoresPendentes === 0 ? (
-                <span style={{ color: '#34d399' }}>✓ Todos os credores e contas estão em dia!</span>
-              ) : (
-                <span>
-                  <strong>{countCredoresPendentes}</strong> credores/fornecedores aguardando quitação.
-                </span>
-              )}
-            </div>
-          </div>
-
-          {onNavigateToContasPagar && (
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={onNavigateToContasPagar}
-              style={{
-                width: '100%',
-                justifyContent: 'center',
-                marginTop: '0.5rem',
-                borderColor: 'rgba(244, 63, 94, 0.35)',
-                color: '#fb7185',
-              }}
-            >
-              <Building2 size={14} /> Acessar Tela Quem Devemos <ArrowRight size={14} />
-            </button>
-          )}
-        </div>
-
-        {/* CARD 3: Balanço Líquido Geral do Negócio */}
-        <div
-          className="card"
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            background: 'linear-gradient(135deg, rgba(17, 24, 39, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%)',
-          }}
-        >
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <DollarSign size={20} color={saldoLiquidoPrevisto >= 0 ? '#10b981' : '#ef4444'} />
-                <h4 style={{ fontSize: '1.05rem' }}>Balanço Líquido Geral</h4>
-              </div>
-              <span className={`badge ${saldoLiquidoPrevisto >= 0 ? 'badge-pago' : 'badge-vencido'}`}>
-                {saldoLiquidoPrevisto >= 0 ? 'Superávit Previsto' : 'Déficit'}
-              </span>
-            </div>
-
-            <div style={{ textAlign: 'center', padding: '1rem', background: 'var(--bg-main)', borderRadius: '10px', border: '1px solid var(--border-subtle)', marginBottom: '1rem' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
-                Saldo Estimado (Receber - Pagar)
-              </div>
-              <div
-                style={{
-                  fontSize: '1.65rem',
-                  fontWeight: 800,
-                  color: saldoLiquidoPrevisto >= 0 ? '#34d399' : '#f87171',
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-              >
-                {saldoLiquidoPrevisto >= 0 ? '+' : ''}
-                {formatBRL(saldoLiquidoPrevisto)}
-              </div>
-            </div>
-
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-dim)', textAlign: 'center', lineHeight: '1.4' }}>
-              Cálculo em tempo real do faturamento previsto menos os compromissos com credores cadastrados.
-            </div>
-          </div>
-
-          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '0.75rem', marginTop: '0.75rem', display: 'flex', justifyContent: 'space-between', fontSize: '0.76rem', color: 'var(--text-muted)' }}>
-            <span>A Receber: {formatBRL(metrics.valorTotalMensal)}</span>
-            <span style={{ color: '#f87171' }}>A Pagar: {formatBRL(totalQueDevemosPendente)}</span>
-          </div>
-        </div>
+      {/* Situação das cobranças no ciclo (clique para abrir a lista) */}
+      <div className="grid-cards">
+        <StatTile
+          label="Pendentes"
+          value={metrics.totalPendentes}
+          hint="Fora do período de aviso"
+          onClick={onNavigateToClientes}
+        />
+        <StatTile
+          label="Avisados"
+          value={metrics.totalAvisados}
+          hint="Já receberam lembrete"
+          tone={metrics.totalAvisados > 0 ? 'warning' : 'neutral'}
+          onClick={onNavigateToClientes}
+        />
+        <StatTile
+          label="Vencidos"
+          value={metrics.totalVencidos}
+          hint={metrics.totalVencidos > 0 ? 'Precisam de cobrança' : 'Nenhuma parcela atrasada'}
+          tone={metrics.totalVencidos > 0 ? 'danger' : 'neutral'}
+          onClick={onNavigateToClientes}
+        />
+        <StatTile
+          label="Pagos"
+          value={metrics.totalPagos}
+          hint="Pagamentos confirmados"
+          tone={metrics.totalPagos > 0 ? 'success' : 'neutral'}
+          onClick={onNavigateToClientes}
+        />
       </div>
 
-      {/* LINHA INFERIOR: RESUMO DE QUEM DEVEMOS & STATUS WHATSAPP */}
-      <div className="dashboard-bottom-grid">
-        {/* Widget: Próximos Pagamentos de Quem Devemos */}
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Building2 size={18} color="#f87171" />
-              <h4 style={{ fontSize: '1rem' }}>Próximos Pagamentos a Fornecedores</h4>
+      {/* Financeiro: a receber, a pagar e saldo */}
+      <div className="dashboard-finance-grid">
+        <section className="card panel">
+          <div className="panel-head">
+            <h3 className="panel-title">A receber</h3>
+            <span className="panel-caption">Ciclo atual</span>
+          </div>
+
+          <div className="figure-row">
+            <div className="figure">
+              <span className="figure-label">Previsto</span>
+              <span className="figure-value">{formatBRL(metrics.valorTotalMensal)}</span>
             </div>
+            <div className="figure">
+              <span className="figure-label">
+                <span className="status-dot dot-success" aria-hidden="true" />
+                Recebido
+              </span>
+              <span className="figure-value">{formatBRL(metrics.valorTotalRecebido)}</span>
+            </div>
+          </div>
+
+          <div>
+            <div className="progress-meta">
+              <span>Recebido até agora</span>
+              <span>{percentualRecebido}%</span>
+            </div>
+            <div
+              className="progress"
+              role="progressbar"
+              aria-valuenow={percentualRecebido}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Percentual recebido no ciclo"
+            >
+              <span style={{ width: `${percentualRecebido}%` }} />
+            </div>
+          </div>
+
+          <div className="panel-foot">
+            <button className="btn btn-secondary btn-sm btn-block" onClick={onNavigateToClientes}>
+              Ver clientes e vendas <ArrowRight size={14} />
+            </button>
+          </div>
+        </section>
+
+        <section className="card panel">
+          <div className="panel-head">
+            <h3 className="panel-title">A pagar</h3>
+            <span className="panel-caption">Fornecedores e credores</span>
+          </div>
+
+          <div className="figure-row">
+            <div className="figure">
+              <span className="figure-label">
+                {totalQueDevemosPendente > 0 && <span className="status-dot dot-danger" aria-hidden="true" />}
+                Em aberto
+              </span>
+              <span className="figure-value">{formatBRL(totalQueDevemosPendente)}</span>
+            </div>
+            <div className="figure">
+              <span className="figure-label">
+                <span className="status-dot dot-success" aria-hidden="true" />
+                Quitado
+              </span>
+              <span className="figure-value">{formatBRL(totalQueDevemosPago)}</span>
+            </div>
+          </div>
+
+          <p className="panel-text">
+            {contasPendentes.length === 0
+              ? 'Todas as contas estão em dia.'
+              : `${contasPendentes.length} ${contasPendentes.length === 1 ? 'conta aguardando' : 'contas aguardando'} pagamento.`}
+          </p>
+
+          {onNavigateToContasPagar && (
+            <div className="panel-foot">
+              <button className="btn btn-secondary btn-sm btn-block" onClick={onNavigateToContasPagar}>
+                Ver contas a pagar <ArrowRight size={14} />
+              </button>
+            </div>
+          )}
+        </section>
+
+        <section className="card panel">
+          <div className="panel-head">
+            <h3 className="panel-title">Saldo previsto</h3>
+            <span className="panel-caption">A receber − a pagar</span>
+          </div>
+
+          <div>
+            <div className="hero-figure">
+              {saldoPositivo ? '' : '−'}
+              {formatBRL(Math.abs(saldoLiquidoPrevisto))}
+            </div>
+            <div className="figure-label" style={{ marginTop: '0.5rem' }}>
+              <span className={`status-dot ${saldoPositivo ? 'dot-success' : 'dot-danger'}`} aria-hidden="true" />
+              {saldoPositivo ? 'Sobra prevista no ciclo' : 'Falta prevista no ciclo'}
+            </div>
+          </div>
+
+          <div className="panel-foot" style={{ justifyContent: 'space-between' }}>
+            <span className="panel-caption">A receber {formatBRL(metrics.valorTotalMensal)}</span>
+            <span className="panel-caption">A pagar {formatBRL(totalQueDevemosPendente)}</span>
+          </div>
+        </section>
+      </div>
+
+      <div className="dashboard-bottom-grid">
+        <section className="card panel">
+          <div className="panel-head">
+            <h3 className="panel-title">Próximos pagamentos</h3>
             {onNavigateToContasPagar && (
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={onNavigateToContasPagar}
-                style={{ fontSize: '0.76rem', padding: '3px 8px' }}
-              >
+              <button className="btn btn-ghost btn-sm" onClick={onNavigateToContasPagar}>
                 Ver todos
               </button>
             )}
           </div>
 
-          {contasPagar.filter((c) => !c.pago).length === 0 ? (
-            <div style={{ padding: '2rem 1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-              Nenhuma conta ou credor com pagamento pendente no momento.
-            </div>
+          {contasPendentes.length === 0 ? (
+            <p className="panel-text">Nenhuma conta com pagamento pendente.</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {contasPagar
-                .filter((c) => !c.pago)
-                .slice(0, 4)
-                .map((conta) => (
-                  <div
-                    key={conta.id}
-                    style={{
-                      background: 'var(--bg-main)',
-                      border: '1px solid var(--border-subtle)',
-                      borderRadius: '8px',
-                      padding: '10px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontWeight: 600, color: '#fff', fontSize: '0.88rem' }}>
-                        {conta.nome_credor}
-                      </div>
-                      <div style={{ fontSize: '0.74rem', color: 'var(--text-dim)' }}>
-                        {conta.descricao || 'Sem descrição'}
-                        {conta.data_vencimento && ` • Vencimento: ${formatDate(conta.data_vencimento)}`}
-                      </div>
-                    </div>
-
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: 700, color: '#f87171', fontSize: '0.94rem' }}>
-                        {formatBRL(conta.valor)}
-                      </div>
-                      <span className="badge badge-vencido" style={{ fontSize: '0.68rem', padding: '2px 6px' }}>
-                        Pendente
-                      </span>
+            <div>
+              {contasPendentes.slice(0, 4).map((conta) => (
+                <div key={conta.id} className="list-row">
+                  <div style={{ minWidth: 0 }}>
+                    <div className="list-row-title">{conta.nome_credor}</div>
+                    <div className="list-row-sub">
+                      {conta.descricao || 'Sem descrição'}
+                      {conta.data_vencimento && ` · vence em ${formatDateBR(conta.data_vencimento)}`}
                     </div>
                   </div>
-                ))}
+                  <div className="list-row-title num">{formatBRL(conta.valor)}</div>
+                </div>
+              ))}
             </div>
           )}
-        </div>
+        </section>
 
-        {/* Card Status do WhatsApp */}
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Smartphone size={20} color="var(--primary)" />
-              <h4 style={{ fontSize: '1.05rem' }}>
-                {isRemotePanel ? 'Status da Máquina-Sede' : 'Status do WhatsApp (Sede)'}
-              </h4>
-            </div>
+        <section className="card panel">
+          <div className="panel-head">
+            <h3 className="panel-title">{isRemotePanel ? 'Máquina-sede' : 'WhatsApp'}</h3>
             {isRemotePanel ? (
-              <span className={`badge ${SEDE_BADGE_CLASS[sede.tone]}`}>{sede.short}</span>
-            ) : whatsAppStatus === 'open' ? (
-              <span className="badge badge-pago">Conectado</span>
+              <span className={`badge ${SEDE_BADGE_CLASS[sede.tone]}`}>
+                <span className={`status-dot ${SEDE_DOT_CLASS[sede.tone]}`} aria-hidden="true" />
+                {sede.short}
+              </span>
             ) : (
-              <span className="badge badge-vencido">Desconectado</span>
+              <span className={`badge ${isConnected ? 'badge-pago' : 'badge-vencido'}`}>
+                <span className={`status-dot ${isConnected ? 'online' : 'offline'}`} aria-hidden="true" />
+                {isConnected ? 'Conectado' : 'Desconectado'}
+              </span>
             )}
           </div>
 
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: '1.4' }}>
+          <p className="panel-text">
             {isRemotePanel
               ? sede.detail
-              : whatsAppStatus === 'open'
-                ? 'A sessão está ativa e sincronizada com a máquina-sede. As mensagens de cobrança serão disparadas normalmente.'
-                : 'O WhatsApp não está emparelhado. Clique no botão abaixo para escanear o QR Code e autorizar os envios.'}
+              : isConnected
+                ? 'A sessão está ativa neste computador. Os lembretes saem normalmente.'
+                : 'Nenhum número conectado. Leia o QR Code com o celular da loja para liberar os envios.'}
           </p>
 
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            {!isRemotePanel && (
-              <button className="btn btn-outline-primary btn-sm" onClick={onOpenWhatsAppModal}>
+          {!isRemotePanel && (
+            <div className="panel-foot">
+              <button className="btn btn-secondary btn-sm" onClick={onOpenWhatsAppModal}>
                 <Smartphone size={15} />
-                {whatsAppStatus === 'open' ? 'Gerenciar Conexão' : 'Escanear QR Code'}
+                {isConnected ? 'Gerenciar conexão' : 'Ler QR Code'}
               </button>
-            )}
-            <button className="btn btn-secondary btn-sm" onClick={onNavigateToClientes}>
-              <Users size={15} />
-              Ver Clientes Devedores
-            </button>
-          </div>
-        </div>
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );
