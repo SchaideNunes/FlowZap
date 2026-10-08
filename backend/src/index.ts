@@ -1,11 +1,4 @@
-import dotenv from 'dotenv';
-import path from 'path';
-
-// Carrega .env da raiz do projeto ou da pasta backend
-dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
-dotenv.config();
-
+import './config/env.js';
 import { app, scheduler } from './app.js';
 
 const port = Number(process.env.PORT) || 3001;
