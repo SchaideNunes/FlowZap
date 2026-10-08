@@ -52,15 +52,20 @@ A organização do backend deve manter uma separação clara e unidirecional de 
 
 ## 3. Diretrizes de Frontend & Design Anti-AI
 
-### 3.1. Princípios de Design Anti-AI
-- **Não ao Genérico:** Proibido utilizar templates clichês de IA (gradientes caóticos roxo/neon, hover scales exagerados ou botões brilhantes sem hierarquia).
-- **Tema Escuro Sofisticado:** Paleta dark luxuosa e de alto contraste:
-  - Fundo principal: tons profundos de ardósia/chumbo (`#0b0f17`, `#0f172a`, `#1e293b`).
-  - Tons luminosos com significado financeiro:
-    - **Verde Esmeralda (`#10b981`, `#059669`)**: Receitas recebidas, status pago, saldo positivo.
-    - **Âmbar / Laranja (`#f59e0b`, `#d97706`)**: Cobranças a vencer em breve, atenção.
-    - **Vermelho Carmim (`#ef4444`, `#dc2626`)**: Contas vencidas, despesas a pagar, ações de exclusão.
-    - **Ciano / Azul Safira (`#06b6d4`, `#3b82f6`)**: Notificações, ações manuais, dados informativos.
+### 3.1. Identidade Visual (A&V Store) & Design Anti-AI
+- **Não ao Genérico:** Proibido utilizar templates clichês de IA (gradientes, brilhos/glow, hover scales exagerados ou cores decorativas sem significado).
+- **Marca em preto e branco**, tirada da logo do cliente (`frontend/public/logo.webp`; original em `frontend/src/assets/brand/`). Interface escura e minimalista.
+  - Superfícies: `--bg-main #0a0a0a`, `--bg-card #141414`, `--bg-inset #0f0f0f`, `--bg-raised #262626`; linhas finas `rgba(255,255,255,0.09)`.
+  - Texto: `--text-main #f5f5f5`, `--text-muted #a8a8a8`, `--text-dim #858585` (todos com contraste AA sobre as superfícies).
+  - **Ação principal da tela:** botão branco com texto preto (`.btn-primary`), **uma por tela**. As demais usam contorno (`.btn-secondary`); confirmar pagamento usa `.btn-pay`.
+- **Cor só para status.** São as únicas cores da interface, validadas para daltonismo e contraste:
+  - **Verde (`--success #5ee08f`)**: pago, recebido, conectado.
+  - **Âmbar (`--warning #f5a524`)**: avisado, a vencer, atenção.
+  - **Vermelho (`--danger #f06a6a`)**: vencido, erro, exclusão.
+  - A cor nunca vai sozinha: sempre com rótulo ou ícone. Valores numéricos usam a cor do texto; o estado aparece em um ponto colorido (`.status-dot`) ao lado do rótulo.
+  - Azul, roxo e outros tons decorativos não fazem parte da paleta.
+- **Sem cores fixas nos componentes:** usar sempre as variáveis de `frontend/src/index.css` (`var(--success)`, `rgba(var(--danger-rgb), 0.12)` etc.).
+- **Componentes compartilhados:** `components/ui/PageHeader`, `StatTile` e `EmptyState`; formatação em `utils/format.ts` (`formatBRL`, `formatDateBR`, `todayISO`).
 - **Tipografia:** Google Fonts aplicadas:
   - **Inter**: Para dados tabulares, textos corridos, badges e inputs (máxima legibilidade).
   - **Outfit**: Para títulos (`h1`, `h2`), métricas de KPI e cabeçalhos de destaque.
@@ -73,6 +78,9 @@ A organização do backend deve manter uma separação clara e unidirecional de 
   - Colunas alinhadas, badges de status legíveis e botões de ação rápida ("Marcar como Pago", "Editar", "Excluir").
 - **Telas Smartphone (<768px):**
   - **Visão em Cartões Fintech Mobile-First (estilo Nubank/Inter)**: Ao invés de tabelas cortadas horizontalmente, o layout se transforma em cards táteis otimizados para o polegar, com valores em destaque, data de vencimento e botões de toque largo (mínimo 44px de altura).
+  - **Navegação na base da tela**: as abas viram uma barra inferior fixa, ao alcance do polegar.
+  - Tabelas sem cartões próprios usam a classe `.stack-table` com `data-label` em cada `<td>` (cada linha vira um cartão).
+  - **Nenhuma tela pode ter rolagem horizontal** da página, em nenhuma largura.
 - **Resiliência e Tolerância a Falhas:**
   - O frontend DEVE conter um componente `ErrorBoundary` em volta da árvore de rotas.
   - Todo consumo de erro da API deve usar o utilitário `extractErrorMessage()` para prevenir que objetos de resposta acionem o erro React #31 (*Objects are not valid as a React child*).
