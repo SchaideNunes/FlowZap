@@ -32,6 +32,7 @@ describe('VendaController (TDD)', () => {
     mockBillingService = {
       createVenda: vi.fn(),
       markAsPaid: vi.fn(),
+      listPagamentos: vi.fn(),
       evaluateReminderState: vi.fn(),
     } as unknown as BillingService;
 
@@ -107,6 +108,39 @@ describe('VendaController (TDD)', () => {
 
       expect(mockRes.status).toHaveBeenCalledWith(400);
       expect(mockRes.json).toHaveBeenCalledWith({ error: 'ID inválido' });
+    });
+  });
+
+  describe('getPagamentos endpoint', () => {
+    it('should return 200 with the received payments', async () => {
+      const pagamentos = [
+        {
+          id: 7,
+          venda_id: 10,
+          data_pagamento: '2026-10-08T22:10:00.000Z',
+          valor: 120,
+          vencimento: '2026-09-15',
+          parcela: null,
+          total_parcelas: null,
+          descricao: 'Internet 500MB',
+          cliente_nome: 'João Silva',
+        },
+      ];
+      vi.mocked(mockBillingService.listPagamentos).mockResolvedValue(pagamentos);
+
+      await controller.getPagamentos(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(pagamentos);
+    });
+
+    it('should return 500 when the lookup fails', async () => {
+      vi.mocked(mockBillingService.listPagamentos).mockRejectedValue(new Error('falhou'));
+
+      await controller.getPagamentos(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(500);
+      expect(mockRes.json).toHaveBeenCalledWith({ error: 'falhou' });
     });
   });
 

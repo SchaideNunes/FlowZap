@@ -2042,6 +2042,29 @@ button.stat-tile:hover {
     padding: 0;
   }
 
+  /* Rodapé de totais: uma linha só, rótulo à esquerda e valor à direita */
+  .stack-table tfoot {
+    display: block;
+    padding: 0 0.85rem 0.85rem;
+  }
+
+  .stack-table tfoot tr {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 0.9rem;
+  }
+
+  .stack-table tfoot td {
+    border: none;
+    background: transparent;
+  }
+
+  .stack-table tfoot td:empty {
+    display: none;
+  }
+
   .modal-overlay {
     padding: 0.5rem;
     align-items: flex-end;

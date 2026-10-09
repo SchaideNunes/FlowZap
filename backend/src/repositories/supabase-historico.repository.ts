@@ -44,6 +44,21 @@ export class SupabaseHistoricoRepository implements IHistoricoRepository {
     return (data || []) as unknown as HistoricoWithVendaCliente[];
   }
 
+  async findPagamentos(limit: number = 100): Promise<HistoricoWithVendaCliente[]> {
+    const { data, error } = await this.client
+      .from('historico_mensagens')
+      .select('id, venda_id, tipo, data_envio, status_envio, mensagem, detalhes, venda:vendas(id, descricao, valor, valor_total, parcela_atual, total_parcelas, status_mes_atual, data_vencimento_atual, cliente:clientes(id, nome, whatsapp))')
+      .eq('tipo', 'confirmacao_manual')
+      .order('data_envio', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      throw new Error(`Erro ao buscar pagamentos recebidos: ${error.message}`);
+    }
+
+    return (data || []) as unknown as HistoricoWithVendaCliente[];
+  }
+
   async create(entry: HistoricoMensagem): Promise<HistoricoMensagem> {
     const { data, error } = await this.client
       .from('historico_mensagens')

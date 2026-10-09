@@ -14,6 +14,7 @@ export function createVendaRouter(
 
   router.get('/', vendaController.getAll);
   router.get('/metrics', vendaController.getMetrics);
+  router.get('/pagamentos', vendaController.getPagamentos);
   router.get('/cliente/:clienteId', vendaController.getByCliente);
   router.get('/:id', vendaController.getById);
   router.get('/:id/historico', vendaController.getHistorico);

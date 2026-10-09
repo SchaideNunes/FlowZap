@@ -51922,6 +51922,13 @@ var SupabaseHistoricoRepository = class {
     }
     return data || [];
   }
+  async findPagamentos(limit = 100) {
+    const { data, error } = await this.client.from("historico_mensagens").select("id, venda_id, tipo, data_envio, status_envio, mensagem, detalhes, venda:vendas(id, descricao, valor, valor_total, parcela_atual, total_parcelas, status_mes_atual, data_vencimento_atual, cliente:clientes(id, nome, whatsapp))").eq("tipo", "confirmacao_manual").order("data_envio", { ascending: false }).limit(limit);
+    if (error) {
+      throw new Error(`Erro ao buscar pagamentos recebidos: ${error.message}`);
+    }
+    return data || [];
+  }
   async create(entry) {
     const { data, error } = await this.client.from("historico_mensagens").insert({
       venda_id: entry.venda_id,
@@ -52055,6 +52062,16 @@ function daysDifference(targetDateStr, baseDateStr = formatDateToISO(/* @__PURE_
 }
 
 // src/services/billing.service.ts
+function snapshotPagamento(venda) {
+  const parcelado = Boolean(venda.total_parcelas && venda.total_parcelas > 1);
+  return {
+    valor: Number(venda.valor),
+    vencimento: venda.data_vencimento_atual || null,
+    parcela: parcelado ? venda.parcela_atual || 1 : null,
+    total_parcelas: parcelado ? venda.total_parcelas : null
+  };
+}
+var numberOrNull = (value) => typeof value === "number" && Number.isFinite(value) ? value : null;
 var BillingService = class {
   vendaRepo;
   clienteRepo;
@@ -52101,7 +52118,8 @@ var BillingService = class {
           venda_id: vendaId,
           tipo: "confirmacao_manual",
           status_envio: "enviado",
-          mensagem: `Venda totalmente quitada! Todas as ${venda.total_parcelas} parcelas foram pagas.`
+          mensagem: `Venda totalmente quitada! Todas as ${venda.total_parcelas} parcelas foram pagas.`,
+          detalhes: snapshotPagamento(venda)
         });
         return updated3;
       }
@@ -52118,7 +52136,8 @@ var BillingService = class {
         venda_id: vendaId,
         tipo: "confirmacao_manual",
         status_envio: "enviado",
-        mensagem: `Pagamento da parcela ${venda.parcela_atual || 1}/${venda.total_parcelas} confirmado. Pr\xF3xima parcela: ${proximaParcela}/${venda.total_parcelas}`
+        mensagem: `Pagamento da parcela ${venda.parcela_atual || 1}/${venda.total_parcelas} confirmado. Pr\xF3xima parcela: ${proximaParcela}/${venda.total_parcelas}`,
+        detalhes: snapshotPagamento(venda)
       });
       return updated2;
     }
@@ -52131,9 +52150,30 @@ var BillingService = class {
       venda_id: vendaId,
       tipo: "confirmacao_manual",
       status_envio: "enviado",
-      mensagem: "Pagamento confirmado manualmente pelo usu\xE1rio"
+      mensagem: "Pagamento confirmado manualmente pelo usu\xE1rio",
+      detalhes: snapshotPagamento(venda)
     });
     return updated;
+  }
+  /**
+   * Pagamentos já confirmados, do mais recente para o mais antigo
+   */
+  async listPagamentos(limit = 100) {
+    const registros = await this.historicoRepo.findPagamentos(limit);
+    return registros.map((registro) => {
+      const detalhes = registro.detalhes || {};
+      return {
+        id: registro.id,
+        venda_id: registro.venda_id,
+        data_pagamento: registro.data_envio || "",
+        valor: numberOrNull(detalhes.valor) ?? Number(registro.venda?.valor ?? 0),
+        vencimento: typeof detalhes.vencimento === "string" ? detalhes.vencimento : null,
+        parcela: numberOrNull(detalhes.parcela),
+        total_parcelas: numberOrNull(detalhes.total_parcelas),
+        descricao: registro.venda?.descricao ?? null,
+        cliente_nome: registro.venda?.cliente?.nome ?? null
+      };
+    });
   }
   /**
    * Avalia o status e lembrete necessário para uma venda no dia de referência
@@ -57005,6 +57045,15 @@ var VendaController = class {
       res.status(500).json({ error: msg });
     }
   };
+  getPagamentos = async (_req, res) => {
+    try {
+      const pagamentos = await this.billingService.listPagamentos();
+      res.status(200).json(pagamentos);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao buscar pagamentos recebidos";
+      res.status(500).json({ error: msg });
+    }
+  };
   toggleAtivo = async (req, res) => {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -57491,6 +57540,7 @@ function createVendaRouter(vendaController, authService) {
   router.use(authMiddleware);
   router.get("/", vendaController.getAll);
   router.get("/metrics", vendaController.getMetrics);
+  router.get("/pagamentos", vendaController.getPagamentos);
   router.get("/cliente/:clienteId", vendaController.getByCliente);
   router.get("/:id", vendaController.getById);
   router.get("/:id/historico", vendaController.getHistorico);

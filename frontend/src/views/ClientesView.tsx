@@ -16,11 +16,11 @@ import {
   Pause,
   Play,
 } from 'lucide-react';
-import { Cliente, Venda } from '../types/index.js';
+import { Cliente, PagamentoRecebido, Venda } from '../types/index.js';
 import { api } from '../services/api.js';
 import { formatFullWhatsApp } from '../utils/phone.js';
 import { extractErrorMessage } from '../utils/error.js';
-import { formatBRL, formatDateBR } from '../utils/format.js';
+import { formatBRL, formatDateBR, todayISO } from '../utils/format.js';
 import { PageHeader } from '../components/ui/PageHeader.js';
 import { StatTile } from '../components/ui/StatTile.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
@@ -45,6 +45,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
 }) => {
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [pagamentos, setPagamentos] = useState<PagamentoRecebido[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todos');
@@ -55,12 +56,15 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [vendasRes, clientesRes] = await Promise.all([
+      const [vendasRes, clientesRes, pagamentosRes] = await Promise.all([
         api.get('/vendas'),
         api.get('/clientes'),
+        // A lista de recebidos não pode impedir a planilha de abrir
+        api.get('/vendas/pagamentos').catch(() => ({ data: [] })),
       ]);
       setVendas(vendasRes.data || []);
       setClientes(clientesRes.data || []);
+      setPagamentos(Array.isArray(pagamentosRes.data) ? pagamentosRes.data : []);
     } catch {
       // Ignora erro passageiro
     } finally {
@@ -85,9 +89,17 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
 
     setPayingVendaId(venda.id);
     try {
-      await api.patch(`/vendas/${venda.id}/pago`);
-      setFeedbackMsg(`Pagamento de "${venda.descricao}" confirmado com sucesso!`);
-      setTimeout(() => setFeedbackMsg(null), 4000);
+      const res = await api.patch(`/vendas/${venda.id}/pago`);
+      const atualizada: Venda | undefined = res.data?.venda;
+      // A venda continua na lista, já no ciclo seguinte: dizer para onde o pagamento foi
+      const destino =
+        atualizada && !atualizada.ativo
+          ? 'Venda quitada.'
+          : atualizada?.data_vencimento_atual
+            ? `A próxima parcela vence em ${formatDateBR(atualizada.data_vencimento_atual)}.`
+            : '';
+      setFeedbackMsg(`Pagamento de "${venda.descricao}" registrado em Pagos. ${destino}`.trim());
+      setTimeout(() => setFeedbackMsg(null), 8000);
       fetchData();
     } catch (err: any) {
       alert(extractErrorMessage(err, 'Erro ao registrar pagamento.'));
@@ -119,7 +131,6 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
         if (statusFilter === 'pendente') return v.status_mes_atual === 'pendente';
         if (statusFilter === 'avisado') return v.status_mes_atual.startsWith('avisado');
         if (statusFilter === 'vencido') return v.status_mes_atual === 'vencido';
-        if (statusFilter === 'pago') return v.status_mes_atual === 'pago';
 
         return true;
       })
@@ -134,14 +145,32 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
       });
   }, [vendas, search, statusFilter, sortBy]);
 
+  const filteredPagamentos = useMemo(() => {
+    const term = search.toLowerCase().trim();
+    if (!term) return pagamentos;
+    return pagamentos.filter(
+      (p) =>
+        (p.cliente_nome || '').toLowerCase().includes(term) ||
+        (p.descricao || '').toLowerCase().includes(term)
+    );
+  }, [pagamentos, search]);
+
+  // Recebido no mês corrente (data local de quando o pagamento foi confirmado)
+  const recebidoNoMes = useMemo(() => {
+    const mesAtual = todayISO().slice(0, 7);
+    const doMes = pagamentos.filter((p) => todayISO(new Date(p.data_pagamento)).startsWith(mesAtual));
+    return {
+      quantidade: doMes.length,
+      valor: doMes.reduce((acc, p) => acc + (Number(p.valor) || 0), 0),
+    };
+  }, [pagamentos]);
+
   const totals = useMemo(() => {
     let sumParcelas = 0;
     let sumTotalVendas = 0;
     let countPendentes = 0;
     let countAvisados = 0;
     let countVencidos = 0;
-    let countPagos = 0;
-    let valorRecebido = 0;
     let valorEmAberto = 0;
 
     vendas.forEach((v) => {
@@ -150,10 +179,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
       sumParcelas += vParcela;
       sumTotalVendas += vTotal;
 
-      if (v.status_mes_atual === 'pago') {
-        countPagos++;
-        valorRecebido += vParcela;
-      } else {
+      if (v.status_mes_atual !== 'pago') {
         valorEmAberto += vParcela;
         if (v.status_mes_atual === 'vencido') countVencidos++;
         else if (v.status_mes_atual.startsWith('avisado')) countAvisados++;
@@ -167,8 +193,6 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
       countPendentes,
       countAvisados,
       countVencidos,
-      countPagos,
-      valorRecebido,
       valorEmAberto,
       totalRegistros: vendas.length,
     };
@@ -217,6 +241,8 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
 
 
   const parcelasEmAberto = totals.countPendentes + totals.countAvisados + totals.countVencidos;
+  const showPagamentos = statusFilter === 'pago';
+  const somaPagamentosFiltrados = filteredPagamentos.reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
   const somaValorFiltrado = filteredVendas.reduce((acc, v) => acc + (Number(v.valor) || 0), 0);
   const somaTotalFiltrado = filteredVendas.reduce(
     (acc, v) => acc + (Number(v.valor_total) || Number(v.valor) * (v.total_parcelas || 1)),
@@ -270,10 +296,12 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
           onClick={() => setStatusFilter('vencido')}
         />
         <StatTile
-          label="Recebido no ciclo"
-          value={formatBRL(totals.valorRecebido)}
-          hint={`${totals.countPagos} ${totals.countPagos === 1 ? 'parcela confirmada' : 'parcelas confirmadas'}`}
-          tone={totals.countPagos > 0 ? 'success' : 'neutral'}
+          label="Recebido no mês"
+          value={formatBRL(recebidoNoMes.valor)}
+          hint={`${recebidoNoMes.quantidade} ${
+            recebidoNoMes.quantidade === 1 ? 'pagamento confirmado' : 'pagamentos confirmados'
+          }`}
+          tone={recebidoNoMes.quantidade > 0 ? 'success' : 'neutral'}
           onClick={() => setStatusFilter('pago')}
         />
         <StatTile
@@ -374,12 +402,12 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
               onClick={() => setStatusFilter('pago')}
             >
               <span>Pagos</span>
-              <span className="excel-filter-count">{totals.countPagos}</span>
+              <span className="excel-filter-count">{pagamentos.length}</span>
             </button>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ display: showPagamentos ? 'none' : 'flex', alignItems: 'center', gap: '6px' }}>
               <ArrowUpDown size={14} color="var(--text-dim)" />
               <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>Ordenar:</span>
               <select
@@ -405,12 +433,96 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                 whiteSpace: 'nowrap',
               }}
             >
-              Exibindo <strong>{filteredVendas.length}</strong> de {vendas.length}
+              Exibindo <strong>{showPagamentos ? filteredPagamentos.length : filteredVendas.length}</strong> de{' '}
+              {showPagamentos ? pagamentos.length : vendas.length}
             </div>
           </div>
         </div>
 
+        {/* Pagos: o que já foi recebido (a venda em si segue na lista, no ciclo seguinte) */}
+        {showPagamentos && (
+          <div className="excel-table-container">
+            <table className="excel-table stack-table">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Venda</th>
+                  <th style={{ textAlign: 'center' }}>Parcela</th>
+                  <th className="num">Valor recebido</th>
+                  <th>Vencimento</th>
+                  <th>Pago em</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {loading ? (
+                  <tr className="is-plain">
+                    <td colSpan={6} className="stack-full">
+                      <EmptyState title="Carregando pagamentos..." />
+                    </td>
+                  </tr>
+                ) : filteredPagamentos.length === 0 ? (
+                  <tr className="is-plain">
+                    <td colSpan={6} className="stack-full">
+                      <EmptyState
+                        title="Nenhum pagamento recebido"
+                        text={
+                          search
+                            ? 'Nenhum pagamento corresponde à busca.'
+                            : 'Ao tocar em "Marcar pago" em uma venda, o pagamento aparece aqui.'
+                        }
+                      />
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPagamentos.map((p) => (
+                    <tr key={p.id}>
+                      <td data-label="Cliente" className="cell-title">
+                        {p.cliente_nome || 'Cliente desconhecido'}
+                      </td>
+                      <td data-label="Venda">{p.descricao || '-'}</td>
+                      <td data-label="Parcela" style={{ textAlign: 'center' }}>
+                        {p.parcela && p.total_parcelas ? (
+                          <span className="badge">
+                            {p.parcela}/{p.total_parcelas}
+                          </span>
+                        ) : (
+                          <span style={{ color: 'var(--text-dim)' }}>-</span>
+                        )}
+                      </td>
+                      <td data-label="Valor recebido" className="num cell-title">
+                        {formatBRL(p.valor)}
+                      </td>
+                      <td data-label="Vencimento">{formatDateBR(p.vencimento)}</td>
+                      <td data-label="Pago em">
+                        <span className="badge badge-pago">
+                          <span className="status-dot dot-success" aria-hidden="true" />
+                          {formatDateBR(todayISO(new Date(p.data_pagamento)))}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+
+              {filteredPagamentos.length > 0 && (
+                <tfoot>
+                  <tr>
+                    <td colSpan={3} style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
+                      Total de {filteredPagamentos.length}{' '}
+                      {filteredPagamentos.length === 1 ? 'pagamento' : 'pagamentos'}
+                    </td>
+                    <td className="num">{formatBRL(somaPagamentosFiltrados)}</td>
+                    <td colSpan={2}></td>
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        )}
+
         {/* Planilha (computador e tablet) */}
+        {!showPagamentos && (
         <div className="excel-table-container desktop-table-view">
           <table className="excel-table">
             <thead>
@@ -589,7 +701,10 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
           </table>
         </div>
 
+        )}
+
         {/* Cartões (celular) */}
+        {!showPagamentos && (
         <div className="mobile-cards-view">
           {loading ? (
             <EmptyState title="Carregando vendas..." />
@@ -766,6 +881,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
             </>
           )}
         </div>
+        )}
       </div>
     </div>
   );

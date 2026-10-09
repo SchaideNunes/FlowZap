@@ -129,6 +129,16 @@ export class VendaController {
     }
   };
 
+  getPagamentos = async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const pagamentos = await this.billingService.listPagamentos();
+      res.status(200).json(pagamentos);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao buscar pagamentos recebidos';
+      res.status(500).json({ error: msg });
+    }
+  };
+
   toggleAtivo = async (req: Request, res: Response): Promise<void> => {
     const id = Number(req.params.id);
     if (isNaN(id)) {

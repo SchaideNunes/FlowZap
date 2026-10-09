@@ -47,3 +47,33 @@ describe('SupabaseHistoricoRepository.hasMessageBeenSentForCycle', () => {
     await expect(repo.hasMessageBeenSentForCycle(1, 'vencido', '2026-09-18')).rejects.toThrow(/falhou/);
   });
 });
+
+describe('SupabaseHistoricoRepository.findPagamentos', () => {
+  let repo: SupabaseHistoricoRepository;
+  let chain: any;
+
+  beforeEach(() => {
+    chain = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue({ data: [{ id: 1 }], error: null }),
+    };
+    const mockClient = { from: vi.fn().mockReturnValue(chain) };
+    repo = new SupabaseHistoricoRepository(mockClient as unknown as SupabaseClient);
+  });
+
+  it('busca só as confirmações de pagamento, da mais recente para a mais antiga', async () => {
+    const result = await repo.findPagamentos(30);
+
+    expect(chain.eq).toHaveBeenCalledWith('tipo', 'confirmacao_manual');
+    expect(chain.order).toHaveBeenCalledWith('data_envio', { ascending: false });
+    expect(chain.limit).toHaveBeenCalledWith(30);
+    expect(result).toEqual([{ id: 1 }]);
+  });
+
+  it('lança erro quando a consulta falha', async () => {
+    chain.limit.mockResolvedValueOnce({ data: null, error: { message: 'falhou' } });
+    await expect(repo.findPagamentos()).rejects.toThrow(/falhou/);
+  });
+});

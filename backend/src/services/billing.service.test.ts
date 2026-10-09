@@ -122,6 +122,7 @@ describe('BillingService (TDD)', () => {
         tipo: 'confirmacao_manual',
         status_envio: 'enviado',
         mensagem: 'Pagamento confirmado manualmente pelo usuário',
+        detalhes: { valor: 120.0, vencimento: '2026-09-15', parcela: null, total_parcelas: null },
       });
 
       expect(updated.status_mes_atual).toBe('pendente');
@@ -163,7 +164,82 @@ describe('BillingService (TDD)', () => {
         parcela_atual: 3,
       }));
       expect(updated.parcela_atual).toBe(3);
+      expect(mockHistoricoRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          detalhes: { valor: 150.0, vencimento: '2026-09-10', parcela: 2, total_parcelas: 5 },
+        })
+      );
     });
+  });
+
+  describe('listPagamentos (pagamentos recebidos)', () => {
+    it('devolve o valor e o vencimento gravados no momento do pagamento', async () => {
+      mockHistoricoRepo.findPagamentos = vi.fn().mockResolvedValue([
+        {
+          id: 7,
+          venda_id: 10,
+          tipo: 'confirmacao_manual',
+          status_envio: 'enviado',
+          data_envio: '2026-10-08T22:10:00.000Z',
+          detalhes: { valor: 120, vencimento: '2026-09-15', parcela: 2, total_parcelas: 5 },
+          venda: {
+            id: 10,
+            descricao: 'iPhone 13',
+            valor: 999,
+            status_mes_atual: 'pendente',
+            data_vencimento_atual: '2026-10-15',
+            cliente: { id: 1, nome: 'João Silva', whatsapp: '5511999999999' },
+          },
+        },
+      ]);
+
+      const result = await billingService.listPagamentos(50);
+
+      expect(mockHistoricoRepo.findPagamentos).toHaveBeenCalledWith(50);
+      expect(result).toEqual([
+        {
+          id: 7,
+          venda_id: 10,
+          data_pagamento: '2026-10-08T22:10:00.000Z',
+          valor: 120,
+          vencimento: '2026-09-15',
+          parcela: 2,
+          total_parcelas: 5,
+          descricao: 'iPhone 13',
+          cliente_nome: 'João Silva',
+        },
+      ]);
+    });
+
+    it('usa o valor atual da venda nos pagamentos antigos, sem detalhes gravados', async () => {
+      mockHistoricoRepo.findPagamentos = vi.fn().mockResolvedValue([
+        {
+          id: 3,
+          venda_id: 11,
+          tipo: 'confirmacao_manual',
+          status_envio: 'enviado',
+          data_envio: '2026-10-01T12:00:00.000Z',
+          detalhes: null,
+          venda: {
+            id: 11,
+            descricao: 'Capinha',
+            valor: 80,
+            status_mes_atual: 'pendente',
+            data_vencimento_atual: '2026-11-05',
+          },
+        },
+      ]);
+
+      const [pagamento] = await billingService.listPagamentos();
+
+      expect(pagamento.valor).toBe(80);
+      expect(pagamento.vencimento).toBeNull();
+      expect(pagamento.parcela).toBeNull();
+      expect(pagamento.cliente_nome).toBeNull();
+    });
+  });
+
+  describe('markAsPaid (última parcela)', () => {
 
     it('should complete sale (ativo: false) when paying the final installment', async () => {
       const ultimaParcelaVenda: VendaWithCliente = {

@@ -31,6 +31,18 @@ export interface Venda {
   cliente?: Cliente;
 }
 
+export interface PagamentoRecebido {
+  id: number;
+  venda_id: number;
+  data_pagamento: string;
+  valor: number;
+  vencimento: string | null;
+  parcela: number | null;
+  total_parcelas: number | null;
+  descricao: string | null;
+  cliente_nome: string | null;
+}
+
 export interface HistoricoItem {
   id: number;
   venda_id: number;

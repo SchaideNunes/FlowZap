@@ -14,6 +14,35 @@ export interface ReminderDecision {
   novoStatus: VendaStatus;
 }
 
+export interface PagamentoRecebido {
+  id: number;
+  venda_id: number;
+  data_pagamento: string;
+  valor: number;
+  vencimento: string | null;
+  parcela: number | null;
+  total_parcelas: number | null;
+  descricao: string | null;
+  cliente_nome: string | null;
+}
+
+/**
+ * Retrato da parcela no momento do pagamento: a venda avança de ciclo logo em seguida,
+ * então o valor e o vencimento pagos só ficam guardados aqui.
+ */
+function snapshotPagamento(venda: VendaWithCliente): Record<string, unknown> {
+  const parcelado = Boolean(venda.total_parcelas && venda.total_parcelas > 1);
+  return {
+    valor: Number(venda.valor),
+    vencimento: venda.data_vencimento_atual || null,
+    parcela: parcelado ? venda.parcela_atual || 1 : null,
+    total_parcelas: parcelado ? venda.total_parcelas! : null,
+  };
+}
+
+const numberOrNull = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
 export class BillingService {
   private vendaRepo: IVendaRepository;
   private clienteRepo: IClienteRepository;
@@ -75,6 +104,7 @@ export class BillingService {
           tipo: 'confirmacao_manual',
           status_envio: 'enviado',
           mensagem: `Venda totalmente quitada! Todas as ${venda.total_parcelas} parcelas foram pagas.`,
+          detalhes: snapshotPagamento(venda),
         });
 
         return updated;
@@ -97,6 +127,7 @@ export class BillingService {
         tipo: 'confirmacao_manual',
         status_envio: 'enviado',
         mensagem: `Pagamento da parcela ${venda.parcela_atual || 1}/${venda.total_parcelas} confirmado. Próxima parcela: ${proximaParcela}/${venda.total_parcelas}`,
+        detalhes: snapshotPagamento(venda),
       });
 
       return updated;
@@ -114,9 +145,32 @@ export class BillingService {
       tipo: 'confirmacao_manual',
       status_envio: 'enviado',
       mensagem: 'Pagamento confirmado manualmente pelo usuário',
+      detalhes: snapshotPagamento(venda),
     });
 
     return updated;
+  }
+
+  /**
+   * Pagamentos já confirmados, do mais recente para o mais antigo
+   */
+  async listPagamentos(limit: number = 100): Promise<PagamentoRecebido[]> {
+    const registros = await this.historicoRepo.findPagamentos(limit);
+
+    return registros.map((registro) => {
+      const detalhes = registro.detalhes || {};
+      return {
+        id: registro.id!,
+        venda_id: registro.venda_id,
+        data_pagamento: registro.data_envio || '',
+        valor: numberOrNull(detalhes.valor) ?? Number(registro.venda?.valor ?? 0),
+        vencimento: typeof detalhes.vencimento === 'string' ? detalhes.vencimento : null,
+        parcela: numberOrNull(detalhes.parcela),
+        total_parcelas: numberOrNull(detalhes.total_parcelas),
+        descricao: registro.venda?.descricao ?? null,
+        cliente_nome: registro.venda?.cliente?.nome ?? null,
+      };
+    });
   }
 
   /**
