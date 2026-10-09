@@ -120,6 +120,7 @@ O motor de cobrança segue rigorosamente as melhores práticas para proteção c
   - O sistema calcula a data do próximo vencimento somando exatamente 1 mês (`avancarProximoMes()`).
   - O cálculo considera de forma determinística meses de 28, 29 (ano bissexto), 30 e 31 dias. Se uma venda vence no dia 31 e o próximo mês tem 30 dias, o vencimento é ajustado para o dia 30.
   - O status de pagamento é reiniciado para pendente para o novo ciclo.
+  - Como a venda segue na lista já no ciclo seguinte, o pagamento fica registrado em `historico_mensagens` (`confirmacao_manual`, com valor, vencimento e parcela pagos em `detalhes`) e aparece na aba **Pagos** de "Clientes e vendas" (`GET /api/vendas/pagamentos`).
   - Para vendas parceladas, o número da parcela atual é incrementado (ex: de 2/12 para 3/12) e, ao atingir o total, a venda é automaticamente marcada como quitada.
 
 ### 5.3. Janela de Avisos (3 avisos + aviso final)
