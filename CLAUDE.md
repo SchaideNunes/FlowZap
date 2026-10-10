@@ -130,6 +130,10 @@ Os disparos são filtrados para clientes ativos e pendentes de pagamento. Dentro
 3. `lembrete_1d`: 1 dia antes do vencimento.
 4. `vencido`: aviso final ("ultimato"), no dia do vencimento (ou depois, se ainda não enviado), uma única vez.
 
+**Configurações editáveis pelo usuário** (tela de Notificações, tabela `configuracoes` de linha única, `GET/PUT /api/configuracoes`, ver `database/migration_configuracoes.sql`):
+- **Texto de cada aviso:** as mensagens padrão ficam em `DEFAULT_TEMPLATES` (`template.service.ts`); o usuário pode sobrescrever cada uma usando as variáveis `{saudacao}`, `{nome}`, `{produto}`, `{valor}`, `{vencimento}` e `{referencia}`. Texto vazio volta para o padrão; variável desconhecida é recusada pelo Zod. `{saudacao}` é obrigatória em toda mensagem personalizada (regra anti-ban da saudação dinâmica).
+- **Envio automático:** com `envio_automatico = false` a rotina diária e a recuperação ao ligar o computador não enviam nada; o disparo manual continua. Sem a tabela, vale o padrão (ligado, mensagens padrão).
+
 Cada tipo é enviado no máximo uma vez por ciclo (histórico de 20 dias antes do vencimento). Alterar os tipos exige ajustar a constraint `historico_mensagens_tipo_check` no banco (ver `database/migration_lembrete_2d.sql`).
 
 ### 5.4. Contas a Pagar (Quem Devemos)
