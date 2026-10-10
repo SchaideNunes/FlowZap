@@ -82,4 +82,25 @@ describe('SupabaseSedeStatusRepository', () => {
       expect(upsert).toHaveBeenCalledWith({ id: 1, ultima_rotina_data: '2026-10-09' }, { onConflict: 'id' });
     });
   });
+
+  describe('markBackup', () => {
+    it('grava a data do último backup na linha única', async () => {
+      const chain: any = { upsert: vi.fn().mockResolvedValue({ error: null }) };
+      mockClient.from.mockReturnValue(chain);
+
+      await repo.markBackup(new Date('2026-10-09T12:00:00Z'));
+
+      expect(chain.upsert).toHaveBeenCalledWith(
+        { id: 1, ultimo_backup_em: '2026-10-09T12:00:00.000Z' },
+        { onConflict: 'id' }
+      );
+    });
+
+    it('lança erro quando a gravação falha (ex.: coluna ainda não criada)', async () => {
+      const chain: any = { upsert: vi.fn().mockResolvedValue({ error: { message: 'column does not exist' } }) };
+      mockClient.from.mockReturnValue(chain);
+
+      await expect(repo.markBackup(new Date())).rejects.toThrow(/does not exist/);
+    });
+  });
 });

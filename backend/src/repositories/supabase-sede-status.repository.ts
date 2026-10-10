@@ -41,4 +41,14 @@ export class SupabaseSedeStatusRepository implements ISedeStatusRepository {
       throw new Error(`Erro ao registrar a rotina diária: ${error.message}`);
     }
   }
+
+  async markBackup(at: Date): Promise<void> {
+    const { error } = await this.client
+      .from(TABLE)
+      .upsert({ id: ROW_ID, ultimo_backup_em: at.toISOString() }, { onConflict: 'id' });
+
+    if (error) {
+      throw new Error(`Erro ao registrar o backup: ${error.message}`);
+    }
+  }
 }

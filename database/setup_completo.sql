@@ -81,8 +81,10 @@ CREATE TABLE IF NOT EXISTS sede_status (
     id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
     estado_whatsapp TEXT NOT NULL DEFAULT 'close',
     atualizado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
-    ultima_rotina_data DATE
+    ultima_rotina_data DATE,
+    ultimo_backup_em TIMESTAMPTZ
 );
+ALTER TABLE sede_status ADD COLUMN IF NOT EXISTS ultimo_backup_em TIMESTAMPTZ;
 
 -- 6. Índices para Otimização de Consultas e do Cron Diário
 CREATE INDEX IF NOT EXISTS idx_clientes_ativo ON clientes(ativo);
@@ -164,3 +166,22 @@ BEFORE UPDATE ON configuracoes
 FOR EACH ROW EXECUTE FUNCTION trigger_set_atualizado_em();
 
 ALTER TABLE configuracoes ENABLE ROW LEVEL SECURITY;
+
+-- Backup: alinha os contadores de id depois de uma restauração
+CREATE OR REPLACE FUNCTION flowzap_ajustar_sequencias()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    PERFORM setval(pg_get_serial_sequence('clientes', 'id'), GREATEST((SELECT COALESCE(MAX(id), 0) FROM clientes), 1));
+    PERFORM setval(pg_get_serial_sequence('vendas', 'id'), GREATEST((SELECT COALESCE(MAX(id), 0) FROM vendas), 1));
+    PERFORM setval(pg_get_serial_sequence('historico_mensagens', 'id'), GREATEST((SELECT COALESCE(MAX(id), 0) FROM historico_mensagens), 1));
+    PERFORM setval(pg_get_serial_sequence('contas_a_pagar', 'id'), GREATEST((SELECT COALESCE(MAX(id), 0) FROM contas_a_pagar), 1));
+END;
+$$;
+
+-- Só o backend (service_role) pode chamar
+REVOKE ALL ON FUNCTION flowzap_ajustar_sequencias() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION flowzap_ajustar_sequencias() TO service_role;

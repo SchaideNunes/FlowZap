@@ -3,6 +3,7 @@ import path from 'path';
 import { createApp } from './app.js';
 import { BaileysService } from './services/baileys.service.js';
 import { SedeHeartbeatService } from './services/sede-heartbeat.service.js';
+import { resolveBackupDir } from './config/backup-dir.js';
 import {
   createBaileysSocketFactory,
   hasRegisteredSession,
@@ -25,7 +26,10 @@ const whatsApp = isServerless
       hasSession: () => hasRegisteredSession(authDir),
     });
 
-const { app, scheduler, sedeStatusRepo } = createApp({ whatsAppGateway: whatsApp });
+const { app, scheduler, sedeStatusRepo, backupService } = createApp({
+  whatsAppGateway: whatsApp,
+  backupDir: isServerless ? undefined : resolveBackupDir(),
+});
 const heartbeat = whatsApp ? new SedeHeartbeatService(sedeStatusRepo, whatsApp) : undefined;
 
 let server: any;
@@ -48,6 +52,9 @@ if (!isServerless) {
   // Avisa o painel online que a sede está ligada
   heartbeat?.start();
 
+  // Cópia diária dos dados em disco (proteção contra perda no banco em nuvem)
+  backupService.startAutomatic();
+
   // Se o computador estava desligado no horário agendado, recupera a rotina do dia
   scheduler
     .runCatchUpIfNeeded()
@@ -66,6 +73,7 @@ const shutdown = () => {
   console.log('\nEncerrando servidor Flow-Zap com segurança...');
   scheduler.stop();
   heartbeat?.stop();
+  backupService.stop();
   whatsApp?.stop();
   if (server) {
     server.close(() => {

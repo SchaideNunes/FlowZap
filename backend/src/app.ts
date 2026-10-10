@@ -24,6 +24,10 @@ import { SupabaseConfiguracaoRepository } from './repositories/supabase-configur
 import { ConfiguracaoService } from './services/configuracao.service.js';
 import { ConfiguracaoController } from './controllers/configuracao.controller.js';
 import { createConfiguracaoRouter } from './routes/configuracao.routes.js';
+import { SupabaseBackupRepository } from './repositories/supabase-backup.repository.js';
+import { BackupService } from './services/backup.service.js';
+import { BackupController } from './controllers/backup.controller.js';
+import { createBackupRouter } from './routes/backup.routes.js';
 import { ContaPagarController } from './controllers/conta-pagar.controller.js';
 import { createContaPagarRouter } from './routes/conta-pagar.routes.js';
 import { createAuthRouter } from './routes/auth.routes.js';
@@ -34,12 +38,15 @@ import { createCobrancaRouter } from './routes/cobranca.routes.js';
 export interface CreateAppOptions {
   /** Conexão com o WhatsApp. Sem ela (ex.: Vercel) o envio fica indisponível. */
   whatsAppGateway?: IWhatsAppGateway;
+  /** Pasta dos backups diários. Só a máquina-sede informa; na nuvem não há disco permanente. */
+  backupDir?: string;
 }
 
 export function createApp(options: CreateAppOptions = {}): {
   app: Express;
   scheduler: SchedulerService;
   sedeStatusRepo: ISedeStatusRepository;
+  backupService: BackupService;
 } {
   const app = express();
 
@@ -116,6 +123,13 @@ export function createApp(options: CreateAppOptions = {}): {
   const contaPagarController = new ContaPagarController(contaPagarRepo);
   const configuracaoController = new ConfiguracaoController(configService);
 
+  const backupService = new BackupService(new SupabaseBackupRepository(supabase), {
+    dir: options.backupDir,
+    keep: Number(process.env.BACKUP_KEEP) || 30,
+    sedeStatusRepo,
+  });
+  const backupController = new BackupController(backupService, sedeStatusRepo);
+
   // Registro das Rotas
   app.use('/api/auth', createAuthRouter(authService, authController));
   app.use('/api/clientes', createClienteRouter(clienteController, authService));
@@ -123,6 +137,7 @@ export function createApp(options: CreateAppOptions = {}): {
   app.use('/api/cobrancas', createCobrancaRouter(cobrancaController, authService));
   app.use('/api/contas-pagar', createContaPagarRouter(contaPagarController, authService));
   app.use('/api/configuracoes', createConfiguracaoRouter(configuracaoController, authService));
+  app.use('/api/backup', createBackupRouter(backupController, authService));
 
   // Middleware de erro global
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -130,7 +145,7 @@ export function createApp(options: CreateAppOptions = {}): {
     res.status(500).json({ error: 'Erro interno no servidor' });
   });
 
-  return { app, scheduler, sedeStatusRepo };
+  return { app, scheduler, sedeStatusRepo, backupService };
 }
 
 export const { app, scheduler } = createApp();

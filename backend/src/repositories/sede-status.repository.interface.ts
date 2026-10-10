@@ -6,6 +6,8 @@ export interface SedeStatusRecord {
   atualizado_em: string | null;
   /** Data (YYYY-MM-DD) da última rotina diária de cobrança executada. */
   ultima_rotina_data: string | null;
+  /** Último backup automático gravado pela máquina-sede (ISO). */
+  ultimo_backup_em?: string | null;
 }
 
 /**
@@ -16,4 +18,5 @@ export interface ISedeStatusRepository {
   getStatus(): Promise<SedeStatusRecord | null>;
   saveHeartbeat(state: WhatsAppConnectionState, at: Date): Promise<void>;
   markRoutineRun(date: string): Promise<void>;
+  markBackup(at: Date): Promise<void>;
 }

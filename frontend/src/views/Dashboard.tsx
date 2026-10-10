@@ -6,6 +6,7 @@ import { summarizeSede, SEDE_BADGE_CLASS, SEDE_DOT_CLASS } from '../utils/sede.j
 import { formatBRL, formatDateBR } from '../utils/format.js';
 import { PageHeader } from '../components/ui/PageHeader.js';
 import { StatTile } from '../components/ui/StatTile.js';
+import { BackupPanel } from '../components/BackupPanel.js';
 
 interface DashboardProps {
   whatsAppInfo: WhatsAppStatus;
@@ -351,6 +352,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           )}
         </section>
+
+        <BackupPanel />
       </div>
     </div>
   );

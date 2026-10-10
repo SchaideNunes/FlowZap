@@ -53,6 +53,20 @@ export interface ConfiguracaoData {
   variaveis: { chave: string; descricao: string }[];
 }
 
+export interface BackupSnapshot {
+  app: 'flowzap';
+  versao: number;
+  gerado_em: string;
+  totais: Record<string, number>;
+  tabelas: Record<string, Record<string, unknown>[]>;
+}
+
+export interface BackupStatus {
+  ultimo_backup_em: string | null;
+  automatico_neste_computador: boolean;
+  guardados: number;
+}
+
 export interface HistoricoItem {
   id: number;
   venda_id: number;
