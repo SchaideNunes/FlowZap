@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { ReminderService } from './reminder.service.js';
 import { ISedeStatusRepository } from '../repositories/sede-status.repository.interface.js';
+import { ConfiguracaoService } from './configuracao.service.js';
 import { parseDailyTime } from '../utils/cron-time.js';
 import { formatDateToISO } from '../utils/date-calculator.js';
 
@@ -8,16 +9,19 @@ export class SchedulerService {
   private reminderService: ReminderService;
   private cronExpression: string;
   private sedeStatusRepo?: ISedeStatusRepository;
+  private configService?: ConfiguracaoService;
   private task: cron.ScheduledTask | null = null;
 
   constructor(
     reminderService: ReminderService,
     cronExpression: string = '0 9 * * *',
-    sedeStatusRepo?: ISedeStatusRepository
+    sedeStatusRepo?: ISedeStatusRepository,
+    configService?: ConfiguracaoService
   ) {
     this.reminderService = reminderService;
     this.cronExpression = cronExpression;
     this.sedeStatusRepo = sedeStatusRepo;
+    this.configService = configService;
   }
 
   start(): void {
@@ -30,7 +34,7 @@ export class SchedulerService {
     this.task = cron.schedule(this.cronExpression, async () => {
       console.log(`[Scheduler] Executando rotina diária de cobrança automática: ${new Date().toISOString()}`);
       try {
-        await this.runRoutine();
+        await this.runScheduledRoutine();
       } catch (error) {
         console.error('[Scheduler] Erro ao executar rotina diária:', error);
       }
@@ -61,9 +65,33 @@ export class SchedulerService {
     const lastRun = await this.readLastRoutineDate();
     if (lastRun === today) return false;
 
+    if (!(await this.isAutomaticSendingEnabled())) {
+      console.log('[Scheduler] Envio automático desligado no painel: a rotina de hoje não será recuperada.');
+      return false;
+    }
+
     console.log('[Scheduler] A rotina de hoje ainda não rodou (sistema iniciado após o horário). Executando agora.');
     await this.runRoutine(today);
     return true;
+  }
+
+  /**
+   * Rotina do horário agendado. Devolve false (sem enviar nada) quando o envio automático
+   * está desligado no painel; o disparo manual não passa por aqui.
+   */
+  async runScheduledRoutine(): Promise<boolean> {
+    if (!(await this.isAutomaticSendingEnabled())) {
+      console.log('[Scheduler] Envio automático desligado no painel: nenhum aviso enviado.');
+      return false;
+    }
+
+    await this.runRoutine();
+    return true;
+  }
+
+  private async isAutomaticSendingEnabled(): Promise<boolean> {
+    if (!this.configService) return true;
+    return (await this.configService.get()).envio_automatico;
   }
 
   private async runRoutine(today: string = formatDateToISO(new Date())): Promise<void> {

@@ -43,6 +43,16 @@ export interface PagamentoRecebido {
   cliente_nome: string | null;
 }
 
+export type TipoAviso = 'lembrete_3d' | 'lembrete_2d' | 'lembrete_1d' | 'vencido';
+
+export interface ConfiguracaoData {
+  envio_automatico: boolean;
+  /** Textos escritos pelo usuário; aviso sem texto próprio usa o de `padroes`. */
+  mensagens: Partial<Record<TipoAviso, string>>;
+  padroes: Record<TipoAviso, string>;
+  variaveis: { chave: string; descricao: string }[];
+}
+
 export interface HistoricoItem {
   id: number;
   venda_id: number;

@@ -3,6 +3,8 @@ import { IHistoricoRepository, TipoMensagem } from '../repositories/historico.re
 import { BillingService } from './billing.service.js';
 import { TemplateService } from './template.service.js';
 import { MessageQueueService } from './message-queue.service.js';
+import { ConfiguracaoService } from './configuracao.service.js';
+import { MensagensPersonalizadas } from '../repositories/configuracao.repository.interface.js';
 import { formatDateToISO, daysDifference } from '../utils/date-calculator.js';
 
 export interface ReminderPreviewItem {
@@ -74,6 +76,7 @@ export class ReminderService {
   private billingService: BillingService;
   private templateService: TemplateService;
   private queueService: MessageQueueService;
+  private configService?: ConfiguracaoService;
   // Defesa extra contra reenvio: lembra o que já foi enviado neste processo, mesmo que o
   // registro no histórico falhe (ex.: banco rejeitando o tipo de mensagem).
   private sentThisSession = new Set<string>();
@@ -83,13 +86,21 @@ export class ReminderService {
     historicoRepo: IHistoricoRepository,
     billingService: BillingService,
     templateService: TemplateService,
-    queueService: MessageQueueService
+    queueService: MessageQueueService,
+    configService?: ConfiguracaoService
   ) {
     this.vendaRepo = vendaRepo;
     this.historicoRepo = historicoRepo;
     this.billingService = billingService;
     this.templateService = templateService;
     this.queueService = queueService;
+    this.configService = configService;
+  }
+
+  /** Textos escritos pelo usuário na tela de Notificações (vazio = mensagens padrão). */
+  private async loadCustomMessages(): Promise<MensagensPersonalizadas> {
+    if (!this.configService) return {};
+    return (await this.configService.get()).mensagens;
   }
 
   private sessionKey(vendaId: number, tipo: TipoMensagem, dataVencimento: string): string {
@@ -102,6 +113,7 @@ export class ReminderService {
    */
   async previewReminders(referenceDateStr: string = formatDateToISO(new Date())): Promise<ReminderPreviewItem[]> {
     const activeVendas = await this.vendaRepo.findActiveVendas();
+    const customMessages = await this.loadCustomMessages();
     const previews: ReminderPreviewItem[] = [];
 
     for (const venda of activeVendas) {
@@ -133,14 +145,18 @@ export class ReminderService {
         continue;
       }
 
-      const message = this.templateService.generateMessage(decision.tipo, {
-        nome: venda.cliente.nome,
-        descricao: venda.descricao,
-        valor: venda.valor,
-        dataVencimento: formattedDate,
-        parcelaAtual: venda.parcela_atual,
-        totalParcelas: venda.total_parcelas,
-      });
+      const message = this.templateService.generateMessage(
+        decision.tipo,
+        {
+          nome: venda.cliente.nome,
+          descricao: venda.descricao,
+          valor: venda.valor,
+          dataVencimento: formattedDate,
+          parcelaAtual: venda.parcela_atual,
+          totalParcelas: venda.total_parcelas,
+        },
+        customMessages[decision.tipo as keyof MensagensPersonalizadas]
+      );
 
       previews.push({
         vendaId: venda.id!,
@@ -216,6 +232,7 @@ export class ReminderService {
     referenceDateStr: string = formatDateToISO(new Date())
   ): Promise<OverdueReminderItem[]> {
     const activeVendas = await this.vendaRepo.findActiveVendas();
+    const customMessages = await this.loadCustomMessages();
     const overdues: OverdueReminderItem[] = [];
 
     for (const venda of activeVendas) {
@@ -260,14 +277,18 @@ export class ReminderService {
         // histórico opcional
       }
 
-      const mensagemCobranca = this.templateService.generateMessage('vencido', {
-        nome: venda.cliente.nome,
-        descricao: venda.descricao,
-        valor: Number(venda.valor),
-        dataVencimento: formattedDate,
-        parcelaAtual: venda.parcela_atual,
-        totalParcelas: venda.total_parcelas,
-      });
+      const mensagemCobranca = this.templateService.generateMessage(
+        'vencido',
+        {
+          nome: venda.cliente.nome,
+          descricao: venda.descricao,
+          valor: Number(venda.valor),
+          dataVencimento: formattedDate,
+          parcelaAtual: venda.parcela_atual,
+          totalParcelas: venda.total_parcelas,
+        },
+        customMessages.vencido
+      );
 
       overdues.push({
         vendaId: venda.id!,

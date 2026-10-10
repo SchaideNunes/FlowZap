@@ -20,6 +20,10 @@ import { CobrancaController } from './controllers/cobranca.controller.js';
 import { SupabaseContaPagarRepository } from './repositories/supabase-conta-pagar.repository.js';
 import { SupabaseSedeStatusRepository } from './repositories/supabase-sede-status.repository.js';
 import { ISedeStatusRepository } from './repositories/sede-status.repository.interface.js';
+import { SupabaseConfiguracaoRepository } from './repositories/supabase-configuracao.repository.js';
+import { ConfiguracaoService } from './services/configuracao.service.js';
+import { ConfiguracaoController } from './controllers/configuracao.controller.js';
+import { createConfiguracaoRouter } from './routes/configuracao.routes.js';
 import { ContaPagarController } from './controllers/conta-pagar.controller.js';
 import { createContaPagarRouter } from './routes/conta-pagar.routes.js';
 import { createAuthRouter } from './routes/auth.routes.js';
@@ -72,6 +76,7 @@ export function createApp(options: CreateAppOptions = {}): {
   const authService = new AuthService(userRepo, jwtSecret);
   const billingService = new BillingService(vendaRepo, clienteRepo, historicoRepo);
   const templateService = new TemplateService();
+  const configService = new ConfiguracaoService(new SupabaseConfiguracaoRepository(supabase));
 
   const whatsAppGateway = options.whatsAppGateway ?? new UnavailableWhatsAppGateway();
 
@@ -91,11 +96,12 @@ export function createApp(options: CreateAppOptions = {}): {
     historicoRepo,
     billingService,
     templateService,
-    queueService
+    queueService,
+    configService
   );
 
   const cronExpression = process.env.CRON_SCHEDULE || '0 9 * * *';
-  const scheduler = new SchedulerService(reminderService, cronExpression, sedeStatusRepo);
+  const scheduler = new SchedulerService(reminderService, cronExpression, sedeStatusRepo, configService);
 
   // Controladores
   const authController = new AuthController(authService);
@@ -108,6 +114,7 @@ export function createApp(options: CreateAppOptions = {}): {
     sedeStatusRepo
   );
   const contaPagarController = new ContaPagarController(contaPagarRepo);
+  const configuracaoController = new ConfiguracaoController(configService);
 
   // Registro das Rotas
   app.use('/api/auth', createAuthRouter(authService, authController));
@@ -115,6 +122,7 @@ export function createApp(options: CreateAppOptions = {}): {
   app.use('/api/vendas', createVendaRouter(vendaController, authService));
   app.use('/api/cobrancas', createCobrancaRouter(cobrancaController, authService));
   app.use('/api/contas-pagar', createContaPagarRouter(contaPagarController, authService));
+  app.use('/api/configuracoes', createConfiguracaoRouter(configuracaoController, authService));
 
   // Middleware de erro global
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

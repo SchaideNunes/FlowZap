@@ -1,4 +1,5 @@
 import { TipoMensagem } from '../repositories/historico.repository.interface.js';
+import { TipoAviso } from '../repositories/configuracao.repository.interface.js';
 
 export interface TemplateData {
   nome: string;
@@ -7,6 +8,50 @@ export interface TemplateData {
   dataVencimento: string; // formato formatado DD/MM/AAAA ou YYYY-MM-DD
   parcelaAtual?: number | null;
   totalParcelas?: number | null;
+}
+
+/**
+ * Variáveis que o usuário pode usar ao escrever a própria mensagem.
+ */
+export const TEMPLATE_VARIABLES: { chave: string; descricao: string }[] = [
+  { chave: '{saudacao}', descricao: 'Saudação que muda a cada envio (Olá, Oi...)' },
+  { chave: '{nome}', descricao: 'Nome do cliente' },
+  { chave: '{produto}', descricao: 'Descrição da venda, com a parcela quando houver' },
+  { chave: '{valor}', descricao: 'Valor da parcela, sem o "R$"' },
+  { chave: '{vencimento}', descricao: 'Data de vencimento (DD/MM/AAAA)' },
+  { chave: '{referencia}', descricao: 'Trecho " referente a *produto*" (some se a venda não tiver descrição)' },
+];
+
+/**
+ * Mensagens padrão de cada aviso, usadas enquanto o usuário não escrever a sua.
+ */
+export const DEFAULT_TEMPLATES: Record<TipoAviso, string> = {
+  lembrete_3d:
+    '{saudacao} {nome}, passando para lembrar que sua cobrança{referencia}, no valor de *R$ {valor}*, vence em 3 dias, no dia *{vencimento}*.',
+  lembrete_2d:
+    '{saudacao} {nome}, passando para lembrar que sua cobrança{referencia}, no valor de *R$ {valor}*, vence em 2 dias, no dia *{vencimento}*.',
+  lembrete_1d:
+    '{saudacao} {nome}, sua cobrança{referencia}, no valor de *R$ {valor}*, vence amanhã, dia *{vencimento}*.',
+  vencido:
+    '{saudacao} {nome}, identificamos que sua cobrança{referencia}, no valor de *R$ {valor}*, com vencimento em *{vencimento}*, ainda está em aberto. Qualquer dúvida ou se já efetuou o pagamento, nos avise por favor!',
+};
+
+const EXTRA_TEMPLATES: Partial<Record<TipoMensagem, string>> = {
+  confirmacao_manual:
+    '{saudacao} {nome}, confirmamos o recebimento do pagamento da sua cobrança{referencia}. Muito obrigado!',
+};
+
+const FALLBACK_TEMPLATE = '{saudacao} {nome}, lembrete de cobrança{referencia} no valor de R$ {valor}.';
+
+const VARIABLE_PATTERN = /\{[^{}\s]*\}/g;
+
+/**
+ * Lista as variáveis escritas no texto que o sistema não conhece (ex.: "{cliente}").
+ */
+export function findUnknownVariables(template: string): string[] {
+  const known = new Set(TEMPLATE_VARIABLES.map((v) => v.chave));
+  const found = template.match(VARIABLE_PATTERN) || [];
+  return [...new Set(found.filter((variable) => !known.has(variable)))];
 }
 
 export class TemplateService {
@@ -24,39 +69,39 @@ export class TemplateService {
     });
   }
 
-  generateMessage(tipo: TipoMensagem, data: TemplateData): string {
-    const greeting = this.getDynamicGreeting();
-    const formattedValor = this.formatCurrency(data.valor);
+  /**
+   * Monta a mensagem do aviso. Com `customTemplate` (texto escrito pelo usuário) usa esse texto;
+   * sem ele, a mensagem padrão do tipo.
+   */
+  generateMessage(tipo: TipoMensagem, data: TemplateData, customTemplate?: string | null): string {
+    const parcelado = Boolean(data.parcelaAtual && data.totalParcelas && data.totalParcelas > 1);
+    const parcelaText = parcelado ? `Parcela ${data.parcelaAtual} de ${data.totalParcelas}` : '';
 
-    let descText = '';
+    let produto = '';
+    let referencia = '';
     if (data.descricao) {
-      if (data.parcelaAtual && data.totalParcelas && data.totalParcelas > 1) {
-        descText = ` referente a *${data.descricao} (Parcela ${data.parcelaAtual} de ${data.totalParcelas})*`;
-      } else {
-        descText = ` referente a *${data.descricao}*`;
-      }
-    } else if (data.parcelaAtual && data.totalParcelas && data.totalParcelas > 1) {
-      descText = ` referente à *Parcela ${data.parcelaAtual} de ${data.totalParcelas}*`;
+      produto = parcelado ? `${data.descricao} (${parcelaText})` : data.descricao;
+      referencia = ` referente a *${produto}*`;
+    } else if (parcelado) {
+      produto = parcelaText;
+      referencia = ` referente à *${parcelaText}*`;
     }
 
-    switch (tipo) {
-      case 'lembrete_3d':
-        return `${greeting} ${data.nome}, passando para lembrar que sua cobrança${descText}, no valor de *R$ ${formattedValor}*, vence em 3 dias, no dia *${data.dataVencimento}*.`;
+    const values: Record<string, string> = {
+      '{saudacao}': this.getDynamicGreeting(),
+      '{nome}': data.nome,
+      '{produto}': produto,
+      '{valor}': this.formatCurrency(data.valor),
+      '{vencimento}': data.dataVencimento,
+      '{referencia}': referencia,
+    };
 
-      case 'lembrete_2d':
-        return `${greeting} ${data.nome}, passando para lembrar que sua cobrança${descText}, no valor de *R$ ${formattedValor}*, vence em 2 dias, no dia *${data.dataVencimento}*.`;
+    const template =
+      customTemplate?.trim() ||
+      (DEFAULT_TEMPLATES as Partial<Record<TipoMensagem, string>>)[tipo] ||
+      EXTRA_TEMPLATES[tipo] ||
+      FALLBACK_TEMPLATE;
 
-      case 'lembrete_1d':
-        return `${greeting} ${data.nome}, sua cobrança${descText}, no valor de *R$ ${formattedValor}*, vence amanhã, dia *${data.dataVencimento}*.`;
-
-      case 'vencido':
-        return `${greeting} ${data.nome}, identificamos que sua cobrança${descText}, no valor de *R$ ${formattedValor}*, com vencimento em *${data.dataVencimento}*, ainda está em aberto. Qualquer dúvida ou se já efetuou o pagamento, nos avise por favor!`;
-
-      case 'confirmacao_manual':
-        return `${greeting} ${data.nome}, confirmamos o recebimento do pagamento da sua cobrança${descText}. Muito obrigado!`;
-
-      default:
-        return `${greeting} ${data.nome}, lembrete de cobrança${descText} no valor de R$ ${formattedValor}.`;
-    }
+    return template.replace(VARIABLE_PATTERN, (variable) => values[variable] ?? variable);
   }
 }

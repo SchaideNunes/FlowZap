@@ -20,6 +20,7 @@ import {
   EnviadoItem,
   Venda,
   WhatsAppStatus,
+  ConfiguracaoData,
 } from '../types/index.js';
 import { api } from '../services/api.js';
 import { formatFullWhatsApp } from '../utils/phone.js';
@@ -29,6 +30,7 @@ import { formatBRL } from '../utils/format.js';
 import { PageHeader } from '../components/ui/PageHeader.js';
 import { StatTile, StatTone } from '../components/ui/StatTile.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
+import { MensagensEditor } from '../components/MensagensEditor.js';
 
 interface NotificacoesViewProps {
   whatsAppInfo: WhatsAppStatus;
@@ -61,7 +63,10 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
   });
 
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'hoje' | 'enviados' | 'atrasados'>('hoje');
+  const [activeTab, setActiveTab] = useState<'hoje' | 'enviados' | 'atrasados' | 'mensagens'>('hoje');
+  const [config, setConfig] = useState<ConfiguracaoData | null>(null);
+  const [savingAuto, setSavingAuto] = useState(false);
+  const [configError, setConfigError] = useState<string | null>(null);
   const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [dispatching, setDispatching] = useState(false);
@@ -90,9 +95,50 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
     }
   };
 
+  const fetchConfig = async () => {
+    try {
+      const res = await api.get('/configuracoes');
+      setConfig(res.data);
+    } catch {
+      // Sem as configurações a tela segue funcionando com o padrão
+    }
+  };
+
   useEffect(() => {
     fetchCentralData(true);
+    fetchConfig();
   }, []);
+
+  const handleToggleAuto = async () => {
+    if (!config || savingAuto) return;
+    const ligar = !config.envio_automatico;
+
+    if (
+      !ligar &&
+      !window.confirm(
+        'Desligar o envio automático? Nenhum aviso sairá sozinho até você ligar de novo. O botão de disparo manual continua funcionando.'
+      )
+    ) {
+      return;
+    }
+
+    setSavingAuto(true);
+    setConfigError(null);
+    try {
+      const res = await api.put('/configuracoes', { envio_automatico: ligar });
+      setConfig(res.data);
+    } catch (err: unknown) {
+      setConfigError(extractErrorMessage(err, 'Não foi possível alterar o envio automático.'));
+    } finally {
+      setSavingAuto(false);
+    }
+  };
+
+  // Uma mensagem alterada muda o texto dos avisos que ainda vão sair hoje
+  const handleMensagensSaved = (nova: ConfiguracaoData) => {
+    setConfig(nova);
+    fetchCentralData();
+  };
 
   const handleDispatchToday = async () => {
     if (isRemotePanel) {
@@ -322,6 +368,43 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
         />
       </div>
 
+      {/* Liga/desliga do envio diário feito pela máquina-sede */}
+      {config && (
+        <div className={`setting-row ${config.envio_automatico ? '' : 'is-off'}`}>
+          <div className="setting-row-text">
+            <div className="setting-row-title">
+              <span
+                className={`status-dot ${config.envio_automatico ? 'dot-success' : 'dot-warning'}`}
+                aria-hidden="true"
+              />
+              Envio automático {config.envio_automatico ? 'ligado' : 'desligado'}
+            </div>
+            <div className="panel-caption">
+              {config.envio_automatico
+                ? 'O computador da loja envia os avisos sozinho, todos os dias.'
+                : 'Nenhum aviso sai sozinho. Para enviar, use o botão "Disparar avisos de hoje" no computador da loja.'}
+            </div>
+            {configError && (
+              <div className="form-hint is-danger" role="alert">
+                {configError}
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={config.envio_automatico}
+            aria-label="Envio automático"
+            className={`switch ${config.envio_automatico ? 'is-on' : ''}`}
+            onClick={handleToggleAuto}
+            disabled={savingAuto}
+          >
+            <span className="switch-thumb" />
+          </button>
+        </div>
+      )}
+
       <div className="excel-wrapper">
         <div className="excel-toolbar">
           <div className="excel-filters">
@@ -356,6 +439,17 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
                 {data.emAtraso.length}
               </span>
             </button>
+
+            {config && (
+              <button
+                type="button"
+                className={`excel-filter-btn ${activeTab === 'mensagens' ? 'active' : ''}`}
+                onClick={() => setActiveTab('mensagens')}
+              >
+                <MessageSquare size={14} />
+                <span>Mensagens</span>
+              </button>
+            )}
           </div>
 
           <div className="toolbar-meta">
@@ -363,9 +457,14 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
               ? 'Avisos que a régua automática programou para hoje.'
               : activeTab === 'enviados'
                 ? 'Mensagens já enviadas: acompanhe quem pagou e dê baixa.'
-                : 'Parcelas vencidas que ainda não foram pagas.'}
+                : activeTab === 'atrasados'
+                  ? 'Parcelas vencidas que ainda não foram pagas.'
+                  : 'Edite o texto de cada aviso. Toque em uma variável para inseri-la.'}
           </div>
         </div>
+
+        {/* Aba 4: texto das mensagens */}
+        {activeTab === 'mensagens' && config && <MensagensEditor config={config} onSaved={handleMensagensSaved} />}
 
         {/* Aba 1: para enviar hoje */}
         {activeTab === 'hoje' && (

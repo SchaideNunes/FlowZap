@@ -20714,7 +20714,7 @@ var require_application = __commonJS({
   "node_modules/express/lib/application.js"(exports2, module2) {
     "use strict";
     var finalhandler = require_finalhandler();
-    var Router6 = require_router();
+    var Router7 = require_router();
     var methods = require_methods();
     var middleware = require_init();
     var query = require_query();
@@ -20779,7 +20779,7 @@ var require_application = __commonJS({
     };
     app2.lazyrouter = function lazyrouter() {
       if (!this._router) {
-        this._router = new Router6({
+        this._router = new Router7({
           caseSensitive: this.enabled("case sensitive routing"),
           strict: this.enabled("strict routing")
         });
@@ -22643,7 +22643,7 @@ var require_express = __commonJS({
     var mixin = require_merge_descriptors();
     var proto = require_application();
     var Route = require_route();
-    var Router6 = require_router();
+    var Router7 = require_router();
     var req = require_request();
     var res = require_response();
     exports2 = module2.exports = createApplication;
@@ -22666,7 +22666,7 @@ var require_express = __commonJS({
     exports2.request = req;
     exports2.response = res;
     exports2.Route = Route;
-    exports2.Router = Router6;
+    exports2.Router = Router7;
     exports2.json = bodyParser.json;
     exports2.query = require_query();
     exports2.raw = bodyParser.raw;
@@ -43459,7 +43459,7 @@ __export(app_exports, {
   scheduler: () => scheduler
 });
 module.exports = __toCommonJS(app_exports);
-var import_express6 = __toESM(require_express2());
+var import_express7 = __toESM(require_express2());
 var import_cors = __toESM(require_lib3());
 
 // node_modules/@supabase/supabase-js/dist/index.mjs
@@ -52216,6 +52216,30 @@ var BillingService = class {
 };
 
 // src/services/template.service.ts
+var TEMPLATE_VARIABLES = [
+  { chave: "{saudacao}", descricao: "Sauda\xE7\xE3o que muda a cada envio (Ol\xE1, Oi...)" },
+  { chave: "{nome}", descricao: "Nome do cliente" },
+  { chave: "{produto}", descricao: "Descri\xE7\xE3o da venda, com a parcela quando houver" },
+  { chave: "{valor}", descricao: 'Valor da parcela, sem o "R$"' },
+  { chave: "{vencimento}", descricao: "Data de vencimento (DD/MM/AAAA)" },
+  { chave: "{referencia}", descricao: 'Trecho " referente a *produto*" (some se a venda n\xE3o tiver descri\xE7\xE3o)' }
+];
+var DEFAULT_TEMPLATES = {
+  lembrete_3d: "{saudacao} {nome}, passando para lembrar que sua cobran\xE7a{referencia}, no valor de *R$ {valor}*, vence em 3 dias, no dia *{vencimento}*.",
+  lembrete_2d: "{saudacao} {nome}, passando para lembrar que sua cobran\xE7a{referencia}, no valor de *R$ {valor}*, vence em 2 dias, no dia *{vencimento}*.",
+  lembrete_1d: "{saudacao} {nome}, sua cobran\xE7a{referencia}, no valor de *R$ {valor}*, vence amanh\xE3, dia *{vencimento}*.",
+  vencido: "{saudacao} {nome}, identificamos que sua cobran\xE7a{referencia}, no valor de *R$ {valor}*, com vencimento em *{vencimento}*, ainda est\xE1 em aberto. Qualquer d\xFAvida ou se j\xE1 efetuou o pagamento, nos avise por favor!"
+};
+var EXTRA_TEMPLATES = {
+  confirmacao_manual: "{saudacao} {nome}, confirmamos o recebimento do pagamento da sua cobran\xE7a{referencia}. Muito obrigado!"
+};
+var FALLBACK_TEMPLATE = "{saudacao} {nome}, lembrete de cobran\xE7a{referencia} no valor de R$ {valor}.";
+var VARIABLE_PATTERN = /\{[^{}\s]*\}/g;
+function findUnknownVariables(template) {
+  const known = new Set(TEMPLATE_VARIABLES.map((v) => v.chave));
+  const found = template.match(VARIABLE_PATTERN) || [];
+  return [...new Set(found.filter((variable) => !known.has(variable)))];
+}
 var TemplateService = class {
   greetings = ["Ol\xE1", "Oi", "Tudo bem?", "Como vai?"];
   getDynamicGreeting() {
@@ -52228,33 +52252,32 @@ var TemplateService = class {
       maximumFractionDigits: 2
     });
   }
-  generateMessage(tipo, data) {
-    const greeting = this.getDynamicGreeting();
-    const formattedValor = this.formatCurrency(data.valor);
-    let descText = "";
+  /**
+   * Monta a mensagem do aviso. Com `customTemplate` (texto escrito pelo usuário) usa esse texto;
+   * sem ele, a mensagem padrão do tipo.
+   */
+  generateMessage(tipo, data, customTemplate) {
+    const parcelado = Boolean(data.parcelaAtual && data.totalParcelas && data.totalParcelas > 1);
+    const parcelaText = parcelado ? `Parcela ${data.parcelaAtual} de ${data.totalParcelas}` : "";
+    let produto = "";
+    let referencia = "";
     if (data.descricao) {
-      if (data.parcelaAtual && data.totalParcelas && data.totalParcelas > 1) {
-        descText = ` referente a *${data.descricao} (Parcela ${data.parcelaAtual} de ${data.totalParcelas})*`;
-      } else {
-        descText = ` referente a *${data.descricao}*`;
-      }
-    } else if (data.parcelaAtual && data.totalParcelas && data.totalParcelas > 1) {
-      descText = ` referente \xE0 *Parcela ${data.parcelaAtual} de ${data.totalParcelas}*`;
+      produto = parcelado ? `${data.descricao} (${parcelaText})` : data.descricao;
+      referencia = ` referente a *${produto}*`;
+    } else if (parcelado) {
+      produto = parcelaText;
+      referencia = ` referente \xE0 *${parcelaText}*`;
     }
-    switch (tipo) {
-      case "lembrete_3d":
-        return `${greeting} ${data.nome}, passando para lembrar que sua cobran\xE7a${descText}, no valor de *R$ ${formattedValor}*, vence em 3 dias, no dia *${data.dataVencimento}*.`;
-      case "lembrete_2d":
-        return `${greeting} ${data.nome}, passando para lembrar que sua cobran\xE7a${descText}, no valor de *R$ ${formattedValor}*, vence em 2 dias, no dia *${data.dataVencimento}*.`;
-      case "lembrete_1d":
-        return `${greeting} ${data.nome}, sua cobran\xE7a${descText}, no valor de *R$ ${formattedValor}*, vence amanh\xE3, dia *${data.dataVencimento}*.`;
-      case "vencido":
-        return `${greeting} ${data.nome}, identificamos que sua cobran\xE7a${descText}, no valor de *R$ ${formattedValor}*, com vencimento em *${data.dataVencimento}*, ainda est\xE1 em aberto. Qualquer d\xFAvida ou se j\xE1 efetuou o pagamento, nos avise por favor!`;
-      case "confirmacao_manual":
-        return `${greeting} ${data.nome}, confirmamos o recebimento do pagamento da sua cobran\xE7a${descText}. Muito obrigado!`;
-      default:
-        return `${greeting} ${data.nome}, lembrete de cobran\xE7a${descText} no valor de R$ ${formattedValor}.`;
-    }
+    const values = {
+      "{saudacao}": this.getDynamicGreeting(),
+      "{nome}": data.nome,
+      "{produto}": produto,
+      "{valor}": this.formatCurrency(data.valor),
+      "{vencimento}": data.dataVencimento,
+      "{referencia}": referencia
+    };
+    const template = customTemplate?.trim() || DEFAULT_TEMPLATES[tipo] || EXTRA_TEMPLATES[tipo] || FALLBACK_TEMPLATE;
+    return template.replace(VARIABLE_PATTERN, (variable) => values[variable] ?? variable);
   }
 };
 
@@ -52404,15 +52427,22 @@ var ReminderService = class {
   billingService;
   templateService;
   queueService;
+  configService;
   // Defesa extra contra reenvio: lembra o que já foi enviado neste processo, mesmo que o
   // registro no histórico falhe (ex.: banco rejeitando o tipo de mensagem).
   sentThisSession = /* @__PURE__ */ new Set();
-  constructor(vendaRepo, historicoRepo, billingService, templateService, queueService) {
+  constructor(vendaRepo, historicoRepo, billingService, templateService, queueService, configService) {
     this.vendaRepo = vendaRepo;
     this.historicoRepo = historicoRepo;
     this.billingService = billingService;
     this.templateService = templateService;
     this.queueService = queueService;
+    this.configService = configService;
+  }
+  /** Textos escritos pelo usuário na tela de Notificações (vazio = mensagens padrão). */
+  async loadCustomMessages() {
+    if (!this.configService) return {};
+    return (await this.configService.get()).mensagens;
   }
   sessionKey(vendaId, tipo, dataVencimento) {
     return `${vendaId}:${tipo}:${dataVencimento}`;
@@ -52423,6 +52453,7 @@ var ReminderService = class {
    */
   async previewReminders(referenceDateStr = formatDateToISO(/* @__PURE__ */ new Date())) {
     const activeVendas = await this.vendaRepo.findActiveVendas();
+    const customMessages = await this.loadCustomMessages();
     const previews = [];
     for (const venda of activeVendas) {
       if (!venda.cliente || !venda.cliente.ativo) {
@@ -52445,14 +52476,18 @@ var ReminderService = class {
       if (this.sentThisSession.has(this.sessionKey(venda.id, decision.tipo, formattedDate))) {
         continue;
       }
-      const message = this.templateService.generateMessage(decision.tipo, {
-        nome: venda.cliente.nome,
-        descricao: venda.descricao,
-        valor: venda.valor,
-        dataVencimento: formattedDate,
-        parcelaAtual: venda.parcela_atual,
-        totalParcelas: venda.total_parcelas
-      });
+      const message = this.templateService.generateMessage(
+        decision.tipo,
+        {
+          nome: venda.cliente.nome,
+          descricao: venda.descricao,
+          valor: venda.valor,
+          dataVencimento: formattedDate,
+          parcelaAtual: venda.parcela_atual,
+          totalParcelas: venda.total_parcelas
+        },
+        customMessages[decision.tipo]
+      );
       previews.push({
         vendaId: venda.id,
         clienteId: venda.cliente.id,
@@ -52512,6 +52547,7 @@ var ReminderService = class {
    */
   async getOverdueReminders(referenceDateStr = formatDateToISO(/* @__PURE__ */ new Date())) {
     const activeVendas = await this.vendaRepo.findActiveVendas();
+    const customMessages = await this.loadCustomMessages();
     const overdues = [];
     for (const venda of activeVendas) {
       if (!venda.cliente || !venda.cliente.ativo) {
@@ -52543,14 +52579,18 @@ var ReminderService = class {
         }
       } catch {
       }
-      const mensagemCobranca = this.templateService.generateMessage("vencido", {
-        nome: venda.cliente.nome,
-        descricao: venda.descricao,
-        valor: Number(venda.valor),
-        dataVencimento: formattedDate,
-        parcelaAtual: venda.parcela_atual,
-        totalParcelas: venda.total_parcelas
-      });
+      const mensagemCobranca = this.templateService.generateMessage(
+        "vencido",
+        {
+          nome: venda.cliente.nome,
+          descricao: venda.descricao,
+          valor: Number(venda.valor),
+          dataVencimento: formattedDate,
+          parcelaAtual: venda.parcela_atual,
+          totalParcelas: venda.total_parcelas
+        },
+        customMessages.vencido
+      );
       overdues.push({
         vendaId: venda.id,
         clienteId: venda.cliente.id,
@@ -52640,11 +52680,13 @@ var SchedulerService = class {
   reminderService;
   cronExpression;
   sedeStatusRepo;
+  configService;
   task = null;
-  constructor(reminderService, cronExpression = "0 9 * * *", sedeStatusRepo) {
+  constructor(reminderService, cronExpression = "0 9 * * *", sedeStatusRepo, configService) {
     this.reminderService = reminderService;
     this.cronExpression = cronExpression;
     this.sedeStatusRepo = sedeStatusRepo;
+    this.configService = configService;
   }
   start() {
     if (this.task) {
@@ -52654,7 +52696,7 @@ var SchedulerService = class {
     this.task = import_node_cron.default.schedule(this.cronExpression, async () => {
       console.log(`[Scheduler] Executando rotina di\xE1ria de cobran\xE7a autom\xE1tica: ${(/* @__PURE__ */ new Date()).toISOString()}`);
       try {
-        await this.runRoutine();
+        await this.runScheduledRoutine();
       } catch (error) {
         console.error("[Scheduler] Erro ao executar rotina di\xE1ria:", error);
       }
@@ -52680,9 +52722,29 @@ var SchedulerService = class {
     const today = formatDateToISO(now);
     const lastRun = await this.readLastRoutineDate();
     if (lastRun === today) return false;
+    if (!await this.isAutomaticSendingEnabled()) {
+      console.log("[Scheduler] Envio autom\xE1tico desligado no painel: a rotina de hoje n\xE3o ser\xE1 recuperada.");
+      return false;
+    }
     console.log("[Scheduler] A rotina de hoje ainda n\xE3o rodou (sistema iniciado ap\xF3s o hor\xE1rio). Executando agora.");
     await this.runRoutine(today);
     return true;
+  }
+  /**
+   * Rotina do horário agendado. Devolve false (sem enviar nada) quando o envio automático
+   * está desligado no painel; o disparo manual não passa por aqui.
+   */
+  async runScheduledRoutine() {
+    if (!await this.isAutomaticSendingEnabled()) {
+      console.log("[Scheduler] Envio autom\xE1tico desligado no painel: nenhum aviso enviado.");
+      return false;
+    }
+    await this.runRoutine();
+    return true;
+  }
+  async isAutomaticSendingEnabled() {
+    if (!this.configService) return true;
+    return (await this.configService.get()).envio_automatico;
   }
   async runRoutine(today = formatDateToISO(/* @__PURE__ */ new Date())) {
     const result = await this.reminderService.dispatchReminders();
@@ -57362,6 +57424,194 @@ var SupabaseSedeStatusRepository = class {
   }
 };
 
+// src/repositories/supabase-configuracao.repository.ts
+var TABLE2 = "configuracoes";
+var ROW_ID2 = 1;
+var SupabaseConfiguracaoRepository = class {
+  client;
+  constructor(client) {
+    this.client = client;
+  }
+  async get() {
+    const { data, error } = await this.client.from(TABLE2).select("envio_automatico, mensagens").eq("id", ROW_ID2).maybeSingle();
+    if (error) {
+      throw new Error(`Erro ao ler as configura\xE7\xF5es: ${error.message}`);
+    }
+    if (!data) return null;
+    return { envio_automatico: data.envio_automatico, mensagens: data.mensagens };
+  }
+  async save(config) {
+    const { error } = await this.client.from(TABLE2).upsert(
+      { id: ROW_ID2, envio_automatico: config.envio_automatico, mensagens: config.mensagens },
+      { onConflict: "id" }
+    );
+    if (error) {
+      throw new Error(`Erro ao gravar as configura\xE7\xF5es: ${error.message}`);
+    }
+    return config;
+  }
+};
+
+// src/repositories/configuracao.repository.interface.ts
+var TIPOS_AVISO = ["lembrete_3d", "lembrete_2d", "lembrete_1d", "vencido"];
+
+// src/services/configuracao.service.ts
+function cleanMensagens(raw) {
+  const mensagens = {};
+  if (!raw || typeof raw !== "object") return mensagens;
+  for (const tipo of TIPOS_AVISO) {
+    const texto = raw[tipo];
+    if (typeof texto === "string" && texto.trim()) {
+      mensagens[tipo] = texto.trim();
+    }
+  }
+  return mensagens;
+}
+var ConfiguracaoService = class {
+  repo;
+  constructor(repo) {
+    this.repo = repo;
+  }
+  /**
+   * Configuração em vigor. Nunca falha: sem registro (ou sem a tabela) vale o padrão,
+   * que é envio automático ligado e mensagens padrão.
+   */
+  async get() {
+    try {
+      const saved = await this.repo.get();
+      return {
+        envio_automatico: saved?.envio_automatico !== false,
+        mensagens: cleanMensagens(saved?.mensagens)
+      };
+    } catch {
+      return { envio_automatico: true, mensagens: {} };
+    }
+  }
+  /**
+   * Altera só o que foi enviado. Mensagem vazia ou nula volta para a padrão.
+   */
+  async update(patch) {
+    const current = await this.get();
+    const next = {
+      envio_automatico: patch.envio_automatico ?? current.envio_automatico,
+      mensagens: cleanMensagens({ ...current.mensagens, ...patch.mensagens || {} })
+    };
+    try {
+      return await this.repo.save(next);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `N\xE3o foi poss\xEDvel salvar. Confira se o arquivo database/migration_configuracoes.sql j\xE1 foi executado no Supabase. (${detail})`
+      );
+    }
+  }
+};
+
+// src/schemas/configuracao.schema.ts
+var MensagemSchema = external_exports.string().trim().max(1e3, { message: "A mensagem pode ter no m\xE1ximo 1000 caracteres" }).refine((texto) => texto.length === 0 || texto.length >= 10, {
+  message: "A mensagem deve ter no m\xEDnimo 10 caracteres"
+}).refine((texto) => texto.length === 0 || texto.includes("{saudacao}"), {
+  message: "A mensagem precisa ter {saudacao}: a sauda\xE7\xE3o variada protege o n\xFAmero contra bloqueio"
+}).superRefine((texto, ctx) => {
+  const unknown = findUnknownVariables(texto);
+  if (unknown.length > 0) {
+    ctx.addIssue({
+      code: external_exports.ZodIssueCode.custom,
+      message: `Vari\xE1vel desconhecida: ${unknown.join(", ")}`
+    });
+  }
+}).nullable().optional();
+var UpdateConfiguracaoSchema = external_exports.object({
+  envio_automatico: external_exports.boolean().optional(),
+  mensagens: external_exports.object({
+    lembrete_3d: MensagemSchema,
+    lembrete_2d: MensagemSchema,
+    lembrete_1d: MensagemSchema,
+    vencido: MensagemSchema
+  }).strict().optional()
+}).strict().refine((data) => data.envio_automatico !== void 0 || data.mensagens !== void 0, {
+  message: "Nada para alterar"
+});
+
+// src/controllers/configuracao.controller.ts
+var ConfiguracaoController = class {
+  service;
+  constructor(service) {
+    this.service = service;
+  }
+  present(config) {
+    return {
+      envio_automatico: config.envio_automatico,
+      mensagens: config.mensagens,
+      padroes: DEFAULT_TEMPLATES,
+      variaveis: TEMPLATE_VARIABLES
+    };
+  }
+  get = async (_req, res) => {
+    try {
+      res.status(200).json(this.present(await this.service.get()));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao carregar as configura\xE7\xF5es";
+      res.status(500).json({ error: msg });
+    }
+  };
+  update = async (req, res) => {
+    const parse2 = UpdateConfiguracaoSchema.safeParse(req.body);
+    if (!parse2.success) {
+      const firstIssue = parse2.error.issues[0]?.message;
+      res.status(400).json({
+        error: firstIssue || "Erro de valida\xE7\xE3o",
+        detalhes: parse2.error.flatten().fieldErrors
+      });
+      return;
+    }
+    try {
+      res.status(200).json(this.present(await this.service.update(parse2.data)));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao salvar as configura\xE7\xF5es";
+      res.status(500).json({ error: msg });
+    }
+  };
+};
+
+// src/routes/configuracao.routes.ts
+var import_express = __toESM(require_express2());
+
+// src/middleware/auth.middleware.ts
+function createAuthMiddleware(authService) {
+  return (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      res.status(401).json({ error: "Token de autentica\xE7\xE3o n\xE3o fornecido" });
+      return;
+    }
+    const parts = authHeader.split(" ");
+    if (parts.length !== 2 || parts[0] !== "Bearer") {
+      res.status(401).json({ error: "Formato de token inv\xE1lido" });
+      return;
+    }
+    const token = parts[1];
+    try {
+      const decoded = authService.verifyToken(token);
+      req.user = decoded;
+      next();
+    } catch {
+      res.status(401).json({ error: "Token inv\xE1lido ou expirado" });
+      return;
+    }
+  };
+}
+
+// src/routes/configuracao.routes.ts
+function createConfiguracaoRouter(controller, authService) {
+  const router = (0, import_express.Router)();
+  const authMiddleware = createAuthMiddleware(authService);
+  router.use(authMiddleware);
+  router.get("/", controller.get);
+  router.put("/", controller.update);
+  return router;
+}
+
 // src/schemas/conta-pagar.schema.ts
 var ContaPagarSchema = external_exports.object({
   id: external_exports.number().int().positive().optional(),
@@ -57468,36 +57718,9 @@ var ContaPagarController = class {
 };
 
 // src/routes/conta-pagar.routes.ts
-var import_express = __toESM(require_express2());
-
-// src/middleware/auth.middleware.ts
-function createAuthMiddleware(authService) {
-  return (req, res, next) => {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      res.status(401).json({ error: "Token de autentica\xE7\xE3o n\xE3o fornecido" });
-      return;
-    }
-    const parts = authHeader.split(" ");
-    if (parts.length !== 2 || parts[0] !== "Bearer") {
-      res.status(401).json({ error: "Formato de token inv\xE1lido" });
-      return;
-    }
-    const token = parts[1];
-    try {
-      const decoded = authService.verifyToken(token);
-      req.user = decoded;
-      next();
-    } catch {
-      res.status(401).json({ error: "Token inv\xE1lido ou expirado" });
-      return;
-    }
-  };
-}
-
-// src/routes/conta-pagar.routes.ts
+var import_express2 = __toESM(require_express2());
 function createContaPagarRouter(controller, authService) {
-  const router = (0, import_express.Router)();
+  const router = (0, import_express2.Router)();
   const authMiddleware = createAuthMiddleware(authService);
   router.use(authMiddleware);
   router.get("/", controller.list);
@@ -57509,9 +57732,9 @@ function createContaPagarRouter(controller, authService) {
 }
 
 // src/routes/auth.routes.ts
-var import_express2 = __toESM(require_express2());
+var import_express3 = __toESM(require_express2());
 function createAuthRouter(authService, authController) {
-  const router = (0, import_express2.Router)();
+  const router = (0, import_express3.Router)();
   const authMiddleware = createAuthMiddleware(authService);
   router.post("/login", authController.login);
   router.get("/me", authMiddleware, authController.me);
@@ -57519,9 +57742,9 @@ function createAuthRouter(authService, authController) {
 }
 
 // src/routes/cliente.routes.ts
-var import_express3 = __toESM(require_express2());
+var import_express4 = __toESM(require_express2());
 function createClienteRouter(clienteController, authService) {
-  const router = (0, import_express3.Router)();
+  const router = (0, import_express4.Router)();
   const authMiddleware = createAuthMiddleware(authService);
   router.use(authMiddleware);
   router.get("/", clienteController.list);
@@ -57533,9 +57756,9 @@ function createClienteRouter(clienteController, authService) {
 }
 
 // src/routes/venda.routes.ts
-var import_express4 = __toESM(require_express2());
+var import_express5 = __toESM(require_express2());
 function createVendaRouter(vendaController, authService) {
-  const router = (0, import_express4.Router)();
+  const router = (0, import_express5.Router)();
   const authMiddleware = createAuthMiddleware(authService);
   router.use(authMiddleware);
   router.get("/", vendaController.getAll);
@@ -57552,9 +57775,9 @@ function createVendaRouter(vendaController, authService) {
 }
 
 // src/routes/cobranca.routes.ts
-var import_express5 = __toESM(require_express2());
+var import_express6 = __toESM(require_express2());
 function createCobrancaRouter(cobrancaController, authService) {
-  const router = (0, import_express5.Router)();
+  const router = (0, import_express6.Router)();
   const authMiddleware = createAuthMiddleware(authService);
   router.use(authMiddleware);
   router.get("/preview", cobrancaController.preview);
@@ -57568,14 +57791,14 @@ function createCobrancaRouter(cobrancaController, authService) {
 
 // src/app.ts
 function createApp(options = {}) {
-  const app2 = (0, import_express6.default)();
+  const app2 = (0, import_express7.default)();
   app2.use(
     (0, import_cors.default)({
       origin: true,
       credentials: true
     })
   );
-  app2.use(import_express6.default.json());
+  app2.use(import_express7.default.json());
   const healthHandler = (_req, res) => {
     res.status(200).json({
       status: "ok",
@@ -57596,6 +57819,7 @@ function createApp(options = {}) {
   const authService = new AuthService(userRepo, jwtSecret);
   const billingService = new BillingService(vendaRepo, clienteRepo, historicoRepo);
   const templateService = new TemplateService();
+  const configService = new ConfiguracaoService(new SupabaseConfiguracaoRepository(supabase));
   const whatsAppGateway = options.whatsAppGateway ?? new UnavailableWhatsAppGateway();
   const minDelayMs = (Number(process.env.MIN_DELAY_SECONDS) || 8) * 1e3;
   const maxDelayMs = (Number(process.env.MAX_DELAY_SECONDS) || 20) * 1e3;
@@ -57611,10 +57835,11 @@ function createApp(options = {}) {
     historicoRepo,
     billingService,
     templateService,
-    queueService
+    queueService,
+    configService
   );
   const cronExpression = process.env.CRON_SCHEDULE || "0 9 * * *";
-  const scheduler2 = new SchedulerService(reminderService, cronExpression, sedeStatusRepo);
+  const scheduler2 = new SchedulerService(reminderService, cronExpression, sedeStatusRepo, configService);
   const authController = new AuthController(authService);
   const clienteController = new ClienteController(clienteRepo);
   const vendaController = new VendaController(vendaRepo, historicoRepo, billingService);
@@ -57625,11 +57850,13 @@ function createApp(options = {}) {
     sedeStatusRepo
   );
   const contaPagarController = new ContaPagarController(contaPagarRepo);
+  const configuracaoController = new ConfiguracaoController(configService);
   app2.use("/api/auth", createAuthRouter(authService, authController));
   app2.use("/api/clientes", createClienteRouter(clienteController, authService));
   app2.use("/api/vendas", createVendaRouter(vendaController, authService));
   app2.use("/api/cobrancas", createCobrancaRouter(cobrancaController, authService));
   app2.use("/api/contas-pagar", createContaPagarRouter(contaPagarController, authService));
+  app2.use("/api/configuracoes", createConfiguracaoRouter(configuracaoController, authService));
   app2.use((err, _req, res, _next) => {
     console.error("[Global Error]", err);
     res.status(500).json({ error: "Erro interno no servidor" });

@@ -149,3 +149,18 @@ ALTER TABLE vendas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE historico_mensagens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contas_a_pagar ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sede_status ENABLE ROW LEVEL SECURITY;
+
+-- Configurações: mensagens personalizadas e liga/desliga do envio automático (linha única)
+CREATE TABLE IF NOT EXISTS configuracoes (
+    id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    envio_automatico BOOLEAN NOT NULL DEFAULT true,
+    mensagens JSONB NOT NULL DEFAULT '{}'::jsonb,
+    atualizado_em TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+DROP TRIGGER IF EXISTS set_atualizado_em_configuracoes ON configuracoes;
+CREATE TRIGGER set_atualizado_em_configuracoes
+BEFORE UPDATE ON configuracoes
+FOR EACH ROW EXECUTE FUNCTION trigger_set_atualizado_em();
+
+ALTER TABLE configuracoes ENABLE ROW LEVEL SECURITY;

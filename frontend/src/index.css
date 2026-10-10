@@ -396,6 +396,147 @@ button.nav-status-pill:hover {
   color: #fff;
 }
 
+/* Chave liga/desliga */
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 52px;
+  height: 30px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-hover);
+  background: var(--bg-raised);
+  cursor: pointer;
+  transition: background 0.2s ease-out, border-color 0.2s ease-out;
+}
+.switch::after {
+  /* área de toque de 44px sem aumentar o desenho */
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+.switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.2s ease-out, background 0.2s ease-out;
+}
+.switch.is-on {
+  background: rgba(var(--success-rgb), 0.22);
+  border-color: rgba(var(--success-rgb), 0.6);
+}
+.switch.is-on .switch-thumb {
+  transform: translateX(22px);
+  background: var(--success);
+}
+.switch:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.switch:focus-visible {
+  outline: 2px solid var(--text-main);
+  outline-offset: 3px;
+}
+
+/* Linha de configuração: texto à esquerda, controle à direita */
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1rem;
+}
+.setting-row.is-off {
+  border-color: rgba(var(--warning-rgb), 0.4);
+}
+.setting-row-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.setting-row-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+/* Editor do texto dos avisos */
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
+  gap: 1rem;
+  padding: 1rem;
+}
+.template-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  min-width: 0;
+  background: var(--bg-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+}
+.template-card .form-group {
+  margin-bottom: 0;
+}
+.template-card .form-textarea {
+  resize: vertical;
+  min-height: 150px;
+  line-height: 1.5;
+}
+.var-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+}
+.var-chip {
+  min-height: 30px;
+  padding: 0 0.6rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  cursor: pointer;
+  transition: background 0.15s ease-out, color 0.15s ease-out, border-color 0.15s ease-out;
+}
+.var-chip:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-strong);
+  color: var(--text-main);
+}
+.wa-preview {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 0.85rem;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--text-main);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.form-hint.is-danger {
+  color: var(--danger);
+}
+.form-hint.is-warning {
+  color: var(--warning);
+}
+
 /* Confirmar pagamento: discreto, com o "check" em verde */
 .btn-pay {
   background: rgba(var(--success-rgb), 0.1);
