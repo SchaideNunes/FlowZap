@@ -8,6 +8,8 @@ export interface TemplateData {
   dataVencimento: string; // formato formatado DD/MM/AAAA ou YYYY-MM-DD
   parcelaAtual?: number | null;
   totalParcelas?: number | null;
+  /** Chave Pix da loja (variável {pix}); vazia quando não configurada. */
+  chavePix?: string | null;
 }
 
 /**
@@ -19,6 +21,7 @@ export const TEMPLATE_VARIABLES: { chave: string; descricao: string }[] = [
   { chave: '{produto}', descricao: 'Descrição da venda, com a parcela quando houver' },
   { chave: '{valor}', descricao: 'Valor da parcela, sem o "R$"' },
   { chave: '{vencimento}', descricao: 'Data de vencimento (DD/MM/AAAA)' },
+  { chave: '{pix}', descricao: 'Chave Pix da loja (cadastrada acima)' },
   { chave: '{referencia}', descricao: 'Trecho " referente a *produto*" (some se a venda não tiver descrição)' },
 ];
 
@@ -94,6 +97,7 @@ export class TemplateService {
       '{valor}': this.formatCurrency(data.valor),
       '{vencimento}': data.dataVencimento,
       '{referencia}': referencia,
+      '{pix}': data.chavePix || '',
     };
 
     const template =

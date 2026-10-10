@@ -15,6 +15,7 @@ export class ConfiguracaoController {
     return {
       envio_automatico: config.envio_automatico,
       mensagens: config.mensagens,
+      chave_pix: config.chave_pix ?? null,
       padroes: DEFAULT_TEMPLATES,
       variaveis: TEMPLATE_VARIABLES,
     };

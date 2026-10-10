@@ -52222,6 +52222,7 @@ var TEMPLATE_VARIABLES = [
   { chave: "{produto}", descricao: "Descri\xE7\xE3o da venda, com a parcela quando houver" },
   { chave: "{valor}", descricao: 'Valor da parcela, sem o "R$"' },
   { chave: "{vencimento}", descricao: "Data de vencimento (DD/MM/AAAA)" },
+  { chave: "{pix}", descricao: "Chave Pix da loja (cadastrada acima)" },
   { chave: "{referencia}", descricao: 'Trecho " referente a *produto*" (some se a venda n\xE3o tiver descri\xE7\xE3o)' }
 ];
 var DEFAULT_TEMPLATES = {
@@ -52274,7 +52275,8 @@ var TemplateService = class {
       "{produto}": produto,
       "{valor}": this.formatCurrency(data.valor),
       "{vencimento}": data.dataVencimento,
-      "{referencia}": referencia
+      "{referencia}": referencia,
+      "{pix}": data.chavePix || ""
     };
     const template = customTemplate?.trim() || DEFAULT_TEMPLATES[tipo] || EXTRA_TEMPLATES[tipo] || FALLBACK_TEMPLATE;
     return template.replace(VARIABLE_PATTERN, (variable) => values[variable] ?? variable);
@@ -52439,10 +52441,10 @@ var ReminderService = class {
     this.queueService = queueService;
     this.configService = configService;
   }
-  /** Textos escritos pelo usuário na tela de Notificações (vazio = mensagens padrão). */
-  async loadCustomMessages() {
-    if (!this.configService) return {};
-    return (await this.configService.get()).mensagens;
+  /** Textos e chave Pix definidos pelo usuário na tela de Notificações. */
+  async loadConfig() {
+    if (!this.configService) return { envio_automatico: true, mensagens: {}, chave_pix: null };
+    return this.configService.get();
   }
   sessionKey(vendaId, tipo, dataVencimento) {
     return `${vendaId}:${tipo}:${dataVencimento}`;
@@ -52453,7 +52455,7 @@ var ReminderService = class {
    */
   async previewReminders(referenceDateStr = formatDateToISO(/* @__PURE__ */ new Date())) {
     const activeVendas = await this.vendaRepo.findActiveVendas();
-    const customMessages = await this.loadCustomMessages();
+    const { mensagens: customMessages, chave_pix: chavePix } = await this.loadConfig();
     const previews = [];
     for (const venda of activeVendas) {
       if (!venda.cliente || !venda.cliente.ativo) {
@@ -52484,7 +52486,8 @@ var ReminderService = class {
           valor: venda.valor,
           dataVencimento: formattedDate,
           parcelaAtual: venda.parcela_atual,
-          totalParcelas: venda.total_parcelas
+          totalParcelas: venda.total_parcelas,
+          chavePix
         },
         customMessages[decision.tipo]
       );
@@ -52547,7 +52550,7 @@ var ReminderService = class {
    */
   async getOverdueReminders(referenceDateStr = formatDateToISO(/* @__PURE__ */ new Date())) {
     const activeVendas = await this.vendaRepo.findActiveVendas();
-    const customMessages = await this.loadCustomMessages();
+    const { mensagens: customMessages, chave_pix: chavePix } = await this.loadConfig();
     const overdues = [];
     for (const venda of activeVendas) {
       if (!venda.cliente || !venda.cliente.ativo) {
@@ -52587,7 +52590,8 @@ var ReminderService = class {
           valor: Number(venda.valor),
           dataVencimento: formattedDate,
           parcelaAtual: venda.parcela_atual,
-          totalParcelas: venda.total_parcelas
+          totalParcelas: venda.total_parcelas,
+          chavePix
         },
         customMessages.vencido
       );
@@ -57439,18 +57443,19 @@ var SupabaseConfiguracaoRepository = class {
     this.client = client;
   }
   async get() {
-    const { data, error } = await this.client.from(TABLE2).select("envio_automatico, mensagens").eq("id", ROW_ID2).maybeSingle();
+    const { data, error } = await this.client.from(TABLE2).select("*").eq("id", ROW_ID2).maybeSingle();
     if (error) {
       throw new Error(`Erro ao ler as configura\xE7\xF5es: ${error.message}`);
     }
     if (!data) return null;
-    return { envio_automatico: data.envio_automatico, mensagens: data.mensagens };
+    return {
+      envio_automatico: data.envio_automatico,
+      mensagens: data.mensagens,
+      chave_pix: data.chave_pix ?? null
+    };
   }
   async save(config) {
-    const { error } = await this.client.from(TABLE2).upsert(
-      { id: ROW_ID2, envio_automatico: config.envio_automatico, mensagens: config.mensagens },
-      { onConflict: "id" }
-    );
+    const { error } = await this.client.from(TABLE2).upsert({ id: ROW_ID2, ...config }, { onConflict: "id" });
     if (error) {
       throw new Error(`Erro ao gravar as configura\xE7\xF5es: ${error.message}`);
     }
@@ -57473,6 +57478,9 @@ function cleanMensagens(raw) {
   }
   return mensagens;
 }
+function cleanPix(raw) {
+  return typeof raw === "string" && raw.trim() ? raw.trim() : null;
+}
 var ConfiguracaoService = class {
   repo;
   constructor(repo) {
@@ -57487,10 +57495,11 @@ var ConfiguracaoService = class {
       const saved = await this.repo.get();
       return {
         envio_automatico: saved?.envio_automatico !== false,
-        mensagens: cleanMensagens(saved?.mensagens)
+        mensagens: cleanMensagens(saved?.mensagens),
+        chave_pix: cleanPix(saved?.chave_pix)
       };
     } catch {
-      return { envio_automatico: true, mensagens: {} };
+      return { envio_automatico: true, mensagens: {}, chave_pix: null };
     }
   }
   /**
@@ -57502,12 +57511,17 @@ var ConfiguracaoService = class {
       envio_automatico: patch.envio_automatico ?? current.envio_automatico,
       mensagens: cleanMensagens({ ...current.mensagens, ...patch.mensagens || {} })
     };
+    if (patch.chave_pix !== void 0) {
+      next.chave_pix = cleanPix(patch.chave_pix);
+    } else if (current.chave_pix) {
+      next.chave_pix = current.chave_pix;
+    }
     try {
       return await this.repo.save(next);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       throw new Error(
-        `N\xE3o foi poss\xEDvel salvar. Confira se o arquivo database/migration_configuracoes.sql j\xE1 foi executado no Supabase. (${detail})`
+        `N\xE3o foi poss\xEDvel salvar. Confira se os arquivos database/migration_configuracoes.sql e database/migration_chave_pix.sql j\xE1 foram executados no Supabase. (${detail})`
       );
     }
   }
@@ -57529,15 +57543,20 @@ var MensagemSchema = external_exports.string().trim().max(1e3, { message: "A men
 }).nullable().optional();
 var UpdateConfiguracaoSchema = external_exports.object({
   envio_automatico: external_exports.boolean().optional(),
+  // Vazio ou nulo remove a chave
+  chave_pix: external_exports.string().trim().max(140, { message: "A chave Pix pode ter no m\xE1ximo 140 caracteres" }).nullable().optional(),
   mensagens: external_exports.object({
     lembrete_3d: MensagemSchema,
     lembrete_2d: MensagemSchema,
     lembrete_1d: MensagemSchema,
     vencido: MensagemSchema
   }).strict().optional()
-}).strict().refine((data) => data.envio_automatico !== void 0 || data.mensagens !== void 0, {
-  message: "Nada para alterar"
-});
+}).strict().refine(
+  (data) => data.envio_automatico !== void 0 || data.mensagens !== void 0 || data.chave_pix !== void 0,
+  {
+    message: "Nada para alterar"
+  }
+);
 
 // src/controllers/configuracao.controller.ts
 var ConfiguracaoController = class {
@@ -57549,6 +57568,7 @@ var ConfiguracaoController = class {
     return {
       envio_automatico: config.envio_automatico,
       mensagens: config.mensagens,
+      chave_pix: config.chave_pix ?? null,
       padroes: DEFAULT_TEMPLATES,
       variaveis: TEMPLATE_VARIABLES
     };

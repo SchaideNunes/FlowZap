@@ -27,6 +27,13 @@ const MensagemSchema = z
 export const UpdateConfiguracaoSchema = z
   .object({
     envio_automatico: z.boolean().optional(),
+    // Vazio ou nulo remove a chave
+    chave_pix: z
+      .string()
+      .trim()
+      .max(140, { message: 'A chave Pix pode ter no máximo 140 caracteres' })
+      .nullable()
+      .optional(),
     mensagens: z
       .object({
         lembrete_3d: MensagemSchema,
@@ -38,8 +45,11 @@ export const UpdateConfiguracaoSchema = z
       .optional(),
   })
   .strict()
-  .refine((data) => data.envio_automatico !== undefined || data.mensagens !== undefined, {
-    message: 'Nada para alterar',
-  });
+  .refine(
+    (data) => data.envio_automatico !== undefined || data.mensagens !== undefined || data.chave_pix !== undefined,
+    {
+      message: 'Nada para alterar',
+    }
+  );
 
 export type UpdateConfiguracaoDTO = z.infer<typeof UpdateConfiguracaoSchema>;

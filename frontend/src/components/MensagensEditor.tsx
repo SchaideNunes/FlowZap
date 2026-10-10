@@ -17,6 +17,7 @@ const AVISOS: { tipo: TipoAviso; titulo: string; quando: string }[] = [
 ];
 
 // Cliente fictício, só para mostrar como a mensagem chega
+const EXEMPLO_PIX = 'sua-chave-pix';
 const EXEMPLO: Record<string, string> = {
   '{saudacao}': 'Olá',
   '{nome}': 'Maria',
@@ -53,6 +54,27 @@ export const MensagensEditor: React.FC<MensagensEditorProps> = ({ config, onSave
   const [salvo, setSalvo] = useState<TipoAviso | null>(null);
   const [erros, setErros] = useState<Partial<Record<TipoAviso, string>>>({});
   const campos = useRef<Partial<Record<TipoAviso, HTMLTextAreaElement | null>>>({});
+
+  const [pix, setPix] = useState(config.chave_pix || '');
+  const [pixEstado, setPixEstado] = useState<'parado' | 'salvando' | 'salvo'>('parado');
+  const [pixErro, setPixErro] = useState<string | null>(null);
+  const pixAlterado = pix.trim() !== (config.chave_pix || '');
+
+  const salvarPix = async () => {
+    setPixEstado('salvando');
+    setPixErro(null);
+    try {
+      const res = await api.put('/configuracoes', { chave_pix: pix.trim() || null });
+      const nova: ConfiguracaoData = res.data;
+      onSaved(nova);
+      setPix(nova.chave_pix || '');
+      setPixEstado('salvo');
+      setTimeout(() => setPixEstado('parado'), 3000);
+    } catch (err: unknown) {
+      setPixErro(extractErrorMessage(err, 'Não foi possível salvar a chave Pix.'));
+      setPixEstado('parado');
+    }
+  };
 
   useEffect(() => {
     if (!salvo) return;
@@ -96,6 +118,51 @@ export const MensagensEditor: React.FC<MensagensEditorProps> = ({ config, onSave
 
   return (
     <div className="template-grid">
+      <section className="template-card template-card-wide">
+        <div className="panel-head">
+          <div>
+            <h3 className="panel-title">Chave Pix</h3>
+            <div className="panel-caption">
+              Entra nas mensagens onde você colocar {'{pix}'}. Para o cliente copiar fácil, deixe a chave sozinha em
+              uma linha.
+            </div>
+          </div>
+          <span className={`badge ${config.chave_pix ? 'badge-pago' : ''}`}>
+            {config.chave_pix ? 'Cadastrada' : 'Não cadastrada'}
+          </span>
+        </div>
+
+        <div className="pix-row">
+          <input
+            type="text"
+            className="form-input"
+            aria-label="Chave Pix"
+            placeholder="CPF, CNPJ, telefone, e-mail ou chave aleatória"
+            maxLength={140}
+            value={pix}
+            onChange={(e) => {
+              setPix(e.target.value);
+              setPixErro(null);
+            }}
+          />
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={!pixAlterado || pixEstado === 'salvando'}
+            onClick={salvarPix}
+          >
+            <Check size={14} />
+            {pixEstado === 'salvando' ? 'Salvando...' : pixEstado === 'salvo' ? 'Salvo' : 'Salvar chave'}
+          </button>
+        </div>
+
+        {pixErro && (
+          <div className="form-hint is-danger" role="alert">
+            {pixErro}
+          </div>
+        )}
+      </section>
+
       {AVISOS.map(({ tipo, titulo, quando }) => {
         const texto = textos[tipo];
         const limpo = texto.trim();
@@ -115,7 +182,10 @@ export const MensagensEditor: React.FC<MensagensEditorProps> = ({ config, onSave
                   ? 'A mensagem precisa ter {saudacao}. A saudação variada protege o número contra bloqueio.'
                   : null;
 
-        const previa = limpo.replace(VARIAVEL, (v) => EXEMPLO[v] ?? v);
+        const previa = limpo.replace(VARIAVEL, (v) =>
+          v === '{pix}' ? config.chave_pix || EXEMPLO_PIX : (EXEMPLO[v] ?? v)
+        );
+        const pixSemChave = texto.includes('{pix}') && !config.chave_pix;
         const idCampo = `mensagem-${tipo}`;
 
         return (
@@ -169,6 +239,11 @@ export const MensagensEditor: React.FC<MensagensEditorProps> = ({ config, onSave
             {problema && alterado && (
               <div className="form-hint is-danger" role="alert">
                 {problema}
+              </div>
+            )}
+            {pixSemChave && (
+              <div className="form-hint is-warning">
+                Esta mensagem usa {'{pix}'}, mas a chave Pix ainda não foi cadastrada. Sem ela, esse trecho sai vazio.
               </div>
             )}
             {erros[tipo] && (

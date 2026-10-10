@@ -16,7 +16,7 @@ describe('ConfiguracaoService', () => {
 
   describe('get', () => {
     it('sem registro, o envio automático fica ligado e as mensagens são as padrão', async () => {
-      expect(await service.get()).toEqual({ envio_automatico: true, mensagens: {} });
+      expect(await service.get()).toEqual({ envio_automatico: true, mensagens: {}, chave_pix: null });
     });
 
     it('devolve o que está gravado', async () => {
@@ -25,19 +25,20 @@ describe('ConfiguracaoService', () => {
       expect(await service.get()).toEqual({
         envio_automatico: false,
         mensagens: { vencido: 'Oi {nome}, sua conta venceu.' },
+        chave_pix: null,
       });
     });
 
     it('se a leitura falhar (ex.: tabela ainda não criada), mantém o comportamento padrão', async () => {
       repo.get.mockRejectedValue(new Error('relation does not exist'));
 
-      expect(await service.get()).toEqual({ envio_automatico: true, mensagens: {} });
+      expect(await service.get()).toEqual({ envio_automatico: true, mensagens: {}, chave_pix: null });
     });
 
     it('ignora valores inválidos gravados no banco', async () => {
       repo.get.mockResolvedValue({ envio_automatico: null, mensagens: { vencido: '   ', lembrete_1d: 42, outro: 'x' } });
 
-      expect(await service.get()).toEqual({ envio_automatico: true, mensagens: {} });
+      expect(await service.get()).toEqual({ envio_automatico: true, mensagens: {}, chave_pix: null });
     });
   });
 

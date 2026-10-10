@@ -157,8 +157,10 @@ CREATE TABLE IF NOT EXISTS configuracoes (
     id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
     envio_automatico BOOLEAN NOT NULL DEFAULT true,
     mensagens JSONB NOT NULL DEFAULT '{}'::jsonb,
+    chave_pix TEXT,
     atualizado_em TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE configuracoes ADD COLUMN IF NOT EXISTS chave_pix TEXT;
 
 DROP TRIGGER IF EXISTS set_atualizado_em_configuracoes ON configuracoes;
 CREATE TRIGGER set_atualizado_em_configuracoes

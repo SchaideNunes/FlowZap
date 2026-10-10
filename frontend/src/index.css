@@ -488,6 +488,22 @@ button.nav-status-pill:hover {
   border-radius: var(--radius-md);
   padding: 1rem;
 }
+.template-card-wide {
+  grid-column: 1 / -1;
+}
+.pix-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.pix-row .form-input {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.pix-row .btn {
+  min-height: 42px;
+}
 .template-card .form-group {
   margin-bottom: 0;
 }

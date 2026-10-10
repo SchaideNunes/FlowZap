@@ -49,6 +49,8 @@ export interface ConfiguracaoData {
   envio_automatico: boolean;
   /** Textos escritos pelo usuário; aviso sem texto próprio usa o de `padroes`. */
   mensagens: Partial<Record<TipoAviso, string>>;
+  /** Chave Pix da loja, usada na variável {pix}. */
+  chave_pix: string | null;
   padroes: Record<TipoAviso, string>;
   variaveis: { chave: string; descricao: string }[];
 }

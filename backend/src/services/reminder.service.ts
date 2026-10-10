@@ -4,7 +4,7 @@ import { BillingService } from './billing.service.js';
 import { TemplateService } from './template.service.js';
 import { MessageQueueService } from './message-queue.service.js';
 import { ConfiguracaoService } from './configuracao.service.js';
-import { MensagensPersonalizadas } from '../repositories/configuracao.repository.interface.js';
+import { Configuracao, MensagensPersonalizadas } from '../repositories/configuracao.repository.interface.js';
 import { formatDateToISO, daysDifference } from '../utils/date-calculator.js';
 
 export interface ReminderPreviewItem {
@@ -97,10 +97,10 @@ export class ReminderService {
     this.configService = configService;
   }
 
-  /** Textos escritos pelo usuário na tela de Notificações (vazio = mensagens padrão). */
-  private async loadCustomMessages(): Promise<MensagensPersonalizadas> {
-    if (!this.configService) return {};
-    return (await this.configService.get()).mensagens;
+  /** Textos e chave Pix definidos pelo usuário na tela de Notificações. */
+  private async loadConfig(): Promise<Configuracao> {
+    if (!this.configService) return { envio_automatico: true, mensagens: {}, chave_pix: null };
+    return this.configService.get();
   }
 
   private sessionKey(vendaId: number, tipo: TipoMensagem, dataVencimento: string): string {
@@ -113,7 +113,7 @@ export class ReminderService {
    */
   async previewReminders(referenceDateStr: string = formatDateToISO(new Date())): Promise<ReminderPreviewItem[]> {
     const activeVendas = await this.vendaRepo.findActiveVendas();
-    const customMessages = await this.loadCustomMessages();
+    const { mensagens: customMessages, chave_pix: chavePix } = await this.loadConfig();
     const previews: ReminderPreviewItem[] = [];
 
     for (const venda of activeVendas) {
@@ -154,6 +154,7 @@ export class ReminderService {
           dataVencimento: formattedDate,
           parcelaAtual: venda.parcela_atual,
           totalParcelas: venda.total_parcelas,
+          chavePix,
         },
         customMessages[decision.tipo as keyof MensagensPersonalizadas]
       );
@@ -232,7 +233,7 @@ export class ReminderService {
     referenceDateStr: string = formatDateToISO(new Date())
   ): Promise<OverdueReminderItem[]> {
     const activeVendas = await this.vendaRepo.findActiveVendas();
-    const customMessages = await this.loadCustomMessages();
+    const { mensagens: customMessages, chave_pix: chavePix } = await this.loadConfig();
     const overdues: OverdueReminderItem[] = [];
 
     for (const venda of activeVendas) {
@@ -286,6 +287,7 @@ export class ReminderService {
           dataVencimento: formattedDate,
           parcelaAtual: venda.parcela_atual,
           totalParcelas: venda.total_parcelas,
+          chavePix,
         },
         customMessages.vencido
       );

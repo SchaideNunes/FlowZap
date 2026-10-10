@@ -14,7 +14,7 @@ export class SupabaseConfiguracaoRepository implements IConfiguracaoRepository {
   async get(): Promise<Configuracao | null> {
     const { data, error } = await this.client
       .from(TABLE)
-      .select('envio_automatico, mensagens')
+      .select('*')
       .eq('id', ROW_ID)
       .maybeSingle();
 
@@ -24,16 +24,18 @@ export class SupabaseConfiguracaoRepository implements IConfiguracaoRepository {
 
     if (!data) return null;
 
-    return { envio_automatico: data.envio_automatico, mensagens: data.mensagens };
+    // select('*'): a coluna chave_pix pode ainda não existir (migração pendente)
+    return {
+      envio_automatico: data.envio_automatico,
+      mensagens: data.mensagens,
+      chave_pix: data.chave_pix ?? null,
+    };
   }
 
   async save(config: Configuracao): Promise<Configuracao> {
     const { error } = await this.client
       .from(TABLE)
-      .upsert(
-        { id: ROW_ID, envio_automatico: config.envio_automatico, mensagens: config.mensagens },
-        { onConflict: 'id' }
-      );
+      .upsert({ id: ROW_ID, ...config }, { onConflict: 'id' });
 
     if (error) {
       throw new Error(`Erro ao gravar as configurações: ${error.message}`);

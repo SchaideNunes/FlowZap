@@ -24,7 +24,32 @@ describe('SupabaseConfiguracaoRepository', () => {
 
     expect(mockClient.from).toHaveBeenCalledWith('configuracoes');
     expect(chain.eq).toHaveBeenCalledWith('id', 1);
-    expect(result).toEqual({ envio_automatico: false, mensagens: { vencido: 'x' } });
+    expect(chain.select).toHaveBeenCalledWith('*');
+    expect(result).toEqual({ envio_automatico: false, mensagens: { vencido: 'x' }, chave_pix: null });
+  });
+
+  it('lê a chave Pix quando a coluna existe', async () => {
+    const chain: any = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi
+        .fn()
+        .mockResolvedValue({ data: { id: 1, envio_automatico: true, mensagens: {}, chave_pix: 'k' }, error: null }),
+    };
+    mockClient.from.mockReturnValue(chain);
+
+    expect((await repo.get())?.chave_pix).toBe('k');
+  });
+
+  it('grava a chave Pix só quando ela vem na configuração', async () => {
+    const chain: any = { upsert: vi.fn().mockResolvedValue({ error: null }) };
+    mockClient.from.mockReturnValue(chain);
+
+    await repo.save({ envio_automatico: true, mensagens: {} });
+    await repo.save({ envio_automatico: true, mensagens: {}, chave_pix: null });
+
+    expect(chain.upsert.mock.calls[0][0]).toEqual({ id: 1, envio_automatico: true, mensagens: {} });
+    expect(chain.upsert.mock.calls[1][0]).toEqual({ id: 1, envio_automatico: true, mensagens: {}, chave_pix: null });
   });
 
   it('devolve null quando ainda não há registro', async () => {

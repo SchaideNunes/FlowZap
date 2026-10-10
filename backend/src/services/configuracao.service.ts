@@ -19,6 +19,10 @@ function cleanMensagens(raw: unknown): MensagensPersonalizadas {
   return mensagens;
 }
 
+function cleanPix(raw: unknown): string | null {
+  return typeof raw === 'string' && raw.trim() ? raw.trim() : null;
+}
+
 export class ConfiguracaoService {
   private repo: IConfiguracaoRepository;
 
@@ -36,9 +40,10 @@ export class ConfiguracaoService {
       return {
         envio_automatico: saved?.envio_automatico !== false,
         mensagens: cleanMensagens(saved?.mensagens),
+        chave_pix: cleanPix(saved?.chave_pix),
       };
     } catch {
-      return { envio_automatico: true, mensagens: {} };
+      return { envio_automatico: true, mensagens: {}, chave_pix: null };
     }
   }
 
@@ -53,12 +58,20 @@ export class ConfiguracaoService {
       mensagens: cleanMensagens({ ...current.mensagens, ...(patch.mensagens || {}) }),
     };
 
+    // A coluna só entra na gravação quando há chave ou quando ela foi alterada: assim um
+    // banco ainda sem a migração da chave Pix continua salvando o resto.
+    if (patch.chave_pix !== undefined) {
+      next.chave_pix = cleanPix(patch.chave_pix);
+    } else if (current.chave_pix) {
+      next.chave_pix = current.chave_pix;
+    }
+
     try {
       return await this.repo.save(next);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       throw new Error(
-        `Não foi possível salvar. Confira se o arquivo database/migration_configuracoes.sql já foi executado no Supabase. (${detail})`
+        `Não foi possível salvar. Confira se os arquivos database/migration_configuracoes.sql e database/migration_chave_pix.sql já foram executados no Supabase. (${detail})`
       );
     }
   }

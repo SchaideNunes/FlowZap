@@ -9,6 +9,8 @@ export interface Configuracao {
   envio_automatico: boolean;
   /** Textos escritos pelo usuário; o aviso sem texto próprio usa a mensagem padrão. */
   mensagens: MensagensPersonalizadas;
+  /** Chave Pix da loja, usada na variável {pix} das mensagens. */
+  chave_pix?: string | null;
 }
 
 /**
