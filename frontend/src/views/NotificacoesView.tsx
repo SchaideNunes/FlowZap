@@ -80,13 +80,16 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
       setData(centralData);
 
       if (shouldAutoSelectTab) {
-        if (centralData.agendadosHoje.length > 0) {
-          setActiveTab('hoje');
-        } else if (centralData.enviadosRecentes && centralData.enviadosRecentes.length > 0) {
-          setActiveTab('enviados');
-        } else if (centralData.emAtraso.length > 0) {
-          setActiveTab('atrasados');
-        }
+        const sugerida =
+          centralData.agendadosHoje.length > 0
+            ? 'hoje'
+            : centralData.enviadosRecentes && centralData.enviadosRecentes.length > 0
+              ? 'enviados'
+              : centralData.emAtraso.length > 0
+                ? 'atrasados'
+                : 'hoje';
+        // Se a pessoa já escolheu uma aba enquanto os dados carregavam, não troca por cima
+        setActiveTab((atual) => (atual === 'hoje' ? sugerida : atual));
       }
     } catch {
       // Falha passageira
