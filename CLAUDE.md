@@ -167,6 +167,15 @@ O projeto adota o modelo oficial de múltiplos serviços em um único projeto Ve
 - A sessão do WhatsApp fica em `backend/.whatsapp-auth/` (ou `WHATSAPP_AUTH_DIR`), contém credenciais e jamais pode ser versionada.
 - O arquivo `backend/src/config/supabase.ts` implementa inicialização tolerante a falhas (fallback inicial) para que a ausência temporária de variáveis de ambiente no container não provoque encerramento do processo no boot.
 
+### 6.3. Backup e Proteção dos Dados
+O banco fica no plano gratuito do Supabase (sem backup automático, e o projeto é pausado após dias sem uso), então o sistema guarda as próprias cópias:
+- **Backup diário automático na máquina-sede:** `BackupService.startAutomatic()` (chamado só em `src/index.ts`) grava um arquivo por dia em `backend/backups/` (ou `BACKUP_DIR`, que pode apontar para uma pasta sincronizada com a nuvem) e mantém os 30 mais recentes (`BACKUP_KEEP`). A pasta contém dados de clientes e **nunca é versionada**.
+- **Banco vazio não sobrescreve nada:** se o banco vier vazio e já houver backups, o do dia não é gravado e os antigos não são apagados.
+- **Backup manual pelo painel** (Visão geral): `GET /api/backup` devolve o arquivo completo (.json) e o frontend gera o relatório em PDF (`utils/backup-export.ts`, com `jspdf` carregado sob demanda). `GET /api/backup/status` informa o último backup.
+- **A tabela `usuarios` não entra no backup** (senhas). Depois de uma perda total os logins são recriados à parte.
+- **Restauração (máquina-sede):** `npm run backup:restaurar -- <arquivo>` mostra o conteúdo sem alterar nada; com `--confirmar` regrava os dados pelo id (não apaga o que foi criado depois). Em banco novo: rodar `database/setup_completo.sql` antes. `database/migration_backup.sql` cria a coluna `sede_status.ultimo_backup_em` e a função `flowzap_ajustar_sequencias()`.
+- O sinal de vida da sede (a cada minuto) mantém o projeto do Supabase em uso enquanto o computador da loja está ligado.
+
 ---
 
 ## 7. Checklist para Qualquer Modificação de Código
