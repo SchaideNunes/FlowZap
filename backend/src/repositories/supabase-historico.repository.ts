@@ -15,6 +15,24 @@ export class SupabaseHistoricoRepository implements IHistoricoRepository {
     this.client = client;
   }
 
+  async findById(id: number): Promise<HistoricoMensagem | null> {
+    const { data, error } = await this.client.from('historico_mensagens').select('*').eq('id', id).maybeSingle();
+
+    if (error) {
+      throw new Error(`Erro ao buscar registro do histórico: ${error.message}`);
+    }
+
+    return (data as HistoricoMensagem | null) ?? null;
+  }
+
+  async delete(id: number): Promise<void> {
+    const { error } = await this.client.from('historico_mensagens').delete().eq('id', id);
+
+    if (error) {
+      throw new Error(`Erro ao apagar registro do histórico: ${error.message}`);
+    }
+  }
+
   async findByVendaId(vendaId: number): Promise<HistoricoMensagem[]> {
     const { data, error } = await this.client
       .from('historico_mensagens')

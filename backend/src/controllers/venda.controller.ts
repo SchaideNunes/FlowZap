@@ -139,6 +139,23 @@ export class VendaController {
     }
   };
 
+  undoPayment = async (req: Request, res: Response): Promise<void> => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+      res.status(400).json({ error: 'ID inválido' });
+      return;
+    }
+
+    try {
+      const venda = await this.billingService.undoPayment(id);
+      res.status(200).json({ message: 'Pagamento desfeito', venda });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao desfazer pagamento';
+      // "Não encontrado" é 404; os demais são recusas de regra de negócio
+      res.status(/não encontrad/i.test(msg) ? 404 : 409).json({ error: msg });
+    }
+  };
+
   toggleAtivo = async (req: Request, res: Response): Promise<void> => {
     const id = Number(req.params.id);
     if (isNaN(id)) {

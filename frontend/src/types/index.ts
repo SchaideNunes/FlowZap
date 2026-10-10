@@ -41,6 +41,7 @@ export interface PagamentoRecebido {
   total_parcelas: number | null;
   descricao: string | null;
   cliente_nome: string | null;
+  pode_desfazer: boolean;
 }
 
 export type TipoAviso = 'lembrete_3d' | 'lembrete_2d' | 'lembrete_1d' | 'vencido';

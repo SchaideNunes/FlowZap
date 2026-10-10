@@ -30,9 +30,11 @@ export interface HistoricoWithVendaCliente extends HistoricoMensagem {
 }
 
 export interface IHistoricoRepository {
+  findById(id: number): Promise<HistoricoMensagem | null>;
   findByVendaId(vendaId: number): Promise<HistoricoMensagem[]>;
   findRecentEnviados(limit?: number): Promise<HistoricoWithVendaCliente[]>;
   findPagamentos(limit?: number): Promise<HistoricoWithVendaCliente[]>;
   create(entry: HistoricoMensagem): Promise<HistoricoMensagem>;
+  delete(id: number): Promise<void>;
   hasMessageBeenSentForCycle(vendaId: number, tipo: TipoMensagem, cycleDueDate: string): Promise<boolean>;
 }

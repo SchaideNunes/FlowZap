@@ -51908,6 +51908,19 @@ var SupabaseHistoricoRepository = class {
   constructor(client) {
     this.client = client;
   }
+  async findById(id) {
+    const { data, error } = await this.client.from("historico_mensagens").select("*").eq("id", id).maybeSingle();
+    if (error) {
+      throw new Error(`Erro ao buscar registro do hist\xF3rico: ${error.message}`);
+    }
+    return data ?? null;
+  }
+  async delete(id) {
+    const { error } = await this.client.from("historico_mensagens").delete().eq("id", id);
+    if (error) {
+      throw new Error(`Erro ao apagar registro do hist\xF3rico: ${error.message}`);
+    }
+  }
   async findByVendaId(vendaId) {
     const { data, error } = await this.client.from("historico_mensagens").select("*").eq("venda_id", vendaId).order("data_envio", { ascending: false });
     if (error) {
@@ -52068,7 +52081,9 @@ function snapshotPagamento(venda) {
     valor: Number(venda.valor),
     vencimento: venda.data_vencimento_atual || null,
     parcela: parcelado ? venda.parcela_atual || 1 : null,
-    total_parcelas: parcelado ? venda.total_parcelas : null
+    total_parcelas: parcelado ? venda.total_parcelas : null,
+    // Status antes do pagamento: é para onde a venda volta se o pagamento for desfeito
+    status: venda.status_mes_atual
   };
 }
 var numberOrNull = (value) => typeof value === "number" && Number.isFinite(value) ? value : null;
@@ -52160,8 +52175,11 @@ var BillingService = class {
    */
   async listPagamentos(limit = 100) {
     const registros = await this.historicoRepo.findPagamentos(limit);
+    const vendasVistas = /* @__PURE__ */ new Set();
     return registros.map((registro) => {
       const detalhes = registro.detalhes || {};
+      const maisRecenteDaVenda = !vendasVistas.has(registro.venda_id);
+      vendasVistas.add(registro.venda_id);
       return {
         id: registro.id,
         venda_id: registro.venda_id,
@@ -52171,9 +52189,45 @@ var BillingService = class {
         parcela: numberOrNull(detalhes.parcela),
         total_parcelas: numberOrNull(detalhes.total_parcelas),
         descricao: registro.venda?.descricao ?? null,
-        cliente_nome: registro.venda?.cliente?.nome ?? null
+        cliente_nome: registro.venda?.cliente?.nome ?? null,
+        pode_desfazer: maisRecenteDaVenda && typeof detalhes.vencimento === "string"
       };
     });
+  }
+  /**
+   * Desfaz um "marcar como pago" dado por engano: a venda volta para a parcela, o vencimento
+   * e o status de antes, e o registro do pagamento é apagado.
+   */
+  async undoPayment(historicoId) {
+    const pagamento = await this.historicoRepo.findById(historicoId);
+    if (!pagamento || pagamento.tipo !== "confirmacao_manual") {
+      throw new Error("Pagamento n\xE3o encontrado");
+    }
+    const detalhes = pagamento.detalhes || {};
+    if (typeof detalhes.vencimento !== "string") {
+      throw new Error("Este pagamento \xE9 antigo e n\xE3o pode ser desfeito: ajuste a venda manualmente.");
+    }
+    const historico = await this.historicoRepo.findByVendaId(pagamento.venda_id);
+    const ultimoPagamento = historico.find((registro) => registro.tipo === "confirmacao_manual");
+    if (ultimoPagamento && ultimoPagamento.id !== pagamento.id) {
+      throw new Error("S\xF3 \xE9 poss\xEDvel desfazer o pagamento mais recente da venda.");
+    }
+    const venda = await this.vendaRepo.findById(pagamento.venda_id);
+    if (!venda) {
+      throw new Error("Venda n\xE3o encontrada");
+    }
+    const statusAnterior = typeof detalhes.status === "string" && detalhes.status !== "pago" ? detalhes.status : "pendente";
+    const restore = {
+      data_vencimento_atual: detalhes.vencimento,
+      status_mes_atual: statusAnterior,
+      ativo: true
+    };
+    if (typeof detalhes.parcela === "number") {
+      restore.parcela_atual = detalhes.parcela;
+    }
+    const updated = await this.vendaRepo.update(pagamento.venda_id, restore);
+    await this.historicoRepo.delete(historicoId);
+    return updated;
   }
   /**
    * Avalia o status e lembrete necessário para uma venda no dia de referência
@@ -57120,6 +57174,20 @@ var VendaController = class {
       res.status(500).json({ error: msg });
     }
   };
+  undoPayment = async (req, res) => {
+    const id = Number(req.params.id);
+    if (isNaN(id)) {
+      res.status(400).json({ error: "ID inv\xE1lido" });
+      return;
+    }
+    try {
+      const venda = await this.billingService.undoPayment(id);
+      res.status(200).json({ message: "Pagamento desfeito", venda });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao desfazer pagamento";
+      res.status(/não encontrad/i.test(msg) ? 404 : 409).json({ error: msg });
+    }
+  };
   toggleAtivo = async (req, res) => {
     const id = Number(req.params.id);
     if (isNaN(id)) {
@@ -58013,6 +58081,7 @@ function createVendaRouter(vendaController, authService) {
   router.get("/:id", vendaController.getById);
   router.get("/:id/historico", vendaController.getHistorico);
   router.post("/", vendaController.create);
+  router.post("/pagamentos/:id/desfazer", vendaController.undoPayment);
   router.put("/:id", vendaController.update);
   router.patch("/:id/pago", vendaController.markAsPaid);
   router.patch("/:id/status", vendaController.toggleAtivo);

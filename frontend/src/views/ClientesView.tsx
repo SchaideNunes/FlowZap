@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Pause,
   Play,
+  Undo2,
 } from 'lucide-react';
 import { Cliente, PagamentoRecebido, Venda } from '../types/index.js';
 import { api } from '../services/api.js';
@@ -52,6 +53,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
   const [sortBy, setSortBy] = useState<SortOption>('vencimento');
   const [payingVendaId, setPayingVendaId] = useState<number | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+  const [undoingId, setUndoingId] = useState<number | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -105,6 +107,25 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
       alert(extractErrorMessage(err, 'Erro ao registrar pagamento.'));
     } finally {
       setPayingVendaId(null);
+    }
+  };
+
+  const handleUndoPayment = async (pagamento: PagamentoRecebido) => {
+    const confirm = window.confirm(
+      `Desfazer o pagamento de "${pagamento.descricao || 'venda'}" (${formatBRL(pagamento.valor)})? A parcela volta a ficar em aberto, com vencimento em ${formatDateBR(pagamento.vencimento)}.`
+    );
+    if (!confirm) return;
+
+    setUndoingId(pagamento.id);
+    try {
+      await api.post(`/vendas/pagamentos/${pagamento.id}/desfazer`);
+      setFeedbackMsg(`Pagamento de "${pagamento.descricao || 'venda'}" desfeito. A parcela voltou para a lista em aberto.`);
+      setTimeout(() => setFeedbackMsg(null), 8000);
+      fetchData();
+    } catch (err: any) {
+      alert(extractErrorMessage(err, 'Erro ao desfazer o pagamento.'));
+    } finally {
+      setUndoingId(null);
     }
   };
 
@@ -451,19 +472,20 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                   <th className="num">Valor recebido</th>
                   <th>Vencimento</th>
                   <th>Pago em</th>
+                  <th style={{ textAlign: 'right' }}>Ações</th>
                 </tr>
               </thead>
 
               <tbody>
                 {loading ? (
                   <tr className="is-plain">
-                    <td colSpan={6} className="stack-full">
+                    <td colSpan={7} className="stack-full">
                       <EmptyState title="Carregando pagamentos..." />
                     </td>
                   </tr>
                 ) : filteredPagamentos.length === 0 ? (
                   <tr className="is-plain">
-                    <td colSpan={6} className="stack-full">
+                    <td colSpan={7} className="stack-full">
                       <EmptyState
                         title="Nenhum pagamento recebido"
                         text={
@@ -500,6 +522,29 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                           {formatDateBR(todayISO(new Date(p.data_pagamento)))}
                         </span>
                       </td>
+                      <td className={p.pode_desfazer ? 'stack-full' : 'stack-hide'} style={{ textAlign: 'right' }}>
+                        <div className="cell-actions">
+                          {p.pode_desfazer ? (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => handleUndoPayment(p)}
+                              disabled={undoingId === p.id}
+                              title="Marcou como pago por engano? Volta a parcela para em aberto"
+                            >
+                              <Undo2 size={14} />
+                              {undoingId === p.id ? 'Desfazendo...' : 'Desfazer'}
+                            </button>
+                          ) : (
+                            <span
+                              className="panel-caption"
+                              title="Só o pagamento mais recente de cada venda pode ser desfeito"
+                            >
+                              -
+                            </span>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -513,7 +558,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                       {filteredPagamentos.length === 1 ? 'pagamento' : 'pagamentos'}
                     </td>
                     <td className="num">{formatBRL(somaPagamentosFiltrados)}</td>
-                    <td colSpan={2}></td>
+                    <td colSpan={3}></td>
                   </tr>
                 </tfoot>
               )}

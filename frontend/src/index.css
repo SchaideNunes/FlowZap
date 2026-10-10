@@ -2170,6 +2170,11 @@ button.stat-tile:hover {
     text-align: left;
   }
 
+  /* Célula sem conteúdo útil no cartão (ex.: ação indisponível) */
+  .stack-table td.stack-hide {
+    display: none;
+  }
+
   .stack-table td.stack-full {
     display: block;
     text-align: left;

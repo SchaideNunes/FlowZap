@@ -1,7 +1,7 @@
 import { IVendaRepository, VendaWithCliente } from '../repositories/venda.repository.interface.js';
 import { IClienteRepository } from '../repositories/cliente.repository.interface.js';
 import { IHistoricoRepository, TipoMensagem } from '../repositories/historico.repository.interface.js';
-import { CreateVendaDTO, VendaDTO, VendaStatus } from '../schemas/venda.schema.js';
+import { CreateVendaDTO, UpdateVendaDTO, VendaDTO, VendaStatus } from '../schemas/venda.schema.js';
 import {
   calculateInitialDueDate,
   calculateNextMonthDueDate,
@@ -24,6 +24,8 @@ export interface PagamentoRecebido {
   total_parcelas: number | null;
   descricao: string | null;
   cliente_nome: string | null;
+  /** Só o pagamento mais recente de cada venda, e com os dados da parcela gravados. */
+  pode_desfazer: boolean;
 }
 
 /**
@@ -37,6 +39,8 @@ function snapshotPagamento(venda: VendaWithCliente): Record<string, unknown> {
     vencimento: venda.data_vencimento_atual || null,
     parcela: parcelado ? venda.parcela_atual || 1 : null,
     total_parcelas: parcelado ? venda.total_parcelas! : null,
+    // Status antes do pagamento: é para onde a venda volta se o pagamento for desfeito
+    status: venda.status_mes_atual,
   };
 }
 
@@ -156,9 +160,13 @@ export class BillingService {
    */
   async listPagamentos(limit: number = 100): Promise<PagamentoRecebido[]> {
     const registros = await this.historicoRepo.findPagamentos(limit);
+    const vendasVistas = new Set<number>();
 
     return registros.map((registro) => {
       const detalhes = registro.detalhes || {};
+      // A lista vem do mais recente para o mais antigo: o primeiro de cada venda é o último pagamento
+      const maisRecenteDaVenda = !vendasVistas.has(registro.venda_id);
+      vendasVistas.add(registro.venda_id);
       return {
         id: registro.id!,
         venda_id: registro.venda_id,
@@ -169,8 +177,51 @@ export class BillingService {
         total_parcelas: numberOrNull(detalhes.total_parcelas),
         descricao: registro.venda?.descricao ?? null,
         cliente_nome: registro.venda?.cliente?.nome ?? null,
+        pode_desfazer: maisRecenteDaVenda && typeof detalhes.vencimento === 'string',
       };
     });
+  }
+
+  /**
+   * Desfaz um "marcar como pago" dado por engano: a venda volta para a parcela, o vencimento
+   * e o status de antes, e o registro do pagamento é apagado.
+   */
+  async undoPayment(historicoId: number): Promise<VendaDTO> {
+    const pagamento = await this.historicoRepo.findById(historicoId);
+    if (!pagamento || pagamento.tipo !== 'confirmacao_manual') {
+      throw new Error('Pagamento não encontrado');
+    }
+
+    const detalhes = pagamento.detalhes || {};
+    if (typeof detalhes.vencimento !== 'string') {
+      throw new Error('Este pagamento é antigo e não pode ser desfeito: ajuste a venda manualmente.');
+    }
+
+    const historico = await this.historicoRepo.findByVendaId(pagamento.venda_id);
+    const ultimoPagamento = historico.find((registro) => registro.tipo === 'confirmacao_manual');
+    if (ultimoPagamento && ultimoPagamento.id !== pagamento.id) {
+      throw new Error('Só é possível desfazer o pagamento mais recente da venda.');
+    }
+
+    const venda = await this.vendaRepo.findById(pagamento.venda_id);
+    if (!venda) {
+      throw new Error('Venda não encontrada');
+    }
+
+    const statusAnterior = typeof detalhes.status === 'string' && detalhes.status !== 'pago' ? detalhes.status : 'pendente';
+    const restore: UpdateVendaDTO = {
+      data_vencimento_atual: detalhes.vencimento,
+      status_mes_atual: statusAnterior as VendaStatus,
+      ativo: true,
+    };
+    if (typeof detalhes.parcela === 'number') {
+      restore.parcela_atual = detalhes.parcela;
+    }
+
+    const updated = await this.vendaRepo.update(pagamento.venda_id, restore);
+    await this.historicoRepo.delete(historicoId);
+
+    return updated;
   }
 
   /**

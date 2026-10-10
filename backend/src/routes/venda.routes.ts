@@ -19,6 +19,7 @@ export function createVendaRouter(
   router.get('/:id', vendaController.getById);
   router.get('/:id/historico', vendaController.getHistorico);
   router.post('/', vendaController.create);
+  router.post('/pagamentos/:id/desfazer', vendaController.undoPayment);
   router.put('/:id', vendaController.update);
   router.patch('/:id/pago', vendaController.markAsPaid);
   router.patch('/:id/status', vendaController.toggleAtivo);

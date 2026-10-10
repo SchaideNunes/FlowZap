@@ -33,6 +33,7 @@ describe('VendaController (TDD)', () => {
       createVenda: vi.fn(),
       markAsPaid: vi.fn(),
       listPagamentos: vi.fn(),
+      undoPayment: vi.fn(),
       evaluateReminderState: vi.fn(),
     } as unknown as BillingService;
 
@@ -141,6 +142,50 @@ describe('VendaController (TDD)', () => {
 
       expect(mockRes.status).toHaveBeenCalledWith(500);
       expect(mockRes.json).toHaveBeenCalledWith({ error: 'falhou' });
+    });
+  });
+
+  describe('undoPayment endpoint', () => {
+    it('should undo the payment and return the restored venda', async () => {
+      mockReq.params = { id: '7' };
+      const venda = { id: 20, data_vencimento_atual: '2026-09-10' };
+      vi.mocked(mockBillingService.undoPayment).mockResolvedValue(venda as any);
+
+      await controller.undoPayment(mockReq as Request, mockRes as Response);
+
+      expect(mockBillingService.undoPayment).toHaveBeenCalledWith(7);
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith({ message: 'Pagamento desfeito', venda });
+    });
+
+    it('should return 400 for an invalid id', async () => {
+      mockReq.params = { id: 'abc' };
+
+      await controller.undoPayment(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(400);
+      expect(mockBillingService.undoPayment).not.toHaveBeenCalled();
+    });
+
+    it('should return 404 when the payment does not exist', async () => {
+      mockReq.params = { id: '7' };
+      vi.mocked(mockBillingService.undoPayment).mockRejectedValue(new Error('Pagamento não encontrado'));
+
+      await controller.undoPayment(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(404);
+    });
+
+    it('should return 409 with the reason when the payment cannot be undone', async () => {
+      mockReq.params = { id: '7' };
+      vi.mocked(mockBillingService.undoPayment).mockRejectedValue(
+        new Error('Só é possível desfazer o pagamento mais recente da venda.')
+      );
+
+      await controller.undoPayment(mockReq as Request, mockRes as Response);
+
+      expect(mockRes.status).toHaveBeenCalledWith(409);
+      expect(mockRes.json).toHaveBeenCalledWith({ error: 'Só é possível desfazer o pagamento mais recente da venda.' });
     });
   });
 

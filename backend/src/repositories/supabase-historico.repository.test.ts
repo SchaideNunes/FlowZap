@@ -77,3 +77,52 @@ describe('SupabaseHistoricoRepository.findPagamentos', () => {
     await expect(repo.findPagamentos()).rejects.toThrow(/falhou/);
   });
 });
+
+describe('SupabaseHistoricoRepository: findById e delete', () => {
+  let mockClient: any;
+  let repo: SupabaseHistoricoRepository;
+
+  beforeEach(() => {
+    mockClient = { from: vi.fn() };
+    repo = new SupabaseHistoricoRepository(mockClient as SupabaseClient);
+  });
+
+  it('busca um registro pelo id', async () => {
+    const chain: any = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: { id: 7 }, error: null }),
+    };
+    mockClient.from.mockReturnValue(chain);
+
+    expect(await repo.findById(7)).toEqual({ id: 7 });
+    expect(chain.eq).toHaveBeenCalledWith('id', 7);
+  });
+
+  it('devolve null quando o registro não existe', async () => {
+    const chain: any = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+    };
+    mockClient.from.mockReturnValue(chain);
+
+    expect(await repo.findById(7)).toBeNull();
+  });
+
+  it('apaga um registro pelo id', async () => {
+    const eq = vi.fn().mockResolvedValue({ error: null });
+    mockClient.from.mockReturnValue({ delete: vi.fn().mockReturnValue({ eq }) });
+
+    await repo.delete(7);
+
+    expect(eq).toHaveBeenCalledWith('id', 7);
+  });
+
+  it('lança erro quando não consegue apagar', async () => {
+    const eq = vi.fn().mockResolvedValue({ error: { message: 'falhou' } });
+    mockClient.from.mockReturnValue({ delete: vi.fn().mockReturnValue({ eq }) });
+
+    await expect(repo.delete(7)).rejects.toThrow(/falhou/);
+  });
+});

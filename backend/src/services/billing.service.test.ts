@@ -122,7 +122,7 @@ describe('BillingService (TDD)', () => {
         tipo: 'confirmacao_manual',
         status_envio: 'enviado',
         mensagem: 'Pagamento confirmado manualmente pelo usuário',
-        detalhes: { valor: 120.0, vencimento: '2026-09-15', parcela: null, total_parcelas: null },
+        detalhes: { valor: 120.0, vencimento: '2026-09-15', parcela: null, total_parcelas: null, status: 'vencido' },
       });
 
       expect(updated.status_mes_atual).toBe('pendente');
@@ -166,7 +166,7 @@ describe('BillingService (TDD)', () => {
       expect(updated.parcela_atual).toBe(3);
       expect(mockHistoricoRepo.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          detalhes: { valor: 150.0, vencimento: '2026-09-10', parcela: 2, total_parcelas: 5 },
+          detalhes: { valor: 150.0, vencimento: '2026-09-10', parcela: 2, total_parcelas: 5, status: 'vencido' },
         })
       );
     });
@@ -207,6 +207,7 @@ describe('BillingService (TDD)', () => {
           total_parcelas: 5,
           descricao: 'iPhone 13',
           cliente_nome: 'João Silva',
+          pode_desfazer: true,
         },
       ]);
     });
