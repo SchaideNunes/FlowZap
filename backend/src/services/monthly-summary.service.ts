@@ -31,6 +31,8 @@ export interface MonthlySummary {
   /** Recebido menos contas pagas. */
   saldo: number;
   avisos_enviados: number;
+  /** Avisos de cobrança enviados no dia de hoje (independe do mês consultado). */
+  avisos_enviados_hoje: number;
   pagamentos: {
     id: number;
     data_pagamento: string;
@@ -119,9 +121,13 @@ export class MonthlySummaryService {
     const fimDoMes = monthStart(addMonths(mes, 1));
     const hoje = toBrazil(now).toISOString().slice(0, 10);
 
-    const [registros, avisosEnviados, vendas, clientes, contas] = await Promise.all([
+    const inicioDoDia = new Date(Date.parse(`${hoje}T00:00:00.000Z`) + BRAZIL_OFFSET_MS);
+    const fimDoDia = new Date(inicioDoDia.getTime() + 24 * 60 * 60 * 1000);
+
+    const [registros, avisosEnviados, avisosHoje, vendas, clientes, contas] = await Promise.all([
       this.historicoRepo.findPagamentosBetween(monthStart(meses[0]), fimDoMes),
       this.historicoRepo.countAvisosBetween(monthStart(mes), fimDoMes),
+      this.historicoRepo.countAvisosBetween(inicioDoDia.toISOString(), fimDoDia.toISOString()),
       this.vendaRepo.findAllVendas(),
       this.clienteRepo.findAll(),
       this.contaPagarRepo.findAll(),
@@ -196,6 +202,7 @@ export class MonthlySummaryService {
       contas_em_aberto: { total: somaContas(contasEmAberto), quantidade: contasEmAberto.length },
       saldo: round(recebido - pago),
       avisos_enviados: avisosEnviados,
+      avisos_enviados_hoje: avisosHoje,
       pagamentos: pagamentosDoMes,
       vendas: vendasNovas,
       contas: [...contasPagas, ...contasEmAberto].map((c) => ({

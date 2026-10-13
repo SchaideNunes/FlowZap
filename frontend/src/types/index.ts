@@ -89,6 +89,7 @@ export interface ResumoMensal {
   contas_em_aberto: ResumoTotais;
   saldo: number;
   avisos_enviados: number;
+  avisos_enviados_hoje: number;
   pagamentos: {
     id: number;
     data_pagamento: string;

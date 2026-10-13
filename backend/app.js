@@ -57990,9 +57990,12 @@ var MonthlySummaryService = class {
     const meses = Array.from({ length: HISTORY_MONTHS }, (_, i) => addMonths(mes, i - (HISTORY_MONTHS - 1)));
     const fimDoMes = monthStart(addMonths(mes, 1));
     const hoje = toBrazil(now).toISOString().slice(0, 10);
-    const [registros, avisosEnviados, vendas, clientes, contas] = await Promise.all([
+    const inicioDoDia = new Date(Date.parse(`${hoje}T00:00:00.000Z`) + BRAZIL_OFFSET_MS);
+    const fimDoDia = new Date(inicioDoDia.getTime() + 24 * 60 * 60 * 1e3);
+    const [registros, avisosEnviados, avisosHoje, vendas, clientes, contas] = await Promise.all([
       this.historicoRepo.findPagamentosBetween(monthStart(meses[0]), fimDoMes),
       this.historicoRepo.countAvisosBetween(monthStart(mes), fimDoMes),
+      this.historicoRepo.countAvisosBetween(inicioDoDia.toISOString(), fimDoDia.toISOString()),
       this.vendaRepo.findAllVendas(),
       this.clienteRepo.findAll(),
       this.contaPagarRepo.findAll()
@@ -58052,6 +58055,7 @@ var MonthlySummaryService = class {
       contas_em_aberto: { total: somaContas(contasEmAberto), quantidade: contasEmAberto.length },
       saldo: round(recebido - pago),
       avisos_enviados: avisosEnviados,
+      avisos_enviados_hoje: avisosHoje,
       pagamentos: pagamentosDoMes,
       vendas: vendasNovas,
       contas: [...contasPagas, ...contasEmAberto].map((c) => ({

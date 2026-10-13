@@ -121,6 +121,18 @@ describe('MonthlySummaryService (resumo por mês)', () => {
     expect(resumo.avisos_enviados).toBe(7);
   });
 
+  it('conta os avisos enviados hoje, do início ao fim do dia no horário do Brasil', async () => {
+    historicoRepo.countAvisosBetween.mockImplementation(async (start: string) =>
+      start === '2026-10-13T03:00:00.000Z' ? 3 : 20
+    );
+
+    const resumo = await service.getSummary('2026-10', hoje);
+
+    expect(historicoRepo.countAvisosBetween).toHaveBeenCalledWith('2026-10-13T03:00:00.000Z', '2026-10-14T03:00:00.000Z');
+    expect(resumo.avisos_enviados_hoje).toBe(3);
+    expect(resumo.avisos_enviados).toBe(20);
+  });
+
   it('traz a evolução dos últimos 6 meses, do mais antigo para o mês escolhido', async () => {
     const resumo = await service.getSummary('2026-10', hoje);
 

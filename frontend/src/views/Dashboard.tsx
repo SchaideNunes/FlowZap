@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Send, RefreshCw, UserPlus, Plus, Smartphone, ArrowRight } from 'lucide-react';
-import { DashboardMetrics, WhatsAppStatus, ContaPagar } from '../types/index.js';
+import { DashboardMetrics, WhatsAppStatus, ContaPagar, ResumoMensal } from '../types/index.js';
 import { api } from '../services/api.js';
 import { summarizeSede, SEDE_BADGE_CLASS, SEDE_DOT_CLASS } from '../utils/sede.js';
 import { formatBRL, formatDateBR } from '../utils/format.js';
@@ -42,16 +42,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
     valorTotalRecebido: 0,
   });
   const [contasPagar, setContasPagar] = useState<ContaPagar[]>([]);
+  // Avisos enviados e pagamentos recebidos vêm do histórico, não do status atual das vendas
+  const [resumo, setResumo] = useState<ResumoMensal | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
     try {
-      const [metricsRes, contasRes] = await Promise.all([
+      const [metricsRes, contasRes, resumoRes] = await Promise.all([
         api.get('/vendas/metrics'),
         api.get('/contas-pagar'),
+        // O resumo não pode impedir o painel de abrir
+        api.get('/resumo/mensal').catch(() => ({ data: null })),
       ]);
       setMetrics(metricsRes.data);
       setContasPagar(contasRes.data || []);
+      setResumo(resumoRes.data);
     } catch {
       // Ignora erro passageiro
     } finally {
@@ -76,10 +81,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const saldoLiquidoPrevisto = metrics.valorTotalMensal - totalQueDevemosPendente;
   const saldoPositivo = saldoLiquidoPrevisto >= 0;
 
-  const percentualRecebido =
-    metrics.valorTotalMensal > 0
-      ? Math.min(100, Math.round((metrics.valorTotalRecebido / metrics.valorTotalMensal) * 100))
-      : 0;
+  // Ao ser paga, a venda já avança para o mês seguinte: o recebido vem dos pagamentos do mês
+  const recebidoNoMes = resumo?.recebido.total ?? 0;
+  const totalDoMes = recebidoNoMes + metrics.valorTotalMensal;
+  const percentualRecebido = totalDoMes > 0 ? Math.min(100, Math.round((recebidoNoMes / totalDoMes) * 100)) : 0;
+  const aVencer = metrics.totalPendentes + metrics.totalAvisados;
+  const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
   return (
     <div>
@@ -152,30 +159,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* Situação das cobranças no ciclo (clique para abrir a lista) */}
       <div className="grid-cards">
         <StatTile
-          label="Pendentes"
-          value={metrics.totalPendentes}
-          hint="Fora do período de aviso"
-          onClick={onNavigateToClientes}
+          label="Avisos enviados hoje"
+          value={resumo ? resumo.avisos_enviados_hoje : '—'}
+          hint={resumo ? `${plural(resumo.avisos_enviados, 'mensagem', 'mensagens')} neste mês` : undefined}
         />
         <StatTile
-          label="Avisados"
-          value={metrics.totalAvisados}
-          hint="Já receberam lembrete"
-          tone={metrics.totalAvisados > 0 ? 'warning' : 'neutral'}
-          onClick={onNavigateToClientes}
-        />
-        <StatTile
-          label="Vencidos"
+          label="Parcelas vencidas"
           value={metrics.totalVencidos}
-          hint={metrics.totalVencidos > 0 ? 'Precisam de cobrança' : 'Nenhuma parcela atrasada'}
+          hint={metrics.totalVencidos > 0 ? 'Ver quem cobrar' : 'Nenhuma parcela atrasada'}
           tone={metrics.totalVencidos > 0 ? 'danger' : 'neutral'}
           onClick={onNavigateToClientes}
         />
         <StatTile
-          label="Pagos"
-          value={metrics.totalPagos}
-          hint="Pagamentos confirmados"
-          tone={metrics.totalPagos > 0 ? 'success' : 'neutral'}
+          label="Parcelas a vencer"
+          value={aVencer}
+          hint={
+            metrics.totalAvisados > 0
+              ? `${plural(metrics.totalAvisados, 'já foi avisada', 'já foram avisadas')} do vencimento`
+              : 'Nenhuma no período de aviso'
+          }
+          tone={metrics.totalAvisados > 0 ? 'warning' : 'neutral'}
+          onClick={onNavigateToClientes}
+        />
+        <StatTile
+          label="Recebido no mês"
+          value={resumo ? formatBRL(recebidoNoMes) : '—'}
+          hint={resumo ? plural(resumo.recebido.quantidade, 'pagamento confirmado', 'pagamentos confirmados') : undefined}
+          tone={resumo && resumo.recebido.quantidade > 0 ? 'success' : 'neutral'}
           onClick={onNavigateToClientes}
         />
       </div>
@@ -185,12 +195,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <section className="card panel">
           <div className="panel-head">
             <h3 className="panel-title">A receber</h3>
-            <span className="panel-caption">Ciclo atual</span>
+            <span className="panel-caption">Este mês</span>
           </div>
 
           <div className="figure-row">
             <div className="figure">
-              <span className="figure-label">Previsto</span>
+              <span className="figure-label">Em aberto</span>
               <span className="figure-value">{formatBRL(metrics.valorTotalMensal)}</span>
             </div>
             <div className="figure">
@@ -198,7 +208,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <span className="status-dot dot-success" aria-hidden="true" />
                 Recebido
               </span>
-              <span className="figure-value">{formatBRL(metrics.valorTotalRecebido)}</span>
+              <span className="figure-value">{formatBRL(recebidoNoMes)}</span>
             </div>
           </div>
 
@@ -221,7 +231,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
           <div className="panel-foot">
             <button className="btn btn-secondary btn-sm btn-block" onClick={onNavigateToClientes}>
-              Ver clientes e vendas <ArrowRight size={14} />
+              Ver clientes <ArrowRight size={14} />
             </button>
           </div>
         </section>
