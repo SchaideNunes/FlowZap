@@ -4,6 +4,7 @@ import { createApp } from './app.js';
 import { BaileysService } from './services/baileys.service.js';
 import { SedeHeartbeatService } from './services/sede-heartbeat.service.js';
 import { resolveBackupDir } from './config/backup-dir.js';
+import { loadSedeIdentity } from './config/sede-id.js';
 import {
   createBaileysSocketFactory,
   hasRegisteredSession,
@@ -26,11 +27,12 @@ const whatsApp = isServerless
       hasSession: () => hasRegisteredSession(authDir),
     });
 
-const { app, scheduler, sedeStatusRepo, backupService } = createApp({
+const { app, scheduler, sedeStatusRepo, backupService, sedeLock } = createApp({
   whatsAppGateway: whatsApp,
   backupDir: isServerless ? undefined : resolveBackupDir(),
+  sedeIdentity: isServerless ? undefined : loadSedeIdentity(),
 });
-const heartbeat = whatsApp ? new SedeHeartbeatService(sedeStatusRepo, whatsApp) : undefined;
+const heartbeat = whatsApp ? new SedeHeartbeatService(sedeStatusRepo, whatsApp, { lock: sedeLock }) : undefined;
 
 let server: any;
 
@@ -49,23 +51,49 @@ if (!isServerless) {
   // Inicia o agendador automático diário de cobranças
   scheduler.start();
 
-  // Avisa o painel online que a sede está ligada
-  heartbeat?.start();
-
   // Cópia diária dos dados em disco (proteção contra perda no banco em nuvem)
   backupService.startAutomatic();
 
-  // Se o computador estava desligado no horário agendado, recupera a rotina do dia
-  scheduler
-    .runCatchUpIfNeeded()
-    .catch((error) => console.error('[Scheduler] Erro na rotina de recuperação:', error));
+  // O que só a sede faz: recuperar a rotina do dia e manter o WhatsApp conectado
+  const startAsSede = () => {
+    // Se o computador estava desligado no horário agendado, recupera a rotina do dia
+    scheduler
+      .runCatchUpIfNeeded()
+      .catch((error) => console.error('[Scheduler] Erro na rotina de recuperação:', error));
 
-  // Reabre a sessão salva do WhatsApp. Sem sessão, a conexão só é aberta quando
-  // alguém pede o QR Code no painel, evitando tentativas à toa.
-  if (whatsApp && hasRegisteredSession(authDir)) {
-    void whatsApp.start();
+    // Reabre a sessão salva do WhatsApp. Sem sessão, a conexão só é aberta quando
+    // alguém pede o QR Code no painel, evitando tentativas à toa.
+    if (whatsApp && hasRegisteredSession(authDir)) {
+      void whatsApp.start();
+    } else {
+      console.log('[WhatsApp] Nenhum número conectado. Abra o painel e leia o QR Code para conectar.');
+    }
+  };
+
+  if (sedeLock) {
+    sedeLock.setOnChange((holder) => {
+      if (holder) {
+        console.log('[Sede] Este computador é a sede: as cobranças saem por aqui.');
+        startAsSede();
+      } else {
+        console.log('[Sede] Outra máquina passou a ser a sede: este computador parou de enviar cobranças.');
+        whatsApp?.stop();
+      }
+    });
+
+    void sedeLock.acquire().then((holder) => {
+      if (!holder) {
+        const { sedeNome } = sedeLock.getInfo();
+        console.log(
+          `[Sede] Outra máquina já é a sede${sedeNome ? ` (${sedeNome})` : ''}. Este computador funciona só como painel.`
+        );
+      }
+      // Renova a trava a cada minuto e, sendo a sede, avisa o painel online que está ligada
+      heartbeat?.start();
+    });
   } else {
-    console.log('[WhatsApp] Nenhum número conectado. Abra o painel e leia o QR Code para conectar.');
+    heartbeat?.start();
+    startAsSede();
   }
 }
 

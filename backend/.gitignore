@@ -1,4 +1,6 @@
 # Sessão do WhatsApp (credenciais do número conectado): nunca versionar
 .whatsapp-auth/
+# Identidade desta instalacao (trava de sede unica)
+.sede-id
 # Backups diários: contêm os dados dos clientes
 backups/

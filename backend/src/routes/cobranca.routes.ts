@@ -15,6 +15,7 @@ export function createCobrancaRouter(
   router.get('/preview', cobrancaController.preview);
   router.get('/central', cobrancaController.getCentral);
   router.post('/disparar', cobrancaController.disparar);
+  router.post('/assumir-sede', cobrancaController.assumirSede);
   router.get('/queue-status', cobrancaController.getQueueStatus);
   router.get('/whatsapp-status', cobrancaController.getWhatsAppStatus);
   router.get('/whatsapp-qrcode', cobrancaController.getWhatsAppQrCode);

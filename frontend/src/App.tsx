@@ -12,6 +12,7 @@ import { DisparoModal } from './components/DisparoModal.js';
 import { ClienteModal } from './components/ClienteModal.js';
 import { VendaModal } from './components/VendaModal.js';
 import { HistoricoModal } from './components/HistoricoModal.js';
+import { SedeLockBanner } from './components/SedeLockBanner.js';
 import { Cliente, Venda, WhatsAppStatus } from './types/index.js';
 import { api } from './services/api.js';
 
@@ -53,6 +54,7 @@ export const App: React.FC = () => {
         state: res.data.state,
         available: res.data.available,
         sede: res.data.sede,
+        trava: res.data.trava,
       });
     } catch {
       setWhatsAppStatus('close');
@@ -147,6 +149,9 @@ export const App: React.FC = () => {
       />
 
       <main className="main-content">
+        {whatsAppInfo.trava && !whatsAppInfo.trava.souSede && (
+          <SedeLockBanner trava={whatsAppInfo.trava} onChanged={checkWhatsApp} />
+        )}
         {currentTab === 'dashboard' ? (
           <Dashboard
             whatsAppInfo={whatsAppInfo}

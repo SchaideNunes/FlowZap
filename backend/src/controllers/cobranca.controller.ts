@@ -3,6 +3,7 @@ import { ReminderService } from '../services/reminder.service.js';
 import { IWhatsAppGateway, ConnectionStatus } from '../services/whatsapp-gateway.interface.js';
 import { MessageQueueService } from '../services/message-queue.service.js';
 import { ISedeStatusRepository } from '../repositories/sede-status.repository.interface.js';
+import { SedeLockService } from '../services/sede-lock.service.js';
 
 // Sinal de vida da sede mais antigo que isto significa computador desligado ou sem internet
 const SEDE_ONLINE_WINDOW_MS = 3 * 60 * 1000;
@@ -12,17 +13,27 @@ export class CobrancaController {
   private whatsAppGateway: IWhatsAppGateway;
   private queueService: MessageQueueService;
   private sedeStatusRepo?: ISedeStatusRepository;
+  private sedeLock?: SedeLockService;
 
   constructor(
     reminderService: ReminderService,
     whatsAppGateway: IWhatsAppGateway,
     queueService: MessageQueueService,
-    sedeStatusRepo?: ISedeStatusRepository
+    sedeStatusRepo?: ISedeStatusRepository,
+    sedeLock?: SedeLockService
   ) {
     this.reminderService = reminderService;
     this.whatsAppGateway = whatsAppGateway;
     this.queueService = queueService;
     this.sedeStatusRepo = sedeStatusRepo;
+    this.sedeLock = sedeLock;
+  }
+
+  /** Mensagem para quando esta máquina não é a sede (null quando ela pode enviar). */
+  private notSedeMessage(): string | null {
+    if (!this.sedeLock || this.sedeLock.isHolder()) return null;
+    const { sedeNome } = this.sedeLock.getInfo();
+    return `Este computador não é a sede${sedeNome ? ` (a sede é "${sedeNome}")` : ''}. As cobranças saem só pela sede.`;
   }
 
   preview = async (_req: Request, res: Response): Promise<void> => {
@@ -47,6 +58,12 @@ export class CobrancaController {
 
   disparar = async (_req: Request, res: Response): Promise<void> => {
     try {
+      const notSede = this.notSedeMessage();
+      if (notSede) {
+        res.status(409).json({ error: notSede });
+        return;
+      }
+
       const status = await this.whatsAppGateway.checkInstanceStatus();
       if (status.available === false) {
         res.status(409).json({
@@ -85,9 +102,15 @@ export class CobrancaController {
     try {
       const status = await this.whatsAppGateway.checkInstanceStatus();
 
+      // Sistema instalado, mas outra máquina é a sede: vê o estado dela, como o painel online
+      if (status.available !== false && this.sedeLock && !this.sedeLock.isHolder()) {
+        res.status(200).json({ ...(await this.getRemoteSedeStatus()), trava: this.sedeLock.getInfo() });
+        return;
+      }
+
       // Na própria sede o estado local é a verdade
       if (status.available !== false) {
-        res.status(200).json(status);
+        res.status(200).json(this.sedeLock ? { ...status, trava: this.sedeLock.getInfo() } : status);
         return;
       }
 
@@ -124,8 +147,34 @@ export class CobrancaController {
     }
   }
 
+  /** "Usar este computador como sede": decisão de uma pessoa, no painel desta máquina. */
+  assumirSede = async (_req: Request, res: Response): Promise<void> => {
+    if (!this.sedeLock) {
+      res.status(409).json({ error: 'Só o sistema instalado em um computador pode ser a sede.' });
+      return;
+    }
+
+    try {
+      if (!(await this.sedeLock.takeOver())) {
+        res.status(409).json({ error: 'Não foi possível tornar este computador a sede. Tente de novo.' });
+        return;
+      }
+      res.status(200).json({ trava: this.sedeLock.getInfo() });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao assumir a sede';
+      res.status(500).json({ error: msg });
+    }
+  };
+
   getWhatsAppQrCode = async (_req: Request, res: Response): Promise<void> => {
     try {
+      // Pedir o QR Code abre a conexão do WhatsApp: só a sede pode fazer isso
+      const notSede = this.notSedeMessage();
+      if (notSede) {
+        res.status(409).json({ error: notSede });
+        return;
+      }
+
       const qrData = await this.whatsAppGateway.getQrCode();
       res.status(200).json(qrData);
     } catch (err: unknown) {

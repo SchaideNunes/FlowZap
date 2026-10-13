@@ -94,6 +94,9 @@ CREATE TABLE IF NOT EXISTS sede_status (
     ultimo_backup_em TIMESTAMPTZ
 );
 ALTER TABLE sede_status ADD COLUMN IF NOT EXISTS ultimo_backup_em TIMESTAMPTZ;
+-- Trava de sede única: qual instalação envia as cobranças
+ALTER TABLE sede_status ADD COLUMN IF NOT EXISTS sede_id TEXT;
+ALTER TABLE sede_status ADD COLUMN IF NOT EXISTS sede_nome TEXT;
 
 -- 6. Índices para Otimização de Consultas e do Cron Diário
 CREATE INDEX IF NOT EXISTS idx_clientes_ativo ON clientes(ativo);

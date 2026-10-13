@@ -52757,12 +52757,14 @@ var SchedulerService = class {
   cronExpression;
   sedeStatusRepo;
   configService;
+  lock;
   task = null;
-  constructor(reminderService, cronExpression = "0 9 * * *", sedeStatusRepo, configService) {
+  constructor(reminderService, cronExpression = "0 9 * * *", sedeStatusRepo, configService, lock) {
     this.reminderService = reminderService;
     this.cronExpression = cronExpression;
     this.sedeStatusRepo = sedeStatusRepo;
     this.configService = configService;
+    this.lock = lock;
   }
   start() {
     if (this.task) {
@@ -52791,6 +52793,7 @@ var SchedulerService = class {
    * Reenvios são evitados pela verificação de duplicidade do histórico de mensagens.
    */
   async runCatchUpIfNeeded(now = /* @__PURE__ */ new Date()) {
+    if (!this.isSede()) return false;
     const scheduled = parseDailyTime(this.cronExpression);
     if (!scheduled) return false;
     const minutesNow = now.getHours() * 60 + now.getMinutes();
@@ -52811,12 +52814,19 @@ var SchedulerService = class {
    * está desligado no painel; o disparo manual não passa por aqui.
    */
   async runScheduledRoutine() {
+    if (!this.isSede()) return false;
     if (!await this.isAutomaticSendingEnabled()) {
       console.log("[Scheduler] Envio autom\xE1tico desligado no painel: nenhum aviso enviado.");
       return false;
     }
     await this.runRoutine();
     return true;
+  }
+  /** Com outra máquina como sede, esta não envia nem marca a rotina do dia como feita. */
+  isSede() {
+    if (!this.lock || this.lock.isHolder()) return true;
+    console.log("[Scheduler] Outra m\xE1quina \xE9 a sede: este computador n\xE3o envia cobran\xE7as.");
+    return false;
   }
   async isAutomaticSendingEnabled() {
     if (!this.configService) return true;
@@ -52838,6 +52848,87 @@ var SchedulerService = class {
       return (await this.sedeStatusRepo?.getStatus())?.ultima_rotina_data ?? null;
     } catch {
       return null;
+    }
+  }
+};
+
+// src/services/sede-lock.service.ts
+var SedeLockService = class {
+  repo;
+  id;
+  nome;
+  onChange;
+  log;
+  state = "unknown";
+  atual = { nome: null, vistaEm: null };
+  constructor(repo, options) {
+    this.repo = repo;
+    this.id = options.id;
+    this.nome = options.nome;
+    this.onChange = options.onChange;
+    this.log = options.log ?? ((message) => console.warn(`[Sede] ${message}`));
+  }
+  /** Define quem é avisado quando esta máquina ganha ou perde a trava. */
+  setOnChange(onChange) {
+    this.onChange = onChange;
+  }
+  /** Esta máquina pode enviar cobranças agora? Antes da primeira conferência, não. */
+  isHolder() {
+    return this.state === "holder" || this.state === "unavailable";
+  }
+  /** Primeira conferência, ao iniciar o sistema. */
+  acquire() {
+    return this.claim(false);
+  }
+  /** Conferência periódica: renova a trava ou percebe que outra máquina a tomou. */
+  refresh() {
+    return this.claim(false);
+  }
+  /** Decisão de uma pessoa, no painel desta máquina: ela passa a ser a sede. */
+  takeOver() {
+    return this.claim(true);
+  }
+  getInfo() {
+    const souSede = this.isHolder();
+    return {
+      disponivel: this.state !== "unavailable",
+      souSede,
+      ...souSede ? {} : { sedeNome: this.atual.nome, sedeVistaEm: this.atual.vistaEm }
+    };
+  }
+  async claim(force) {
+    const before = this.isHolder();
+    try {
+      const won = await this.repo.claimSede(this.id, this.nome, force);
+      if (won) {
+        this.state = "holder";
+      } else {
+        this.state = "observer";
+        await this.readCurrentHolder();
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/does not exist|schema cache|column/i.test(message)) {
+        if (this.state !== "unavailable") {
+          this.log(
+            "A trava de sede \xFAnica n\xE3o est\xE1 ativa: execute database/migration_trava_sede.sql no Supabase. At\xE9 l\xE1, n\xE3o inicie o sistema em duas m\xE1quinas com o mesmo banco."
+          );
+        }
+        this.state = "unavailable";
+      } else if (this.state === "unknown") {
+        this.state = "observer";
+      }
+    }
+    const after = this.isHolder();
+    if (after !== before) this.onChange?.(after);
+    return after;
+  }
+  async readCurrentHolder() {
+    try {
+      const record = await this.repo.getStatus();
+      this.atual = { nome: record?.sede_nome ?? null, vistaEm: record?.atualizado_em ?? null };
+    } catch {
+      this.atual = { nome: null, vistaEm: null };
     }
   }
 };
@@ -57266,11 +57357,19 @@ var CobrancaController = class {
   whatsAppGateway;
   queueService;
   sedeStatusRepo;
-  constructor(reminderService, whatsAppGateway, queueService, sedeStatusRepo) {
+  sedeLock;
+  constructor(reminderService, whatsAppGateway, queueService, sedeStatusRepo, sedeLock) {
     this.reminderService = reminderService;
     this.whatsAppGateway = whatsAppGateway;
     this.queueService = queueService;
     this.sedeStatusRepo = sedeStatusRepo;
+    this.sedeLock = sedeLock;
+  }
+  /** Mensagem para quando esta máquina não é a sede (null quando ela pode enviar). */
+  notSedeMessage() {
+    if (!this.sedeLock || this.sedeLock.isHolder()) return null;
+    const { sedeNome } = this.sedeLock.getInfo();
+    return `Este computador n\xE3o \xE9 a sede${sedeNome ? ` (a sede \xE9 "${sedeNome}")` : ""}. As cobran\xE7as saem s\xF3 pela sede.`;
   }
   preview = async (_req, res) => {
     try {
@@ -57292,6 +57391,11 @@ var CobrancaController = class {
   };
   disparar = async (_req, res) => {
     try {
+      const notSede = this.notSedeMessage();
+      if (notSede) {
+        res.status(409).json({ error: notSede });
+        return;
+      }
       const status = await this.whatsAppGateway.checkInstanceStatus();
       if (status.available === false) {
         res.status(409).json({
@@ -57326,8 +57430,12 @@ var CobrancaController = class {
   getWhatsAppStatus = async (_req, res) => {
     try {
       const status = await this.whatsAppGateway.checkInstanceStatus();
+      if (status.available !== false && this.sedeLock && !this.sedeLock.isHolder()) {
+        res.status(200).json({ ...await this.getRemoteSedeStatus(), trava: this.sedeLock.getInfo() });
+        return;
+      }
       if (status.available !== false) {
-        res.status(200).json(status);
+        res.status(200).json(this.sedeLock ? { ...status, trava: this.sedeLock.getInfo() } : status);
         return;
       }
       res.status(200).json(await this.getRemoteSedeStatus());
@@ -57353,8 +57461,30 @@ var CobrancaController = class {
       return { state: "close", available: false, sede: null };
     }
   }
+  /** "Usar este computador como sede": decisão de uma pessoa, no painel desta máquina. */
+  assumirSede = async (_req, res) => {
+    if (!this.sedeLock) {
+      res.status(409).json({ error: "S\xF3 o sistema instalado em um computador pode ser a sede." });
+      return;
+    }
+    try {
+      if (!await this.sedeLock.takeOver()) {
+        res.status(409).json({ error: "N\xE3o foi poss\xEDvel tornar este computador a sede. Tente de novo." });
+        return;
+      }
+      res.status(200).json({ trava: this.sedeLock.getInfo() });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao assumir a sede";
+      res.status(500).json({ error: msg });
+    }
+  };
   getWhatsAppQrCode = async (_req, res) => {
     try {
+      const notSede = this.notSedeMessage();
+      if (notSede) {
+        res.status(409).json({ error: notSede });
+        return;
+      }
       const qrData = await this.whatsAppGateway.getQrCode();
       res.status(200).json(qrData);
     } catch (err) {
@@ -57497,6 +57627,7 @@ var SupabaseContaPagarRepository = class {
 // src/repositories/supabase-sede-status.repository.ts
 var TABLE = "sede_status";
 var ROW_ID = 1;
+var UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 var SupabaseSedeStatusRepository = class {
   client;
   constructor(client) {
@@ -57520,6 +57651,18 @@ var SupabaseSedeStatusRepository = class {
     if (error) {
       throw new Error(`Erro ao registrar a rotina di\xE1ria: ${error.message}`);
     }
+  }
+  async claimSede(sedeId, nome, force) {
+    if (!UUID.test(sedeId)) {
+      throw new Error("Identificador de sede inv\xE1lido.");
+    }
+    await this.client.from(TABLE).upsert({ id: ROW_ID }, { onConflict: "id", ignoreDuplicates: true });
+    const update = this.client.from(TABLE).update({ sede_id: sedeId, sede_nome: nome }).eq("id", ROW_ID);
+    const { data, error } = await (force ? update : update.or(`sede_id.is.null,sede_id.eq.${sedeId}`)).select("id");
+    if (error) {
+      throw new Error(`Erro ao conferir a trava da sede: ${error.message}`);
+    }
+    return Array.isArray(data) && data.length > 0;
   }
   async markBackup(at) {
     const { error } = await this.client.from(TABLE).upsert({ id: ROW_ID, ultimo_backup_em: at.toISOString() }, { onConflict: "id" });
@@ -58288,6 +58431,7 @@ function createCobrancaRouter(cobrancaController, authService) {
   router.get("/preview", cobrancaController.preview);
   router.get("/central", cobrancaController.getCentral);
   router.post("/disparar", cobrancaController.disparar);
+  router.post("/assumir-sede", cobrancaController.assumirSede);
   router.get("/queue-status", cobrancaController.getQueueStatus);
   router.get("/whatsapp-status", cobrancaController.getWhatsAppStatus);
   router.get("/whatsapp-qrcode", cobrancaController.getWhatsAppQrCode);
@@ -58343,8 +58487,9 @@ function createApp(options = {}) {
     queueService,
     configService
   );
+  const sedeLock = options.sedeIdentity ? new SedeLockService(sedeStatusRepo, options.sedeIdentity) : void 0;
   const cronExpression = process.env.CRON_SCHEDULE || "0 9 * * *";
-  const scheduler2 = new SchedulerService(reminderService, cronExpression, sedeStatusRepo, configService);
+  const scheduler2 = new SchedulerService(reminderService, cronExpression, sedeStatusRepo, configService, sedeLock);
   const authController = new AuthController(authService);
   const clienteController = new ClienteController(clienteRepo);
   const vendaController = new VendaController(vendaRepo, historicoRepo, billingService);
@@ -58352,7 +58497,8 @@ function createApp(options = {}) {
     reminderService,
     whatsAppGateway,
     queueService,
-    sedeStatusRepo
+    sedeStatusRepo,
+    sedeLock
   );
   const contaPagarController = new ContaPagarController(contaPagarRepo);
   const configuracaoController = new ConfiguracaoController(configService);
@@ -58377,7 +58523,7 @@ function createApp(options = {}) {
     console.error("[Global Error]", err);
     res.status(500).json({ error: "Erro interno no servidor" });
   });
-  return { app: app2, scheduler: scheduler2, sedeStatusRepo, backupService };
+  return { app: app2, scheduler: scheduler2, sedeStatusRepo, backupService, sedeLock };
 }
 var { app, scheduler } = createApp();
 var app_default = app;

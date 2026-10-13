@@ -13,6 +13,7 @@ import { UnavailableWhatsAppGateway } from './services/unavailable-gateway.js';
 import { MessageQueueService } from './services/message-queue.service.js';
 import { ReminderService } from './services/reminder.service.js';
 import { SchedulerService } from './services/scheduler.service.js';
+import { SedeLockService } from './services/sede-lock.service.js';
 import { AuthController } from './controllers/auth.controller.js';
 import { ClienteController } from './controllers/cliente.controller.js';
 import { VendaController } from './controllers/venda.controller.js';
@@ -43,6 +44,8 @@ export interface CreateAppOptions {
   whatsAppGateway?: IWhatsAppGateway;
   /** Pasta dos backups diários. Só a máquina-sede informa; na nuvem não há disco permanente. */
   backupDir?: string;
+  /** Identidade desta instalação. Com ela, a trava de sede única fica ativa (só na máquina-sede). */
+  sedeIdentity?: { id: string; nome: string };
 }
 
 export function createApp(options: CreateAppOptions = {}): {
@@ -50,6 +53,7 @@ export function createApp(options: CreateAppOptions = {}): {
   scheduler: SchedulerService;
   sedeStatusRepo: ISedeStatusRepository;
   backupService: BackupService;
+  sedeLock?: SedeLockService;
 } {
   const app = express();
 
@@ -110,8 +114,11 @@ export function createApp(options: CreateAppOptions = {}): {
     configService
   );
 
+  // Só uma máquina envia cobranças: as demais que subirem com o mesmo banco ficam como painel
+  const sedeLock = options.sedeIdentity ? new SedeLockService(sedeStatusRepo, options.sedeIdentity) : undefined;
+
   const cronExpression = process.env.CRON_SCHEDULE || '0 9 * * *';
-  const scheduler = new SchedulerService(reminderService, cronExpression, sedeStatusRepo, configService);
+  const scheduler = new SchedulerService(reminderService, cronExpression, sedeStatusRepo, configService, sedeLock);
 
   // Controladores
   const authController = new AuthController(authService);
@@ -121,7 +128,8 @@ export function createApp(options: CreateAppOptions = {}): {
     reminderService,
     whatsAppGateway,
     queueService,
-    sedeStatusRepo
+    sedeStatusRepo,
+    sedeLock
   );
   const contaPagarController = new ContaPagarController(contaPagarRepo);
   const configuracaoController = new ConfiguracaoController(configService);
@@ -152,7 +160,7 @@ export function createApp(options: CreateAppOptions = {}): {
     res.status(500).json({ error: 'Erro interno no servidor' });
   });
 
-  return { app, scheduler, sedeStatusRepo, backupService };
+  return { app, scheduler, sedeStatusRepo, backupService, sedeLock };
 }
 
 export const { app, scheduler } = createApp();

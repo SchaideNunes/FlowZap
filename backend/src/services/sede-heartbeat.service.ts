@@ -1,9 +1,12 @@
 import { ISedeStatusRepository } from '../repositories/sede-status.repository.interface.js';
 import { IWhatsAppGateway } from './whatsapp-gateway.interface.js';
+import { SedeLockService } from './sede-lock.service.js';
 
 export interface SedeHeartbeatConfig {
   intervalMs?: number;
   log?: (message: string) => void;
+  /** Trava de sede única: só quem a detém grava o sinal de vida. */
+  lock?: SedeLockService;
 }
 
 /**
@@ -15,6 +18,7 @@ export class SedeHeartbeatService {
   private gateway: IWhatsAppGateway;
   private intervalMs: number;
   private log: (message: string) => void;
+  private lock?: SedeLockService;
   private timer: ReturnType<typeof setInterval> | null = null;
   private failing = false;
 
@@ -23,6 +27,7 @@ export class SedeHeartbeatService {
     this.gateway = gateway;
     this.intervalMs = config.intervalMs ?? 60000;
     this.log = config.log ?? ((message) => console.warn(`[Sede] ${message}`));
+    this.lock = config.lock;
   }
 
   start(): void {
@@ -40,6 +45,9 @@ export class SedeHeartbeatService {
 
   private async beat(): Promise<void> {
     try {
+      // Renova a trava a cada batida; quem não é a sede não escreve por cima do estado dela
+      if (this.lock && !(await this.lock.refresh())) return;
+
       const { state } = await this.gateway.checkInstanceStatus();
       await this.repo.saveHeartbeat(state, new Date());
       this.failing = false;

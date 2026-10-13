@@ -155,12 +155,23 @@ export interface SedeInfo {
   lastSeen: string | null;
 }
 
+/** Trava de sede única: só uma máquina com o sistema instalado envia cobranças. */
+export interface SedeLockInfo {
+  /** false quando o banco ainda não tem a trava (migração pendente). */
+  disponivel: boolean;
+  souSede: boolean;
+  sedeNome?: string | null;
+  sedeVistaEm?: string | null;
+}
+
 export interface WhatsAppStatus {
   state: 'open' | 'connecting' | 'close' | 'refused' | 'unknown';
   /** false quando este painel não roda na máquina-sede e, portanto, não envia mensagens. */
   available?: boolean;
   /** Estado da máquina-sede informado pelo Supabase (só no painel online). */
   sede?: SedeInfo | null;
+  /** Presente só no sistema instalado em um computador (não no painel online). */
+  trava?: SedeLockInfo;
 }
 
 export interface OverdueReminderItem {

@@ -8,6 +8,10 @@ export interface SedeStatusRecord {
   ultima_rotina_data: string | null;
   /** Último backup automático gravado pela máquina-sede (ISO). */
   ultimo_backup_em?: string | null;
+  /** Instalação que detém a trava de sede única (quem envia as cobranças). */
+  sede_id?: string | null;
+  /** Nome do computador que é a sede. */
+  sede_nome?: string | null;
 }
 
 /**
@@ -19,4 +23,9 @@ export interface ISedeStatusRepository {
   saveHeartbeat(state: WhatsAppConnectionState, at: Date): Promise<void>;
   markRoutineRun(date: string): Promise<void>;
   markBackup(at: Date): Promise<void>;
+  /**
+   * Tenta tornar esta instalação a sede. Sem `force`, só consegue se a trava estiver livre
+   * ou já for dela; com `force`, toma a trava de quem estiver. Devolve se conseguiu.
+   */
+  claimSede(sedeId: string, nome: string, force: boolean): Promise<boolean>;
 }

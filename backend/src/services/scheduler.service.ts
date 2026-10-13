@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { ReminderService } from './reminder.service.js';
 import { ISedeStatusRepository } from '../repositories/sede-status.repository.interface.js';
 import { ConfiguracaoService } from './configuracao.service.js';
+import { SedeLockService } from './sede-lock.service.js';
 import { parseDailyTime } from '../utils/cron-time.js';
 import { formatDateToISO } from '../utils/date-calculator.js';
 
@@ -10,18 +11,21 @@ export class SchedulerService {
   private cronExpression: string;
   private sedeStatusRepo?: ISedeStatusRepository;
   private configService?: ConfiguracaoService;
+  private lock?: SedeLockService;
   private task: cron.ScheduledTask | null = null;
 
   constructor(
     reminderService: ReminderService,
     cronExpression: string = '0 9 * * *',
     sedeStatusRepo?: ISedeStatusRepository,
-    configService?: ConfiguracaoService
+    configService?: ConfiguracaoService,
+    lock?: SedeLockService
   ) {
     this.reminderService = reminderService;
     this.cronExpression = cronExpression;
     this.sedeStatusRepo = sedeStatusRepo;
     this.configService = configService;
+    this.lock = lock;
   }
 
   start(): void {
@@ -55,6 +59,8 @@ export class SchedulerService {
    * Reenvios são evitados pela verificação de duplicidade do histórico de mensagens.
    */
   async runCatchUpIfNeeded(now: Date = new Date()): Promise<boolean> {
+    if (!this.isSede()) return false;
+
     const scheduled = parseDailyTime(this.cronExpression);
     if (!scheduled) return false;
 
@@ -80,6 +86,8 @@ export class SchedulerService {
    * está desligado no painel; o disparo manual não passa por aqui.
    */
   async runScheduledRoutine(): Promise<boolean> {
+    if (!this.isSede()) return false;
+
     if (!(await this.isAutomaticSendingEnabled())) {
       console.log('[Scheduler] Envio automático desligado no painel: nenhum aviso enviado.');
       return false;
@@ -87,6 +95,13 @@ export class SchedulerService {
 
     await this.runRoutine();
     return true;
+  }
+
+  /** Com outra máquina como sede, esta não envia nem marca a rotina do dia como feita. */
+  private isSede(): boolean {
+    if (!this.lock || this.lock.isHolder()) return true;
+    console.log('[Scheduler] Outra máquina é a sede: este computador não envia cobranças.');
+    return false;
   }
 
   private async isAutomaticSendingEnabled(): Promise<boolean> {
