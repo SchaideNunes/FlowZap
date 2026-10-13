@@ -50,7 +50,7 @@ export class SupabaseHistoricoRepository implements IHistoricoRepository {
   async findRecentEnviados(limit: number = 50): Promise<HistoricoWithVendaCliente[]> {
     const { data, error } = await this.client
       .from('historico_mensagens')
-      .select('id, venda_id, tipo, data_envio, status_envio, mensagem, venda:vendas(id, descricao, valor, valor_total, parcela_atual, total_parcelas, status_mes_atual, data_vencimento_atual, cliente:clientes(id, nome, whatsapp))')
+      .select('id, venda_id, tipo, data_envio, status_envio, mensagem, venda:vendas(*, cliente:clientes(id, nome, whatsapp))')
       .eq('status_envio', 'enviado')
       .order('data_envio', { ascending: false })
       .limit(limit);
@@ -65,7 +65,7 @@ export class SupabaseHistoricoRepository implements IHistoricoRepository {
   async findPagamentos(limit: number = 100): Promise<HistoricoWithVendaCliente[]> {
     const { data, error } = await this.client
       .from('historico_mensagens')
-      .select('id, venda_id, tipo, data_envio, status_envio, mensagem, detalhes, venda:vendas(id, descricao, valor, valor_total, parcela_atual, total_parcelas, status_mes_atual, data_vencimento_atual, cliente:clientes(id, nome, whatsapp))')
+      .select('id, venda_id, tipo, data_envio, status_envio, mensagem, detalhes, venda:vendas(*, cliente:clientes(id, nome, whatsapp))')
       .eq('tipo', 'confirmacao_manual')
       .order('data_envio', { ascending: false })
       .limit(limit);
@@ -75,6 +75,39 @@ export class SupabaseHistoricoRepository implements IHistoricoRepository {
     }
 
     return (data || []) as unknown as HistoricoWithVendaCliente[];
+  }
+
+  async findPagamentosBetween(start: string, end: string): Promise<HistoricoWithVendaCliente[]> {
+    const { data, error } = await this.client
+      .from('historico_mensagens')
+      .select('id, venda_id, tipo, data_envio, status_envio, detalhes, venda:vendas(*, cliente:clientes(id, nome, whatsapp))')
+      .eq('tipo', 'confirmacao_manual')
+      .gte('data_envio', start)
+      .lt('data_envio', end)
+      .order('data_envio', { ascending: false })
+      .limit(5000);
+
+    if (error) {
+      throw new Error(`Erro ao buscar pagamentos do período: ${error.message}`);
+    }
+
+    return (data || []) as unknown as HistoricoWithVendaCliente[];
+  }
+
+  async countAvisosBetween(start: string, end: string): Promise<number> {
+    const { count, error } = await this.client
+      .from('historico_mensagens')
+      .select('id', { count: 'exact', head: true })
+      .eq('status_envio', 'enviado')
+      .neq('tipo', 'confirmacao_manual')
+      .gte('data_envio', start)
+      .lt('data_envio', end);
+
+    if (error) {
+      throw new Error(`Erro ao contar avisos do período: ${error.message}`);
+    }
+
+    return count ?? 0;
   }
 
   async create(entry: HistoricoMensagem): Promise<HistoricoMensagem> {

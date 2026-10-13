@@ -98,7 +98,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </button>
             <button className="btn btn-primary btn-sm" onClick={onOpenNovaVendaModal}>
               <Plus size={15} />
-              Nova cobrança
+              Nova venda
             </button>
           </>
         }

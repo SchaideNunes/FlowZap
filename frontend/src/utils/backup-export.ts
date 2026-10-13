@@ -55,7 +55,8 @@ export async function downloadBackupPdf(snapshot: BackupSnapshot): Promise<void>
   >;
   const clientePorId = new Map<number, Row>(clientes.map((c) => [c.id, c]));
   const vendaPorId = new Map<number, Row>(vendas.map((v) => [v.id, v]));
-  const nomeCliente = (id: number) => clientePorId.get(id)?.nome || `Cliente #${id}`;
+  const nomeCliente = (id: number | null, avulso?: string | null) =>
+    (id !== null && clientePorId.get(id)?.nome) || (avulso ? `${avulso} (sem cadastro)` : `Cliente #${id}`);
   const pagamentos = historico_mensagens
     .filter((h) => h.tipo === 'confirmacao_manual')
     .sort((a, b) => String(b.data_envio).localeCompare(String(a.data_envio)));
@@ -113,11 +114,13 @@ export async function downloadBackupPdf(snapshot: BackupSnapshot): Promise<void>
     'Vendas',
     ['Cliente', 'Venda', 'Valor', 'Parcela', 'Total', 'Próx. vencimento', 'Status', 'Cobrança'],
     [...vendas]
-      .sort((a, b) => nomeCliente(a.cliente_id).localeCompare(nomeCliente(b.cliente_id)))
+      .sort((a, b) =>
+        nomeCliente(a.cliente_id, a.cliente_avulso).localeCompare(nomeCliente(b.cliente_id, b.cliente_avulso))
+      )
       .map((v) => {
         const parcelado = Number(v.total_parcelas) > 1;
         return [
-          nomeCliente(v.cliente_id),
+          nomeCliente(v.cliente_id, v.cliente_avulso),
           v.descricao || '',
           formatBRL(v.valor),
           parcelado ? `${v.parcela_atual || 1}/${v.total_parcelas}` : 'À vista',
@@ -138,7 +141,7 @@ export async function downloadBackupPdf(snapshot: BackupSnapshot): Promise<void>
       const d = p.detalhes || {};
       return [
         dateTimeBR(p.data_envio),
-        venda ? nomeCliente(venda.cliente_id) : '-',
+        venda ? nomeCliente(venda.cliente_id, venda.cliente_avulso) : '-',
         venda?.descricao || `Venda #${p.venda_id}`,
         d.parcela && d.total_parcelas ? `${d.parcela}/${d.total_parcelas}` : '-',
         formatBRL(typeof d.valor === 'number' ? d.valor : venda?.valor),

@@ -15614,7 +15614,7 @@ var require_get_intrinsic = __commonJS({
     var max = require_max();
     var min = require_min();
     var pow = require_pow();
-    var round = require_round();
+    var round2 = require_round();
     var sign = require_sign();
     var $Function = Function;
     var getEvalledConstructor = function(expressionSyntax) {
@@ -15728,7 +15728,7 @@ var require_get_intrinsic = __commonJS({
       "%Math.max%": max,
       "%Math.min%": min,
       "%Math.pow%": pow,
-      "%Math.round%": round,
+      "%Math.round%": round2,
       "%Math.sign%": sign,
       "%Reflect.getPrototypeOf%": $ReflectGPO
     };
@@ -20714,7 +20714,7 @@ var require_application = __commonJS({
   "node_modules/express/lib/application.js"(exports2, module2) {
     "use strict";
     var finalhandler = require_finalhandler();
-    var Router8 = require_router();
+    var Router9 = require_router();
     var methods = require_methods();
     var middleware = require_init();
     var query = require_query();
@@ -20779,7 +20779,7 @@ var require_application = __commonJS({
     };
     app2.lazyrouter = function lazyrouter() {
       if (!this._router) {
-        this._router = new Router8({
+        this._router = new Router9({
           caseSensitive: this.enabled("case sensitive routing"),
           strict: this.enabled("strict routing")
         });
@@ -22643,7 +22643,7 @@ var require_express = __commonJS({
     var mixin = require_merge_descriptors();
     var proto = require_application();
     var Route = require_route();
-    var Router8 = require_router();
+    var Router9 = require_router();
     var req = require_request();
     var res = require_response();
     exports2 = module2.exports = createApplication;
@@ -22666,7 +22666,7 @@ var require_express = __commonJS({
     exports2.request = req;
     exports2.response = res;
     exports2.Route = Route;
-    exports2.Router = Router8;
+    exports2.Router = Router9;
     exports2.json = bodyParser.json;
     exports2.query = require_query();
     exports2.raw = bodyParser.raw;
@@ -43459,7 +43459,7 @@ __export(app_exports, {
   scheduler: () => scheduler
 });
 module.exports = __toCommonJS(app_exports);
-var import_express8 = __toESM(require_express2());
+var import_express9 = __toESM(require_express2());
 var import_cors = __toESM(require_lib3());
 
 // node_modules/@supabase/supabase-js/dist/index.mjs
@@ -51738,7 +51738,8 @@ var SupabaseClienteRepository = class {
         whatsapp: row.whatsapp,
         ativo: row.ativo,
         observacoes: row.observacoes,
-        vendas_ativas_count: activeSales
+        vendas_ativas_count: activeSales,
+        criado_em: row.criado_em ?? null
       };
     });
   }
@@ -51812,7 +51813,7 @@ var SupabaseVendaRepository = class {
   }
   async create(data) {
     const payload = {
-      cliente_id: data.cliente_id,
+      cliente_id: data.cliente_id ?? null,
       descricao: data.descricao,
       valor: data.valor,
       dia_vencimento: data.dia_vencimento,
@@ -51820,6 +51821,7 @@ var SupabaseVendaRepository = class {
       data_vencimento_atual: data.data_vencimento_atual,
       ativo: data.ativo ?? true
     };
+    if (data.cliente_avulso) payload.cliente_avulso = data.cliente_avulso;
     if (data.valor_total !== void 0) payload.valor_total = data.valor_total;
     if (data.taxa_juros !== void 0) payload.taxa_juros = data.taxa_juros;
     if (data.total_parcelas !== void 0) payload.total_parcelas = data.total_parcelas;
@@ -51929,18 +51931,32 @@ var SupabaseHistoricoRepository = class {
     return data || [];
   }
   async findRecentEnviados(limit = 50) {
-    const { data, error } = await this.client.from("historico_mensagens").select("id, venda_id, tipo, data_envio, status_envio, mensagem, venda:vendas(id, descricao, valor, valor_total, parcela_atual, total_parcelas, status_mes_atual, data_vencimento_atual, cliente:clientes(id, nome, whatsapp))").eq("status_envio", "enviado").order("data_envio", { ascending: false }).limit(limit);
+    const { data, error } = await this.client.from("historico_mensagens").select("id, venda_id, tipo, data_envio, status_envio, mensagem, venda:vendas(*, cliente:clientes(id, nome, whatsapp))").eq("status_envio", "enviado").order("data_envio", { ascending: false }).limit(limit);
     if (error) {
       throw new Error(`Erro ao buscar mensagens enviadas recentemente: ${error.message}`);
     }
     return data || [];
   }
   async findPagamentos(limit = 100) {
-    const { data, error } = await this.client.from("historico_mensagens").select("id, venda_id, tipo, data_envio, status_envio, mensagem, detalhes, venda:vendas(id, descricao, valor, valor_total, parcela_atual, total_parcelas, status_mes_atual, data_vencimento_atual, cliente:clientes(id, nome, whatsapp))").eq("tipo", "confirmacao_manual").order("data_envio", { ascending: false }).limit(limit);
+    const { data, error } = await this.client.from("historico_mensagens").select("id, venda_id, tipo, data_envio, status_envio, mensagem, detalhes, venda:vendas(*, cliente:clientes(id, nome, whatsapp))").eq("tipo", "confirmacao_manual").order("data_envio", { ascending: false }).limit(limit);
     if (error) {
       throw new Error(`Erro ao buscar pagamentos recebidos: ${error.message}`);
     }
     return data || [];
+  }
+  async findPagamentosBetween(start, end) {
+    const { data, error } = await this.client.from("historico_mensagens").select("id, venda_id, tipo, data_envio, status_envio, detalhes, venda:vendas(*, cliente:clientes(id, nome, whatsapp))").eq("tipo", "confirmacao_manual").gte("data_envio", start).lt("data_envio", end).order("data_envio", { ascending: false }).limit(5e3);
+    if (error) {
+      throw new Error(`Erro ao buscar pagamentos do per\xEDodo: ${error.message}`);
+    }
+    return data || [];
+  }
+  async countAvisosBetween(start, end) {
+    const { count, error } = await this.client.from("historico_mensagens").select("id", { count: "exact", head: true }).eq("status_envio", "enviado").neq("tipo", "confirmacao_manual").gte("data_envio", start).lt("data_envio", end);
+    if (error) {
+      throw new Error(`Erro ao contar avisos do per\xEDodo: ${error.message}`);
+    }
+    return count ?? 0;
   }
   async create(entry) {
     const { data, error } = await this.client.from("historico_mensagens").insert({
@@ -52039,10 +52055,10 @@ function parseISODate(dateStr) {
 }
 function calculateInitialDueDate(diaVencimento, referenceDate = /* @__PURE__ */ new Date()) {
   const currentYear = referenceDate.getFullYear();
-  const currentMonth = referenceDate.getMonth();
+  const currentMonth2 = referenceDate.getMonth();
   const currentDay = referenceDate.getDate();
   let targetYear = currentYear;
-  let targetMonth = currentMonth;
+  let targetMonth = currentMonth2;
   if (diaVencimento < currentDay) {
     targetMonth += 1;
     if (targetMonth > 11) {
@@ -52100,9 +52116,11 @@ var BillingService = class {
    * Cadastra uma nova venda, calculando o ciclo inicial de vencimento
    */
   async createVenda(data) {
-    const cliente = await this.clienteRepo.findById(data.cliente_id);
-    if (!cliente) {
-      throw new Error("Cliente n\xE3o encontrado");
+    if (data.cliente_id !== void 0) {
+      const cliente = await this.clienteRepo.findById(data.cliente_id);
+      if (!cliente) {
+        throw new Error("Cliente n\xE3o encontrado");
+      }
     }
     const dueDate = data.data_vencimento_atual || calculateInitialDueDate(data.dia_vencimento);
     return this.vendaRepo.create({
@@ -52189,7 +52207,7 @@ var BillingService = class {
         parcela: numberOrNull(detalhes.parcela),
         total_parcelas: numberOrNull(detalhes.total_parcelas),
         descricao: registro.venda?.descricao ?? null,
-        cliente_nome: registro.venda?.cliente?.nome ?? null,
+        cliente_nome: registro.venda?.cliente?.nome ?? registro.venda?.cliente_avulso ?? null,
         pode_desfazer: maisRecenteDaVenda && typeof detalhes.vencimento === "string"
       };
     });
@@ -57019,9 +57037,11 @@ var VendaStatusEnum = external_exports.enum([
   "vencido",
   "pago"
 ]);
+var ClienteAvulsoSchema = external_exports.string().trim().min(2, { message: "Informe o nome do cliente" }).max(120, { message: "O nome do cliente pode ter no m\xE1ximo 120 caracteres" });
 var VendaSchema = external_exports.object({
   id: external_exports.number().int().positive().optional(),
-  cliente_id: external_exports.number().int().positive({ message: "cliente_id inv\xE1lido" }),
+  cliente_id: external_exports.number().int().positive({ message: "cliente_id inv\xE1lido" }).nullable().optional(),
+  cliente_avulso: ClienteAvulsoSchema.nullable().optional(),
   descricao: external_exports.string().trim().min(1, { message: "Descri\xE7\xE3o \xE9 obrigat\xF3ria" }),
   valor: external_exports.number().positive({ message: "O valor deve ser maior que zero" }),
   dia_vencimento: external_exports.number().int().min(1, { message: "Dia do vencimento deve ser entre 1 e 31" }).max(31, { message: "Dia do vencimento deve ser entre 1 e 31" }),
@@ -57034,7 +57054,8 @@ var VendaSchema = external_exports.object({
   ativo: external_exports.boolean().default(true)
 });
 var CreateVendaSchema = external_exports.object({
-  cliente_id: external_exports.number().int().positive({ message: "cliente_id inv\xE1lido" }),
+  cliente_id: external_exports.number().int().positive({ message: "cliente_id inv\xE1lido" }).optional(),
+  cliente_avulso: ClienteAvulsoSchema.optional(),
   descricao: external_exports.string().trim().min(1, { message: "Descri\xE7\xE3o \xE9 obrigat\xF3ria" }),
   valor: external_exports.number().positive({ message: "O valor deve ser maior que zero" }),
   dia_vencimento: external_exports.number().int().min(1, { message: "Dia do vencimento deve ser entre 1 e 31" }).max(31, { message: "Dia do vencimento deve ser entre 1 e 31" }),
@@ -57044,8 +57065,14 @@ var CreateVendaSchema = external_exports.object({
   parcela_atual: external_exports.number().int().min(1).default(1).optional(),
   data_vencimento_atual: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   ativo: external_exports.boolean().default(true)
+}).refine((data) => data.cliente_id === void 0 !== (data.cliente_avulso === void 0), {
+  message: "Informe um cliente cadastrado ou o nome de um cliente sem cadastro",
+  path: ["cliente_id"]
 });
 var UpdateVendaSchema = external_exports.object({
+  // Vincular a um cliente cadastrado uma venda feita sem cadastro
+  cliente_id: external_exports.number().int().positive().optional(),
+  cliente_avulso: ClienteAvulsoSchema.nullable().optional(),
   descricao: external_exports.string().trim().min(1).optional(),
   valor: external_exports.number().positive().optional(),
   dia_vencimento: external_exports.number().int().min(1).max(31).optional(),
@@ -57925,6 +57952,166 @@ function createBackupRouter(controller, authService) {
   return router;
 }
 
+// src/services/monthly-summary.service.ts
+var BRAZIL_OFFSET_MS = 3 * 60 * 60 * 1e3;
+var HISTORY_MONTHS = 6;
+var toBrazil = (date) => new Date(date.getTime() - BRAZIL_OFFSET_MS);
+var monthOfInstant = (iso) => {
+  if (!iso) return null;
+  const date = new Date(iso);
+  return isNaN(date.getTime()) ? null : toBrazil(date).toISOString().slice(0, 7);
+};
+var monthOfDate = (date) => date ? date.slice(0, 7) : null;
+var addMonths = (mes, delta) => {
+  const [year, month] = mes.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1 + delta, 1)).toISOString().slice(0, 7);
+};
+var monthStart = (mes) => {
+  const [year, month] = mes.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, 1) + BRAZIL_OFFSET_MS).toISOString();
+};
+var round = (value) => Math.round(value * 100) / 100;
+var numberOrNull2 = (value) => typeof value === "number" && Number.isFinite(value) ? value : null;
+function currentMonth(now = /* @__PURE__ */ new Date()) {
+  return toBrazil(now).toISOString().slice(0, 7);
+}
+var MonthlySummaryService = class {
+  historicoRepo;
+  vendaRepo;
+  clienteRepo;
+  contaPagarRepo;
+  constructor(historicoRepo, vendaRepo, clienteRepo, contaPagarRepo) {
+    this.historicoRepo = historicoRepo;
+    this.vendaRepo = vendaRepo;
+    this.clienteRepo = clienteRepo;
+    this.contaPagarRepo = contaPagarRepo;
+  }
+  async getSummary(mes, now = /* @__PURE__ */ new Date()) {
+    const meses = Array.from({ length: HISTORY_MONTHS }, (_, i) => addMonths(mes, i - (HISTORY_MONTHS - 1)));
+    const fimDoMes = monthStart(addMonths(mes, 1));
+    const hoje = toBrazil(now).toISOString().slice(0, 10);
+    const [registros, avisosEnviados, vendas, clientes, contas] = await Promise.all([
+      this.historicoRepo.findPagamentosBetween(monthStart(meses[0]), fimDoMes),
+      this.historicoRepo.countAvisosBetween(monthStart(mes), fimDoMes),
+      this.vendaRepo.findAllVendas(),
+      this.clienteRepo.findAll(),
+      this.contaPagarRepo.findAll()
+    ]);
+    const pagamentos = registros.map((registro) => {
+      const detalhes = registro.detalhes || {};
+      return {
+        mes: monthOfInstant(registro.data_envio),
+        id: registro.id,
+        data_pagamento: registro.data_envio || "",
+        cliente_nome: registro.venda?.cliente?.nome ?? registro.venda?.cliente_avulso ?? null,
+        descricao: registro.venda?.descricao ?? null,
+        valor: numberOrNull2(detalhes.valor) ?? Number(registro.venda?.valor ?? 0),
+        parcela: numberOrNull2(detalhes.parcela),
+        total_parcelas: numberOrNull2(detalhes.total_parcelas)
+      };
+    });
+    const recebidoEm = (m) => round(pagamentos.filter((p) => p.mes === m).reduce((acc, p) => acc + p.valor, 0));
+    const pagoEm = (m) => round(
+      contas.filter((c) => c.pago && monthOfDate(c.data_pagamento) === m).reduce((acc, c) => acc + Number(c.valor || 0), 0)
+    );
+    const pagamentosDoMes = pagamentos.filter((p) => p.mes === mes).map(({ mes: _mes, ...resto }) => resto);
+    const emAberto = vendas.filter(
+      (v) => v.ativo && v.status_mes_atual !== "pago" && monthOfDate(v.data_vencimento_atual) === mes
+    );
+    const vencidas = emAberto.filter((v) => (v.data_vencimento_atual || "") < hoje);
+    const somaVendas = (lista) => round(lista.reduce((acc, v) => acc + Number(v.valor || 0), 0));
+    const criadoEm = (row) => row.criado_em;
+    const vendasNovas = vendas.filter((v) => monthOfInstant(criadoEm(v)) === mes).map((v) => {
+      const totalParcelas = Number(v.total_parcelas) || 1;
+      return {
+        id: v.id,
+        cliente_nome: v.cliente?.nome ?? v.cliente_avulso ?? null,
+        descricao: v.descricao ?? null,
+        valor: Number(v.valor),
+        valor_total: round(Number(v.valor_total) || Number(v.valor) * totalParcelas),
+        total_parcelas: totalParcelas,
+        criado_em: criadoEm(v) || ""
+      };
+    });
+    const contasPagas = contas.filter((c) => c.pago && monthOfDate(c.data_pagamento) === mes);
+    const contasEmAberto = contas.filter((c) => !c.pago && monthOfDate(c.data_vencimento) === mes);
+    const somaContas = (lista) => round(lista.reduce((acc, c) => acc + Number(c.valor || 0), 0));
+    const recebido = recebidoEm(mes);
+    const pago = pagoEm(mes);
+    return {
+      mes,
+      recebido: { total: recebido, quantidade: pagamentosDoMes.length },
+      a_receber: { total: somaVendas(emAberto), quantidade: emAberto.length },
+      vencido: { total: somaVendas(vencidas), quantidade: vencidas.length },
+      vendas_novas: {
+        quantidade: vendasNovas.length,
+        valor_total: round(vendasNovas.reduce((acc, v) => acc + v.valor_total, 0))
+      },
+      clientes_novos: clientes.filter((c) => monthOfInstant(criadoEm(c)) === mes).length,
+      contas_pagas: { total: pago, quantidade: contasPagas.length },
+      contas_em_aberto: { total: somaContas(contasEmAberto), quantidade: contasEmAberto.length },
+      saldo: round(recebido - pago),
+      avisos_enviados: avisosEnviados,
+      pagamentos: pagamentosDoMes,
+      vendas: vendasNovas,
+      contas: [...contasPagas, ...contasEmAberto].map((c) => ({
+        id: c.id,
+        nome_credor: c.nome_credor,
+        descricao: c.descricao ?? null,
+        valor: Number(c.valor),
+        data_vencimento: c.data_vencimento ?? null,
+        pago: Boolean(c.pago),
+        data_pagamento: c.data_pagamento ?? null
+      })),
+      historico: meses.map((m) => {
+        const r = recebidoEm(m);
+        const p = pagoEm(m);
+        return { mes: m, recebido: r, pago: p, saldo: round(r - p) };
+      })
+    };
+  }
+};
+
+// src/schemas/resumo.schema.ts
+var ResumoMensalQuerySchema = external_exports.object({
+  mes: external_exports.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, { message: "O m\xEAs deve estar no formato AAAA-MM" }).optional()
+});
+
+// src/controllers/resumo.controller.ts
+var ResumoController = class {
+  service;
+  constructor(service) {
+    this.service = service;
+  }
+  getMensal = async (req, res) => {
+    const parse2 = ResumoMensalQuerySchema.safeParse(req.query);
+    if (!parse2.success) {
+      res.status(400).json({
+        error: parse2.error.issues[0]?.message || "Erro de valida\xE7\xE3o",
+        detalhes: parse2.error.flatten().fieldErrors
+      });
+      return;
+    }
+    try {
+      const resumo = await this.service.getSummary(parse2.data.mes ?? currentMonth());
+      res.status(200).json(resumo);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao carregar o resumo do m\xEAs";
+      res.status(500).json({ error: msg });
+    }
+  };
+};
+
+// src/routes/resumo.routes.ts
+var import_express3 = __toESM(require_express2());
+function createResumoRouter(controller, authService) {
+  const router = (0, import_express3.Router)();
+  const authMiddleware = createAuthMiddleware(authService);
+  router.use(authMiddleware);
+  router.get("/mensal", controller.getMensal);
+  return router;
+}
+
 // src/schemas/conta-pagar.schema.ts
 var ContaPagarSchema = external_exports.object({
   id: external_exports.number().int().positive().optional(),
@@ -58031,9 +58218,9 @@ var ContaPagarController = class {
 };
 
 // src/routes/conta-pagar.routes.ts
-var import_express3 = __toESM(require_express2());
+var import_express4 = __toESM(require_express2());
 function createContaPagarRouter(controller, authService) {
-  const router = (0, import_express3.Router)();
+  const router = (0, import_express4.Router)();
   const authMiddleware = createAuthMiddleware(authService);
   router.use(authMiddleware);
   router.get("/", controller.list);
@@ -58045,9 +58232,9 @@ function createContaPagarRouter(controller, authService) {
 }
 
 // src/routes/auth.routes.ts
-var import_express4 = __toESM(require_express2());
+var import_express5 = __toESM(require_express2());
 function createAuthRouter(authService, authController) {
-  const router = (0, import_express4.Router)();
+  const router = (0, import_express5.Router)();
   const authMiddleware = createAuthMiddleware(authService);
   router.post("/login", authController.login);
   router.get("/me", authMiddleware, authController.me);
@@ -58055,9 +58242,9 @@ function createAuthRouter(authService, authController) {
 }
 
 // src/routes/cliente.routes.ts
-var import_express5 = __toESM(require_express2());
+var import_express6 = __toESM(require_express2());
 function createClienteRouter(clienteController, authService) {
-  const router = (0, import_express5.Router)();
+  const router = (0, import_express6.Router)();
   const authMiddleware = createAuthMiddleware(authService);
   router.use(authMiddleware);
   router.get("/", clienteController.list);
@@ -58069,9 +58256,9 @@ function createClienteRouter(clienteController, authService) {
 }
 
 // src/routes/venda.routes.ts
-var import_express6 = __toESM(require_express2());
+var import_express7 = __toESM(require_express2());
 function createVendaRouter(vendaController, authService) {
-  const router = (0, import_express6.Router)();
+  const router = (0, import_express7.Router)();
   const authMiddleware = createAuthMiddleware(authService);
   router.use(authMiddleware);
   router.get("/", vendaController.getAll);
@@ -58089,9 +58276,9 @@ function createVendaRouter(vendaController, authService) {
 }
 
 // src/routes/cobranca.routes.ts
-var import_express7 = __toESM(require_express2());
+var import_express8 = __toESM(require_express2());
 function createCobrancaRouter(cobrancaController, authService) {
-  const router = (0, import_express7.Router)();
+  const router = (0, import_express8.Router)();
   const authMiddleware = createAuthMiddleware(authService);
   router.use(authMiddleware);
   router.get("/preview", cobrancaController.preview);
@@ -58105,14 +58292,14 @@ function createCobrancaRouter(cobrancaController, authService) {
 
 // src/app.ts
 function createApp(options = {}) {
-  const app2 = (0, import_express8.default)();
+  const app2 = (0, import_express9.default)();
   app2.use(
     (0, import_cors.default)({
       origin: true,
       credentials: true
     })
   );
-  app2.use(import_express8.default.json());
+  app2.use(import_express9.default.json());
   const healthHandler = (_req, res) => {
     res.status(200).json({
       status: "ok",
@@ -58165,6 +58352,9 @@ function createApp(options = {}) {
   );
   const contaPagarController = new ContaPagarController(contaPagarRepo);
   const configuracaoController = new ConfiguracaoController(configService);
+  const resumoController = new ResumoController(
+    new MonthlySummaryService(historicoRepo, vendaRepo, clienteRepo, contaPagarRepo)
+  );
   const backupService = new BackupService(new SupabaseBackupRepository(supabase), {
     dir: options.backupDir,
     keep: Number(process.env.BACKUP_KEEP) || 30,
@@ -58178,6 +58368,7 @@ function createApp(options = {}) {
   app2.use("/api/contas-pagar", createContaPagarRouter(contaPagarController, authService));
   app2.use("/api/configuracoes", createConfiguracaoRouter(configuracaoController, authService));
   app2.use("/api/backup", createBackupRouter(backupController, authService));
+  app2.use("/api/resumo", createResumoRouter(resumoController, authService));
   app2.use((err, _req, res, _next) => {
     console.error("[Global Error]", err);
     res.status(500).json({ error: "Erro interno no servidor" });

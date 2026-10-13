@@ -6,7 +6,7 @@ export interface VendaWithCliente extends VendaDTO {
     nome: string;
     whatsapp: string;
     ativo: boolean;
-  };
+  } | null;
 }
 
 export interface DashboardMetrics {

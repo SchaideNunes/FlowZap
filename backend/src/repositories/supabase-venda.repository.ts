@@ -71,7 +71,7 @@ export class SupabaseVendaRepository implements IVendaRepository {
 
   async create(data: CreateVendaDTO): Promise<VendaDTO> {
     const payload: any = {
-      cliente_id: data.cliente_id,
+      cliente_id: data.cliente_id ?? null,
       descricao: data.descricao,
       valor: data.valor,
       dia_vencimento: data.dia_vencimento,
@@ -80,6 +80,8 @@ export class SupabaseVendaRepository implements IVendaRepository {
       ativo: data.ativo ?? true,
     };
 
+    // A coluna só vai na venda sem cadastro: as demais funcionam mesmo antes da migração
+    if (data.cliente_avulso) payload.cliente_avulso = data.cliente_avulso;
     if (data.valor_total !== undefined) payload.valor_total = data.valor_total;
     if (data.taxa_juros !== undefined) payload.taxa_juros = data.taxa_juros;
     if (data.total_parcelas !== undefined) payload.total_parcelas = data.total_parcelas;

@@ -126,3 +126,61 @@ describe('SupabaseHistoricoRepository: findById e delete', () => {
     await expect(repo.delete(7)).rejects.toThrow(/falhou/);
   });
 });
+
+describe('SupabaseHistoricoRepository: consultas por período', () => {
+  let mockClient: any;
+  let repo: SupabaseHistoricoRepository;
+
+  beforeEach(() => {
+    mockClient = { from: vi.fn() };
+    repo = new SupabaseHistoricoRepository(mockClient as SupabaseClient);
+  });
+
+  it('busca os pagamentos confirmados dentro do período', async () => {
+    const chain: any = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      gte: vi.fn().mockReturnThis(),
+      lt: vi.fn().mockReturnThis(),
+      order: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue({ data: [{ id: 1 }], error: null }),
+    };
+    mockClient.from.mockReturnValue(chain);
+
+    const result = await repo.findPagamentosBetween('2026-10-01T03:00:00.000Z', '2026-11-01T03:00:00.000Z');
+
+    expect(chain.eq).toHaveBeenCalledWith('tipo', 'confirmacao_manual');
+    expect(chain.gte).toHaveBeenCalledWith('data_envio', '2026-10-01T03:00:00.000Z');
+    expect(chain.lt).toHaveBeenCalledWith('data_envio', '2026-11-01T03:00:00.000Z');
+    expect(result).toEqual([{ id: 1 }]);
+  });
+
+  it('conta os avisos enviados no período, sem contar pagamentos nem falhas', async () => {
+    const chain: any = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      neq: vi.fn().mockReturnThis(),
+      gte: vi.fn().mockReturnThis(),
+      lt: vi.fn().mockResolvedValue({ count: 7, error: null }),
+    };
+    mockClient.from.mockReturnValue(chain);
+
+    expect(await repo.countAvisosBetween('a', 'b')).toBe(7);
+    expect(chain.select).toHaveBeenCalledWith('id', { count: 'exact', head: true });
+    expect(chain.eq).toHaveBeenCalledWith('status_envio', 'enviado');
+    expect(chain.neq).toHaveBeenCalledWith('tipo', 'confirmacao_manual');
+  });
+
+  it('lança erro quando a contagem falha', async () => {
+    const chain: any = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      neq: vi.fn().mockReturnThis(),
+      gte: vi.fn().mockReturnThis(),
+      lt: vi.fn().mockResolvedValue({ count: null, error: { message: 'falhou' } }),
+    };
+    mockClient.from.mockReturnValue(chain);
+
+    await expect(repo.countAvisosBetween('a', 'b')).rejects.toThrow(/falhou/);
+  });
+});

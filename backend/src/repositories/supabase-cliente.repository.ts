@@ -36,6 +36,7 @@ export class SupabaseClienteRepository implements IClienteRepository {
         ativo: row.ativo,
         observacoes: row.observacoes,
         vendas_ativas_count: activeSales,
+        criado_em: row.criado_em ?? null,
       };
     });
   }

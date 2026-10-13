@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, UserPlus, Save } from 'lucide-react';
+import { X, Save } from 'lucide-react';
 import { Cliente } from '../types/index.js';
 import { api } from '../services/api.js';
 import { maskPhone } from '../utils/phone.js';
@@ -9,13 +9,17 @@ interface ClienteModalProps {
   isOpen: boolean;
   onClose: () => void;
   clienteToEdit?: Cliente | null;
-  onSuccess: () => void;
+  /** Nome já preenchido ao cadastrar quem comprou sem cadastro. */
+  initialNome?: string;
+  /** Recebe o cliente salvo (útil para vincular uma venda ao cadastro novo). */
+  onSuccess: (cliente?: Cliente) => void;
 }
 
 export const ClienteModal: React.FC<ClienteModalProps> = ({
   isOpen,
   onClose,
   clienteToEdit,
+  initialNome,
   onSuccess,
 }) => {
   const [nome, setNome] = useState('');
@@ -35,14 +39,14 @@ export const ClienteModal: React.FC<ClienteModalProps> = ({
       setObservacoes(clienteToEdit.observacoes || '');
       setAtivo(clienteToEdit.ativo);
     } else {
-      setNome('');
+      setNome(initialNome || '');
       setPhoneDisplay('');
       setPhoneDigits('');
       setObservacoes('');
       setAtivo(true);
     }
     setError(null);
-  }, [clienteToEdit, isOpen]);
+  }, [clienteToEdit, initialNome, isOpen]);
 
   if (!isOpen) return null;
 
@@ -54,121 +58,111 @@ export const ClienteModal: React.FC<ClienteModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
     setError(null);
 
     if (phoneDigits.length < 10) {
-      setError('Informe o DDD e o número completo (ex: 11 91234-5678)');
-      setSaving(false);
+      setError('Informe o DDD e o número completo do WhatsApp.');
       return;
     }
 
-    const cleanWhatsapp = '55' + phoneDigits;
+    setSaving(true);
+    const payload = {
+      nome: nome.trim(),
+      whatsapp: '55' + phoneDigits,
+      observacoes: observacoes.trim() || null,
+      ativo,
+    };
 
     try {
-      if (clienteToEdit) {
-        await api.put(`/clientes/${clienteToEdit.id}`, {
-          nome,
-          whatsapp: cleanWhatsapp,
-          observacoes: observacoes || null,
-          ativo,
-        });
-      } else {
-        await api.post('/clientes', {
-          nome,
-          whatsapp: cleanWhatsapp,
-          observacoes: observacoes || null,
-          ativo,
-        });
-      }
-      onSuccess();
+      const res = clienteToEdit
+        ? await api.put(`/clientes/${clienteToEdit.id}`, payload)
+        : await api.post('/clientes', payload);
+      onSuccess(res.data);
       onClose();
     } catch (err: any) {
-      setError(extractErrorMessage(err, 'Erro ao salvar cliente.'));
+      setError(extractErrorMessage(err, 'Erro ao salvar o cliente.'));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content">
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cliente-titulo">
+      <div className="modal-content" style={{ maxWidth: '460px' }}>
         <div className="modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <UserPlus size={20} color="var(--primary)" />
-            <h3 className="modal-title">
-              {clienteToEdit ? 'Editar Dados do Cliente' : 'Cadastrar Novo Cliente'}
-            </h3>
-          </div>
-          <button className="modal-close" onClick={onClose} disabled={saving}>
+          <h3 className="modal-title" id="cliente-titulo">
+            {clienteToEdit ? 'Editar cliente' : 'Novo cliente'}
+          </h3>
+          <button type="button" className="modal-close" onClick={onClose} disabled={saving} aria-label="Fechar">
             <X size={18} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="modal-body">
+          <div className="modal-body venda-form">
             {error && (
-              <div style={{ color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '1rem', background: 'var(--danger-light)', padding: '8px 12px', borderRadius: '8px' }}>
+              <div className="alert alert-danger" role="alert">
                 {error}
               </div>
             )}
 
             <div className="form-group">
-              <label className="form-label">Nome Completo *</label>
+              <label className="form-label" htmlFor="cliente-nome">
+                Nome
+              </label>
               <input
+                id="cliente-nome"
                 type="text"
                 className="form-input"
                 required
+                minLength={2}
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
-                placeholder="Ex: João da Silva"
+                placeholder="Nome do cliente"
+                autoComplete="off"
               />
             </div>
 
             <div className="form-group">
-              <label className="form-label">WhatsApp *</label>
+              <label className="form-label" htmlFor="cliente-whatsapp">
+                WhatsApp
+              </label>
               <div className="input-phone-group">
-                <span className="input-phone-prefix" title="Código do Brasil (+55) fixo">
-                  +55 🇧🇷
-                </span>
+                <span className="input-phone-prefix">+55</span>
                 <input
+                  id="cliente-whatsapp"
                   type="tel"
+                  inputMode="numeric"
                   className="form-input"
                   required
                   value={phoneDisplay}
                   onChange={handlePhoneChange}
                   placeholder="(11) 91234-5678"
                   maxLength={15}
+                  autoComplete="off"
                 />
               </div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-                Digite o DDD e o número (ex: 11912345678). O código +55 do Brasil já fica cravado automaticamente.
-              </div>
+              <span className="form-hint">DDD e número. É para este número que os avisos são enviados.</span>
             </div>
 
             <div className="form-group">
-              <label className="form-label">Observações Livres (Opcional)</label>
+              <label className="form-label" htmlFor="cliente-observacoes">
+                Observações <span className="label-optional">(opcional)</span>
+              </label>
               <textarea
+                id="cliente-observacoes"
                 className="form-textarea"
-                rows={3}
+                rows={2}
                 value={observacoes}
                 onChange={(e) => setObservacoes(e.target.value)}
-                placeholder="Ex: Prefere contato após as 14h, cliente desde 2024..."
               />
             </div>
 
             {clienteToEdit && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '0.5rem' }}>
-                <input
-                  type="checkbox"
-                  id="cliente-ativo"
-                  checked={ativo}
-                  onChange={(e) => setAtivo(e.target.checked)}
-                />
-                <label htmlFor="cliente-ativo" style={{ fontSize: '0.875rem', color: '#fff', cursor: 'pointer' }}>
-                  Cliente Ativo na Base
-                </label>
-              </div>
+              <label className="venda-ativa">
+                <input type="checkbox" checked={ativo} onChange={(e) => setAtivo(e.target.checked)} />
+                <span>Cliente ativo (desmarque para parar os avisos dele)</span>
+              </label>
             )}
           </div>
 
@@ -178,7 +172,7 @@ export const ClienteModal: React.FC<ClienteModalProps> = ({
             </button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
               <Save size={16} />
-              {saving ? 'Salvando...' : 'Salvar Cliente'}
+              {saving ? 'Salvando...' : 'Salvar cliente'}
             </button>
           </div>
         </form>

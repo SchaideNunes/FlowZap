@@ -17,7 +17,10 @@ export type VendaStatus = 'pendente' | 'avisado_3d' | 'avisado_1d' | 'vencido' |
 
 export interface Venda {
   id: number;
-  cliente_id: number;
+  /** Nulo na venda feita para quem não tem cadastro. */
+  cliente_id: number | null;
+  /** Nome de quem comprou sem cadastro. */
+  cliente_avulso?: string | null;
   descricao: string;
   valor: number;
   dia_vencimento: number;
@@ -28,7 +31,7 @@ export interface Venda {
   status_mes_atual: VendaStatus;
   data_vencimento_atual: string;
   ativo: boolean;
-  cliente?: Cliente;
+  cliente?: Cliente | null;
 }
 
 export interface PagamentoRecebido {
@@ -68,6 +71,52 @@ export interface BackupStatus {
   ultimo_backup_em: string | null;
   automatico_neste_computador: boolean;
   guardados: number;
+}
+
+interface ResumoTotais {
+  total: number;
+  quantidade: number;
+}
+
+export interface ResumoMensal {
+  mes: string;
+  recebido: ResumoTotais;
+  a_receber: ResumoTotais;
+  vencido: ResumoTotais;
+  vendas_novas: { quantidade: number; valor_total: number };
+  clientes_novos: number;
+  contas_pagas: ResumoTotais;
+  contas_em_aberto: ResumoTotais;
+  saldo: number;
+  avisos_enviados: number;
+  pagamentos: {
+    id: number;
+    data_pagamento: string;
+    cliente_nome: string | null;
+    descricao: string | null;
+    valor: number;
+    parcela: number | null;
+    total_parcelas: number | null;
+  }[];
+  vendas: {
+    id: number;
+    cliente_nome: string | null;
+    descricao: string | null;
+    valor: number;
+    valor_total: number;
+    total_parcelas: number;
+    criado_em: string;
+  }[];
+  contas: {
+    id: number;
+    nome_credor: string;
+    descricao: string | null;
+    valor: number;
+    data_vencimento: string | null;
+    pago: boolean;
+    data_pagamento: string | null;
+  }[];
+  historico: { mes: string; recebido: number; pago: number; saldo: number }[];
 }
 
 export interface HistoricoItem {

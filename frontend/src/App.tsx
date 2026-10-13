@@ -6,6 +6,7 @@ import { Dashboard } from './views/Dashboard.js';
 import { ClientesView } from './views/ClientesView.js';
 import { ContasPagarView } from './views/ContasPagarView.js';
 import { NotificacoesView } from './views/NotificacoesView.js';
+import { ResumoMensalView } from './views/ResumoMensalView.js';
 import { WhatsAppModal } from './components/WhatsAppModal.js';
 import { DisparoModal } from './components/DisparoModal.js';
 import { ClienteModal } from './components/ClienteModal.js';
@@ -16,7 +17,7 @@ import { api } from './services/api.js';
 
 export const App: React.FC = () => {
   const { user, loading } = useAuth();
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'clientes' | 'contas-pagar' | 'notificacoes'>('dashboard');
+  const [currentTab, setCurrentTab] = useState<'dashboard' | 'clientes' | 'contas-pagar' | 'notificacoes' | 'resumo'>('dashboard');
 
   // WhatsApp connection state
   const [whatsAppInfo, setWhatsAppInfo] = useState<WhatsAppStatus>({ state: 'unknown' });
@@ -31,6 +32,8 @@ export const App: React.FC = () => {
   const [isDisparoModalOpen, setIsDisparoModalOpen] = useState(false);
   const [isClienteModalOpen, setIsClienteModalOpen] = useState(false);
   const [clienteToEdit, setClienteToEdit] = useState<Cliente | null>(null);
+  // Venda feita sem cadastro que está sendo vinculada a um cliente novo
+  const [vendaParaVincular, setVendaParaVincular] = useState<Venda | null>(null);
 
   const [isVendaModalOpen, setIsVendaModalOpen] = useState(false);
   const [vendaClienteId, setVendaClienteId] = useState<number | undefined>(undefined);
@@ -94,13 +97,34 @@ export const App: React.FC = () => {
 
   const handleEditVenda = (venda: Venda) => {
     setVendaToEdit(venda);
-    setVendaClienteId(venda.cliente_id);
+    setVendaClienteId(venda.cliente_id ?? undefined);
     setIsVendaModalOpen(true);
   };
 
   const handleEditCliente = (cliente: Cliente) => {
+    setVendaParaVincular(null);
     setClienteToEdit(cliente);
     setIsClienteModalOpen(true);
+  };
+
+  const handleCadastrarClienteDaVenda = (venda: Venda) => {
+    setClienteToEdit(null);
+    setVendaParaVincular(venda);
+    setIsClienteModalOpen(true);
+  };
+
+  // Depois de salvar o cliente, a venda que estava sem cadastro passa a ser dele
+  const handleClienteSalvo = async (cliente?: Cliente) => {
+    const venda = vendaParaVincular;
+    setVendaParaVincular(null);
+    if (venda && cliente) {
+      try {
+        await api.put(`/vendas/${venda.id}`, { cliente_id: cliente.id, cliente_avulso: null });
+      } catch {
+        alert('O cliente foi cadastrado, mas não foi possível vincular a venda a ele. Tente novamente pela lista.');
+      }
+    }
+    handleDataChanged();
   };
 
   const handleOpenHistorico = (venda: Venda) => {
@@ -128,6 +152,7 @@ export const App: React.FC = () => {
             onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
             onOpenDisparoModal={() => setIsDisparoModalOpen(true)}
             onOpenNovoClienteModal={() => {
+              setVendaParaVincular(null);
               setClienteToEdit(null);
               setIsClienteModalOpen(true);
             }}
@@ -138,16 +163,20 @@ export const App: React.FC = () => {
         ) : currentTab === 'clientes' ? (
           <ClientesView
             onOpenNovoClienteModal={() => {
+              setVendaParaVincular(null);
               setClienteToEdit(null);
               setIsClienteModalOpen(true);
             }}
             onEditCliente={handleEditCliente}
+            onCadastrarClienteDaVenda={handleCadastrarClienteDaVenda}
             onOpenNovaVendaModal={handleOpenNovaVenda}
             onEditVenda={handleEditVenda}
             onOpenHistoricoModal={handleOpenHistorico}
           />
         ) : currentTab === 'contas-pagar' ? (
           <ContasPagarView />
+        ) : currentTab === 'resumo' ? (
+          <ResumoMensalView />
         ) : (
           <NotificacoesView
             whatsAppInfo={whatsAppInfo}
@@ -175,7 +204,8 @@ export const App: React.FC = () => {
         isOpen={isClienteModalOpen}
         onClose={() => setIsClienteModalOpen(false)}
         clienteToEdit={clienteToEdit}
-        onSuccess={handleDataChanged}
+        initialNome={vendaParaVincular?.cliente_avulso || undefined}
+        onSuccess={handleClienteSalvo}
       />
 
       <VendaModal

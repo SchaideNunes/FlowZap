@@ -21,11 +21,13 @@ export interface HistoricoWithVendaCliente extends HistoricoMensagem {
     total_parcelas?: number | null;
     status_mes_atual: string;
     data_vencimento_atual: string;
+    /** Nome de quem comprou sem cadastro (quando não há cliente). */
+    cliente_avulso?: string | null;
     cliente?: {
       id: number;
       nome: string;
       whatsapp: string;
-    };
+    } | null;
   };
 }
 
@@ -34,6 +36,10 @@ export interface IHistoricoRepository {
   findByVendaId(vendaId: number): Promise<HistoricoMensagem[]>;
   findRecentEnviados(limit?: number): Promise<HistoricoWithVendaCliente[]>;
   findPagamentos(limit?: number): Promise<HistoricoWithVendaCliente[]>;
+  /** Pagamentos confirmados com data em [start, end), do mais recente para o mais antigo. */
+  findPagamentosBetween(start: string, end: string): Promise<HistoricoWithVendaCliente[]>;
+  /** Quantos avisos de cobrança foram enviados com sucesso em [start, end). */
+  countAvisosBetween(start: string, end: string): Promise<number>;
   create(entry: HistoricoMensagem): Promise<HistoricoMensagem>;
   delete(id: number): Promise<void>;
   hasMessageBeenSentForCycle(vendaId: number, tipo: TipoMensagem, cycleDueDate: string): Promise<boolean>;

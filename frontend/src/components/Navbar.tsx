@@ -1,10 +1,10 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext.js';
-import { Users, LayoutDashboard, LogOut, QrCode, Bell, Building2 } from 'lucide-react';
+import { Users, LayoutDashboard, LogOut, QrCode, Bell, Building2, CalendarRange } from 'lucide-react';
 import { WhatsAppStatus } from '../types/index.js';
 import { summarizeSede, SEDE_BADGE_CLASS, SEDE_DOT_CLASS } from '../utils/sede.js';
 
-type Tab = 'dashboard' | 'clientes' | 'contas-pagar' | 'notificacoes';
+type Tab = 'dashboard' | 'clientes' | 'contas-pagar' | 'notificacoes' | 'resumo';
 
 interface NavbarProps {
   currentTab: Tab;
@@ -19,6 +19,7 @@ const TABS: Array<{ id: Tab; label: string; short: string; icon: React.ReactNode
   { id: 'clientes', label: 'Clientes e vendas', short: 'Clientes', icon: <Users size={16} /> },
   { id: 'contas-pagar', label: 'Quem devemos', short: 'A pagar', icon: <Building2 size={16} /> },
   { id: 'notificacoes', label: 'Notificações', short: 'Avisos', icon: <Bell size={16} /> },
+  { id: 'resumo', label: 'Resumo mensal', short: 'Mês', icon: <CalendarRange size={16} /> },
 ];
 
 export const Navbar: React.FC<NavbarProps> = ({

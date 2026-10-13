@@ -29,10 +29,14 @@ import { EmptyState } from '../components/ui/EmptyState.js';
 interface ClientesViewProps {
   onOpenNovoClienteModal: () => void;
   onEditCliente: (cliente: Cliente) => void;
+  onCadastrarClienteDaVenda: (venda: Venda) => void;
   onOpenNovaVendaModal: (clienteId?: number) => void;
   onEditVenda: (venda: Venda) => void;
   onOpenHistoricoModal: (venda: Venda) => void;
 }
+
+// Nome de quem comprou: o do cadastro ou, na venda sem cadastro, o que foi digitado
+const nomeDoCliente = (v: Venda) => v.cliente?.nome || v.cliente_avulso || '';
 
 type StatusFilter = 'todos' | 'pendente' | 'avisado' | 'vencido' | 'pago';
 type SortOption = 'vencimento' | 'nome' | 'valor';
@@ -40,6 +44,7 @@ type SortOption = 'vencimento' | 'nome' | 'valor';
 export const ClientesView: React.FC<ClientesViewProps> = ({
   onOpenNovoClienteModal,
   onEditCliente,
+  onCadastrarClienteDaVenda,
   onOpenNovaVendaModal,
   onEditVenda,
   onOpenHistoricoModal,
@@ -143,7 +148,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
       .filter((v) => {
         const term = search.toLowerCase().trim();
         if (term) {
-          const matchNome = (v.cliente?.nome || '').toLowerCase().includes(term);
+          const matchNome = nomeDoCliente(v).toLowerCase().includes(term);
           const matchWhats = (v.cliente?.whatsapp || '').includes(term);
           const matchDesc = (v.descricao || '').toLowerCase().includes(term);
           if (!matchNome && !matchWhats && !matchDesc) return false;
@@ -157,7 +162,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
       })
       .sort((a, b) => {
         if (sortBy === 'nome') {
-          return (a.cliente?.nome || '').localeCompare(b.cliente?.nome || '');
+          return nomeDoCliente(a).localeCompare(nomeDoCliente(b));
         }
         if (sortBy === 'valor') {
           return Number(b.valor) - Number(a.valor);
@@ -619,7 +624,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                     >
                       <td>
                         <div className="cell-inline">
-                          <span className="cell-title">{v.cliente?.nome || 'Cliente desconhecido'}</span>
+                          <span className="cell-title">{nomeDoCliente(v) || 'Cliente desconhecido'}</span>
                           {v.cliente && (
                             <button
                               type="button"
@@ -632,6 +637,17 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                             </button>
                           )}
                         </div>
+                        {!v.cliente && (
+                          <button
+                            type="button"
+                            className="link-btn nowrap"
+                            onClick={() => onCadastrarClienteDaVenda(v)}
+                            title="Este cliente não tem cadastro e não recebe avisos pelo WhatsApp"
+                          >
+                            <UserPlus size={11} />
+                            Sem cadastro · Cadastrar
+                          </button>
+                        )}
                         {v.cliente?.whatsapp && (
                           <a
                             href={`https://wa.me/${v.cliente.whatsapp}`}
@@ -784,11 +800,11 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                     <div className="mobile-card-header">
                       <div className="mobile-card-title-group">
                         <div className="client-avatar-badge" aria-hidden="true">
-                          {v.cliente?.nome ? v.cliente.nome.slice(0, 2).toUpperCase() : `#${idx + 1}`}
+                          {nomeDoCliente(v) ? nomeDoCliente(v).slice(0, 2).toUpperCase() : `#${idx + 1}`}
                         </div>
                         <div style={{ minWidth: 0 }}>
                           <div className="cell-inline">
-                            <span className="mobile-card-name">{v.cliente?.nome || 'Cliente desconhecido'}</span>
+                            <span className="mobile-card-name">{nomeDoCliente(v) || 'Cliente desconhecido'}</span>
                             {v.cliente && (
                               <button
                                 type="button"
@@ -839,6 +855,11 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                             {formatFullWhatsApp(v.cliente.whatsapp)}
                             <ExternalLink size={10} />
                           </a>
+                        ) : !v.cliente ? (
+                          <button type="button" className="link-btn nowrap" onClick={() => onCadastrarClienteDaVenda(v)}>
+                            <UserPlus size={12} />
+                            Sem cadastro · Cadastrar
+                          </button>
                         ) : (
                           <span>Sem WhatsApp</span>
                         )}

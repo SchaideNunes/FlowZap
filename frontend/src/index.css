@@ -396,6 +396,49 @@ button.nav-status-pill:hover {
   color: #fff;
 }
 
+/* Escolha do mês: anterior, nome do mês, próximo */
+.month-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.month-nav .btn {
+  padding: 0;
+  width: 34px;
+}
+.month-nav-label {
+  min-width: 9.5rem;
+  text-align: center;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+/* Tabela curta (poucas colunas): não precisa da largura mínima da planilha */
+.excel-table.table-compact {
+  min-width: 0;
+}
+.excel-table tbody tr.row-clickable {
+  cursor: pointer;
+}
+.excel-table tbody tr.is-current td {
+  background: rgba(255, 255, 255, 0.05);
+}
+.row-link {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  text-align: left;
+}
+.label-short {
+  display: none;
+}
+.saldo-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 /* Chave liga/desliga */
 .switch {
   position: relative;
@@ -1589,49 +1632,72 @@ button.stat-tile:hover {
   border-radius: var(--radius-md) 0 0 var(--radius-md);
 }
 
-.venda-resumo-card {
+/* Escolha entre duas opções dentro de um formulário */
+.segmented {
+  align-self: flex-start;
+}
+.nowrap {
+  white-space: nowrap;
+}
+.label-optional {
+  color: var(--text-dim);
+  font-weight: 400;
+}
+
+/* Formulário de venda */
+.venda-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.venda-form .form-group,
+.venda-form .alert,
+.venda-form .modal-form-row-2,
+.venda-form .modal-form-row-3 {
+  margin: 0;
+}
+.venda-resumo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
   background: var(--bg-inset);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
-  padding: 1.1rem 1.25rem;
-  margin-top: 1rem;
-  margin-bottom: 0.75rem;
+  padding: 0.85rem 1rem;
 }
-
-.installment-pills,
-.desc-chips {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 6px;
-}
-
-.installment-pill,
-.desc-chip {
-  background-color: transparent;
-  border: 1px solid var(--border-subtle);
-  color: var(--text-muted);
-  border-radius: var(--radius-full);
-  padding: 4px 10px;
-  font-family: var(--font-body);
-  font-size: 0.74rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: border-color var(--transition-fast), color var(--transition-fast),
-    background-color var(--transition-fast);
-}
-
-.installment-pill:hover,
-.desc-chip:hover {
-  border-color: var(--border-hover);
-  color: #fff;
-}
-
-.installment-pill.active {
-  background-color: #fff;
-  border-color: #fff;
-  color: var(--primary-contrast);
+.venda-resumo-valor {
+  font-family: var(--font-heading);
+  font-size: 1.3rem;
   font-weight: 600;
+  line-height: 1.2;
+}
+.venda-resumo-detalhe {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.more-toggle {
+  align-self: flex-start;
+  margin: 0;
+  min-height: 32px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+.more-toggle:hover {
+  color: var(--text-main);
+}
+.venda-ativa {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 32px;
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+.venda-ativa input {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  accent-color: var(--success);
 }
 
 /* ==============================================================================
@@ -1970,7 +2036,9 @@ button.stat-tile:hover {
 
   .nav-tabs {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    /* Uma coluna por aba, qualquer que seja a quantidade */
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
     gap: 4px;
     width: 100%;
   }
@@ -2168,6 +2236,23 @@ button.stat-tile:hover {
     letter-spacing: 0.05em;
     color: var(--text-dim);
     text-align: left;
+  }
+
+  /* Tabela curta continua tabela no celular, só mais apertada */
+  .excel-table.table-compact th,
+  .excel-table.table-compact td {
+    padding: 0.65rem 0.5rem;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+  .excel-table.table-compact th {
+    font-size: 0.62rem;
+  }
+  .label-long {
+    display: none;
+  }
+  .label-short {
+    display: inline;
   }
 
   /* Célula sem conteúdo útil no cartão (ex.: ação indisponível) */

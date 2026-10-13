@@ -28,6 +28,9 @@ import { SupabaseBackupRepository } from './repositories/supabase-backup.reposit
 import { BackupService } from './services/backup.service.js';
 import { BackupController } from './controllers/backup.controller.js';
 import { createBackupRouter } from './routes/backup.routes.js';
+import { MonthlySummaryService } from './services/monthly-summary.service.js';
+import { ResumoController } from './controllers/resumo.controller.js';
+import { createResumoRouter } from './routes/resumo.routes.js';
 import { ContaPagarController } from './controllers/conta-pagar.controller.js';
 import { createContaPagarRouter } from './routes/conta-pagar.routes.js';
 import { createAuthRouter } from './routes/auth.routes.js';
@@ -122,6 +125,9 @@ export function createApp(options: CreateAppOptions = {}): {
   );
   const contaPagarController = new ContaPagarController(contaPagarRepo);
   const configuracaoController = new ConfiguracaoController(configService);
+  const resumoController = new ResumoController(
+    new MonthlySummaryService(historicoRepo, vendaRepo, clienteRepo, contaPagarRepo)
+  );
 
   const backupService = new BackupService(new SupabaseBackupRepository(supabase), {
     dir: options.backupDir,
@@ -138,6 +144,7 @@ export function createApp(options: CreateAppOptions = {}): {
   app.use('/api/contas-pagar', createContaPagarRouter(contaPagarController, authService));
   app.use('/api/configuracoes', createConfiguracaoRouter(configuracaoController, authService));
   app.use('/api/backup', createBackupRouter(backupController, authService));
+  app.use('/api/resumo', createResumoRouter(resumoController, authService));
 
   // Middleware de erro global
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

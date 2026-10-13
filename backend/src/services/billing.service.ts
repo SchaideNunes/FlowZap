@@ -66,9 +66,12 @@ export class BillingService {
    * Cadastra uma nova venda, calculando o ciclo inicial de vencimento
    */
   async createVenda(data: CreateVendaDTO): Promise<VendaDTO> {
-    const cliente = await this.clienteRepo.findById(data.cliente_id);
-    if (!cliente) {
-      throw new Error('Cliente não encontrado');
+    // Venda sem cadastro traz só o nome (cliente_avulso) e não tem cliente para conferir
+    if (data.cliente_id !== undefined) {
+      const cliente = await this.clienteRepo.findById(data.cliente_id);
+      if (!cliente) {
+        throw new Error('Cliente não encontrado');
+      }
     }
 
     const dueDate = data.data_vencimento_atual || calculateInitialDueDate(data.dia_vencimento);
@@ -176,7 +179,7 @@ export class BillingService {
         parcela: numberOrNull(detalhes.parcela),
         total_parcelas: numberOrNull(detalhes.total_parcelas),
         descricao: registro.venda?.descricao ?? null,
-        cliente_nome: registro.venda?.cliente?.nome ?? null,
+        cliente_nome: registro.venda?.cliente?.nome ?? registro.venda?.cliente_avulso ?? null,
         pode_desfazer: maisRecenteDaVenda && typeof detalhes.vencimento === 'string',
       };
     });

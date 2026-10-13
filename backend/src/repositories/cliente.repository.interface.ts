@@ -2,6 +2,8 @@ import { ClienteDTO, CreateClienteDTO, UpdateClienteDTO } from '../schemas/clien
 
 export interface ClienteWithStats extends ClienteDTO {
   vendas_ativas_count: number;
+  /** Data de cadastro (ISO). */
+  criado_em?: string | null;
 }
 
 export interface IClienteRepository {

@@ -32,7 +32,9 @@ CREATE TABLE IF NOT EXISTS clientes (
 -- 3. Tabela de Vendas (Cobranças recorrentes ou parceladas por cliente)
 CREATE TABLE IF NOT EXISTS vendas (
     id BIGSERIAL PRIMARY KEY,
-    cliente_id BIGINT NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+    cliente_id BIGINT REFERENCES clientes(id) ON DELETE CASCADE,
+    -- Nome de quem comprou sem cadastro (venda sem cliente_id; não recebe avisos)
+    cliente_avulso TEXT,
     descricao TEXT,
     valor NUMERIC(10, 2) NOT NULL CHECK (valor >= 0),
     dia_vencimento INTEGER NOT NULL CHECK (dia_vencimento >= 1 AND dia_vencimento <= 31),
@@ -48,6 +50,13 @@ CREATE TABLE IF NOT EXISTS vendas (
     criado_em TIMESTAMPTZ NOT NULL DEFAULT now(),
     atualizado_em TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- 3.1. Venda para cliente sem cadastro (para bancos criados antes desta opção)
+ALTER TABLE vendas ALTER COLUMN cliente_id DROP NOT NULL;
+ALTER TABLE vendas ADD COLUMN IF NOT EXISTS cliente_avulso TEXT;
+ALTER TABLE vendas DROP CONSTRAINT IF EXISTS vendas_cliente_ou_avulso_check;
+ALTER TABLE vendas
+    ADD CONSTRAINT vendas_cliente_ou_avulso_check CHECK (cliente_id IS NOT NULL OR cliente_avulso IS NOT NULL);
 
 -- 4. Tabela de Histórico de Mensagens
 CREATE TABLE IF NOT EXISTS historico_mensagens (
