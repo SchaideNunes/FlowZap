@@ -50,6 +50,8 @@ Projetado com arquitetura distribuída para permitir acesso simultâneo a partir
 
 ## 📋 Guia de Instalação e Configuração
 
+> Para instalar no computador da loja, siga o passo a passo conferido em [`INSTALACAO.md`](INSTALACAO.md).
+
 ### Passo 1: Configuração do Supabase (Banco de Dados)
 1. Acesse [supabase.com](https://supabase.com) e crie um projeto gratuito.
 2. No menu lateral esquerdo, vá em **SQL Editor**.
