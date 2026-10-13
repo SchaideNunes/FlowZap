@@ -1,32 +1,36 @@
 @echo off
-chcp 65001 > nul
-title Flow-Zap - Instalação no Agendador de Tarefas do Windows
+rem Script somente em ASCII de proposito: com acentos + "chcp 65001" o cmd do Windows
+rem le o arquivo na posicao errada e "come" letras de alguns comandos.
+title Flow-Zap - Inicializacao Automatica com o Windows
 
 echo ========================================================
-echo   FLOW-ZAP - Configuração de Inicialização Automática
+echo   FLOW-ZAP - Configuracao de Inicializacao Automatica
 echo ========================================================
 echo.
 echo Este script cadastra o FlowZap no Agendador de Tarefas do Windows
-echo para iniciar automaticamente ao fazer logon na Máquina Sede.
+echo para iniciar sozinho quando alguem entrar no Windows nesta maquina.
 echo.
 
-set SCRIPT_PATH=%~dp0iniciar_sede.bat
+set "SCRIPT_PATH=%~dp0iniciar_sede.bat"
 
-echo Registrando tarefa "FlowZap_AutoStart"...
+echo Registrando a tarefa "FlowZap_AutoStart"...
 schtasks /create /tn "FlowZap_AutoStart" /tr "\"%SCRIPT_PATH%\"" /sc onlogon /rl highest /f
 
-if %errorlevel% equ 0 (
-    echo.
-    echo ========================================================
-    echo [SUCESSO] Tarefa registrada com êxito!
-    echo Sempre que você ligar ou entrar no Windows nesta máquina,
-    echo o FlowZap iniciará sozinho em segundo plano.
-    echo ========================================================
-) else (
-    echo.
-    echo [ERRO] Não foi possível registrar a tarefa.
-    echo Dica: Execute este arquivo clicando com botão direito e "Executar como Administrador".
-)
+if errorlevel 1 goto falhou
+echo.
+echo ========================================================
+echo [SUCESSO] Tarefa registrada.
+echo Sempre que alguem entrar no Windows nesta maquina,
+echo o FlowZap inicia sozinho em segundo plano.
+echo ========================================================
+goto fim
 
+:falhou
+echo.
+echo [ERRO] Nao foi possivel registrar a tarefa.
+echo Dica: clique com o botao direito neste arquivo e escolha
+echo "Executar como administrador".
+
+:fim
 echo.
 pause
