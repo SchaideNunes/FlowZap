@@ -1,30 +1,29 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Search,
   UserPlus,
   Plus,
-  CheckCircle2,
   ExternalLink,
   Edit2,
   History,
   Phone,
   Calendar,
   Check,
-  ArrowUpDown,
   X,
   RefreshCw,
-  Pause,
-  Play,
   Undo2,
+  AlertTriangle,
 } from 'lucide-react';
 import { Cliente, PagamentoRecebido, Venda } from '../types/index.js';
 import { api } from '../services/api.js';
 import { formatFullWhatsApp } from '../utils/phone.js';
 import { extractErrorMessage } from '../utils/error.js';
-import { formatBRL, formatDateBR, todayISO } from '../utils/format.js';
+import { formatBRL, formatDateBR, normalizeSearch, todayISO } from '../utils/format.js';
 import { PageHeader } from '../components/ui/PageHeader.js';
 import { StatTile } from '../components/ui/StatTile.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog.js';
+import { Toast, ToastData } from '../components/ui/Toast.js';
 
 interface ClientesViewProps {
   onOpenNovoClienteModal: () => void;
@@ -57,10 +56,19 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todos');
   const [sortBy, setSortBy] = useState<SortOption>('vencimento');
   const [payingVendaId, setPayingVendaId] = useState<number | null>(null);
-  const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [undoingId, setUndoingId] = useState<number | null>(null);
+  // Falha ao carregar não pode parecer "nenhuma venda": tem estado e mensagem próprios
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [payTarget, setPayTarget] = useState<Venda | null>(null);
+  const [undoTarget, setUndoTarget] = useState<PagamentoRecebido | null>(null);
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const toastSeq = useRef(0);
 
-  const fetchData = async () => {
+  const showToast = (data: Omit<ToastData, 'id'>) => setToast({ id: ++toastSeq.current, ...data });
+
+  // Devolve os pagamentos carregados (ou null em caso de falha) para quem acabou de registrar um
+  const fetchData = async (): Promise<PagamentoRecebido[] | null> => {
     setLoading(true);
     try {
       const [vendasRes, clientesRes, pagamentosRes] = await Promise.all([
@@ -69,11 +77,17 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
         // A lista de recebidos não pode impedir a planilha de abrir
         api.get('/vendas/pagamentos').catch(() => ({ data: [] })),
       ]);
+      const recebidos: PagamentoRecebido[] = Array.isArray(pagamentosRes.data) ? pagamentosRes.data : [];
       setVendas(vendasRes.data || []);
       setClientes(clientesRes.data || []);
-      setPagamentos(Array.isArray(pagamentosRes.data) ? pagamentosRes.data : []);
+      setPagamentos(recebidos);
+      setLoadError(null);
+      setHasLoaded(true);
+      return recebidos;
     } catch {
-      // Ignora erro passageiro
+      // O detalhe técnico da falha não ajuda quem está na loja; a orientação sim
+      setLoadError('Verifique a internet e tente de novo.');
+      return null;
     } finally {
       setLoading(false);
     }
@@ -83,74 +97,76 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
     fetchData();
   }, []);
 
-  const handleMarkAsPaid = async (venda: Venda) => {
-    const isParcelado = venda.total_parcelas && venda.total_parcelas > 1;
-    const infoParcela = isParcelado
-      ? ` (Parcela ${venda.parcela_atual || 1} de ${venda.total_parcelas})`
-      : '';
+  const parcelaDe = (venda: Venda) =>
+    venda.total_parcelas && venda.total_parcelas > 1
+      ? `Parcela ${venda.parcela_atual || 1} de ${venda.total_parcelas}`
+      : null;
 
-    const confirm = window.confirm(
-      `Confirmar recebimento do pagamento de "${venda.descricao}"${infoParcela} no valor de ${formatBRL(venda.valor)}?`
-    );
-    if (!confirm) return;
-
-    setPayingVendaId(venda.id);
+  const undoPayment = async (pagamentoId: number, nome: string) => {
+    setUndoingId(pagamentoId);
     try {
-      const res = await api.patch(`/vendas/${venda.id}/pago`);
-      const atualizada: Venda | undefined = res.data?.venda;
-      // A venda continua na lista, já no ciclo seguinte: dizer para onde o pagamento foi
-      const destino =
-        atualizada && !atualizada.ativo
-          ? 'Venda quitada.'
-          : atualizada?.data_vencimento_atual
-            ? `A próxima parcela vence em ${formatDateBR(atualizada.data_vencimento_atual)}.`
-            : '';
-      setFeedbackMsg(`Pagamento de "${venda.descricao}" registrado em Pagos. ${destino}`.trim());
-      setTimeout(() => setFeedbackMsg(null), 8000);
-      fetchData();
-    } catch (err: any) {
-      alert(extractErrorMessage(err, 'Erro ao registrar pagamento.'));
-    } finally {
-      setPayingVendaId(null);
-    }
-  };
-
-  const handleUndoPayment = async (pagamento: PagamentoRecebido) => {
-    const confirm = window.confirm(
-      `Desfazer o pagamento de "${pagamento.descricao || 'venda'}" (${formatBRL(pagamento.valor)})? A parcela volta a ficar em aberto, com vencimento em ${formatDateBR(pagamento.vencimento)}.`
-    );
-    if (!confirm) return;
-
-    setUndoingId(pagamento.id);
-    try {
-      await api.post(`/vendas/pagamentos/${pagamento.id}/desfazer`);
-      setFeedbackMsg(`Pagamento de "${pagamento.descricao || 'venda'}" desfeito. A parcela voltou para a lista em aberto.`);
-      setTimeout(() => setFeedbackMsg(null), 8000);
-      fetchData();
-    } catch (err: any) {
-      alert(extractErrorMessage(err, 'Erro ao desfazer o pagamento.'));
+      await api.post(`/vendas/pagamentos/${pagamentoId}/desfazer`);
+      setUndoTarget(null);
+      showToast({ tone: 'success', message: `Pagamento de ${nome} desfeito. A parcela voltou a ficar em aberto.` });
+      await fetchData();
+    } catch (err: unknown) {
+      setUndoTarget(null);
+      showToast({ tone: 'danger', message: extractErrorMessage(err, 'Não foi possível desfazer o pagamento.') });
     } finally {
       setUndoingId(null);
     }
   };
 
-  const handleToggleVendaAtivo = async (venda: Venda) => {
+  const confirmPayment = async () => {
+    const venda = payTarget;
+    if (!venda) return;
+    const nome = nomeDoCliente(venda) || 'cliente';
+
+    setPayingVendaId(venda.id);
     try {
-      await api.patch(`/vendas/${venda.id}/status`, { ativo: !venda.ativo });
-      fetchData();
-    } catch (err: any) {
-      alert(extractErrorMessage(err, 'Erro ao alterar status da cobrança.'));
+      const res = await api.patch(`/vendas/${venda.id}/pago`);
+      const atualizada: Venda | undefined = res.data?.venda;
+      setPayTarget(null);
+
+      // A venda continua na lista, já no ciclo seguinte: dizer para onde o pagamento foi
+      const destino =
+        atualizada && !atualizada.ativo
+          ? 'Venda quitada.'
+          : atualizada?.data_vencimento_atual
+            ? `Próxima parcela em ${formatDateBR(atualizada.data_vencimento_atual)}.`
+            : '';
+
+      const recebidos = await fetchData();
+      const registro = recebidos?.find((p) => p.venda_id === venda.id && p.pode_desfazer);
+      showToast({
+        tone: 'success',
+        message: `Pagamento de ${nome} registrado (${formatBRL(venda.valor)}). ${destino}`.trim(),
+        actionLabel: registro ? 'Desfazer' : undefined,
+        onAction: registro
+          ? () => {
+              setToast(null);
+              undoPayment(registro.id, nome);
+            }
+          : undefined,
+      });
+    } catch (err: unknown) {
+      setPayTarget(null);
+      showToast({ tone: 'danger', message: extractErrorMessage(err, 'Não foi possível registrar o pagamento.') });
+    } finally {
+      setPayingVendaId(null);
     }
   };
 
   const filteredVendas = useMemo(() => {
     return vendas
       .filter((v) => {
-        const term = search.toLowerCase().trim();
+        // Sem acento e sem a máscara do telefone: "joao" acha "João", "(75) 99150" acha o número
+        const term = normalizeSearch(search);
         if (term) {
-          const matchNome = nomeDoCliente(v).toLowerCase().includes(term);
-          const matchWhats = (v.cliente?.whatsapp || '').includes(term);
-          const matchDesc = (v.descricao || '').toLowerCase().includes(term);
+          const digits = term.replace(/\D/g, '');
+          const matchNome = normalizeSearch(nomeDoCliente(v)).includes(term);
+          const matchWhats = digits.length >= 3 && (v.cliente?.whatsapp || '').includes(digits);
+          const matchDesc = normalizeSearch(v.descricao).includes(term);
           if (!matchNome && !matchWhats && !matchDesc) return false;
         }
 
@@ -172,12 +188,10 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
   }, [vendas, search, statusFilter, sortBy]);
 
   const filteredPagamentos = useMemo(() => {
-    const term = search.toLowerCase().trim();
+    const term = normalizeSearch(search);
     if (!term) return pagamentos;
     return pagamentos.filter(
-      (p) =>
-        (p.cliente_nome || '').toLowerCase().includes(term) ||
-        (p.descricao || '').toLowerCase().includes(term)
+      (p) => normalizeSearch(p.cliente_nome).includes(term) || normalizeSearch(p.descricao).includes(term)
     );
   }, [pagamentos, search]);
 
@@ -266,6 +280,22 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
   };
 
 
+  // Venda parada tem selo próprio: pausar não pode ser percebido só por a linha ficar apagada
+  const getSituacao = (v: Venda, quitada: boolean) =>
+    v.ativo ? (
+      getStatusBadge(v.status_mes_atual)
+    ) : quitada || v.status_mes_atual === 'pago' ? (
+      <span className="badge badge-pago">
+        <span className="status-dot dot-success" aria-hidden="true" />
+        Quitada
+      </span>
+    ) : (
+      <span className="badge" title="Esta venda não recebe avisos. Reative em Editar.">
+        <span className="status-dot dot-neutral" aria-hidden="true" />
+        Pausada
+      </span>
+    );
+
   const parcelasEmAberto = totals.countPendentes + totals.countAvisados + totals.countVencidos;
   const showPagamentos = statusFilter === 'pago';
   const somaPagamentosFiltrados = filteredPagamentos.reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
@@ -275,16 +305,55 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
     0
   );
 
+  const filtrando = Boolean(search.trim()) || statusFilter !== 'todos';
+  const listaVazia = !hasLoaded ? (
+    loadError ? (
+      <EmptyState title="Sem dados para mostrar" text="A consulta falhou. Use “Tentar de novo” acima." />
+    ) : (
+      <EmptyState title="Carregando vendas..." />
+    )
+  ) : filtrando ? (
+    <EmptyState
+      title="Nenhuma venda com esse filtro"
+      text="Nada corresponde à busca ou ao filtro escolhido."
+      action={
+        <button
+          className="btn btn-secondary btn-sm"
+          onClick={() => {
+            setSearch('');
+            setStatusFilter('todos');
+          }}
+        >
+          Limpar busca e filtros
+        </button>
+      }
+    />
+  ) : (
+    <EmptyState
+      title="Nenhuma venda cadastrada"
+      text="Cadastre a primeira venda para começar a acompanhar os pagamentos."
+      action={
+        <button className="btn btn-primary btn-sm" onClick={() => onOpenNovaVendaModal()}>
+          <Plus size={14} /> Nova venda
+        </button>
+      }
+    />
+  );
+
   return (
     <div>
       <PageHeader
         title="Clientes e vendas"
-        subtitle={`${clientes.length} ${clientes.length === 1 ? 'cliente' : 'clientes'} · ${totals.totalRegistros} ${
-          totals.totalRegistros === 1 ? 'venda' : 'vendas'
-        }`}
+        subtitle={
+          hasLoaded
+            ? `${clientes.length} ${clientes.length === 1 ? 'cliente' : 'clientes'} · ${totals.totalRegistros} ${
+                totals.totalRegistros === 1 ? 'venda' : 'vendas'
+              }`
+            : undefined
+        }
         actions={
           <>
-            <button className="btn btn-secondary btn-sm" onClick={fetchData} disabled={loading}>
+            <button className="btn btn-secondary btn-sm" onClick={() => fetchData()} disabled={loading}>
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
               Atualizar
             </button>
@@ -300,10 +369,20 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
         }
       />
 
-      {feedbackMsg && (
-        <div className="alert alert-success" role="status">
-          <CheckCircle2 size={18} />
-          {feedbackMsg}
+      {loadError && (
+        <div className="alert alert-danger" role="alert">
+          <AlertTriangle size={18} aria-hidden="true" />
+          <span>
+            <strong>Não foi possível carregar as vendas.</strong>{' '}
+            {hasLoaded
+              ? 'O que aparece abaixo é de antes da falha e pode estar desatualizado.'
+              : 'Seus dados não foram apagados: é só a consulta que falhou.'}{' '}
+            {loadError}
+          </span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => fetchData()} disabled={loading}>
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            Tentar de novo
+          </button>
         </div>
       )}
 
@@ -311,29 +390,39 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
       <div className="grid-cards">
         <StatTile
           label="Em aberto"
-          value={formatBRL(totals.valorEmAberto)}
-          hint={`${parcelasEmAberto} ${parcelasEmAberto === 1 ? 'parcela a receber' : 'parcelas a receber'}`}
+          value={hasLoaded ? formatBRL(totals.valorEmAberto) : '—'}
+          hint={
+            hasLoaded ? `${parcelasEmAberto} ${parcelasEmAberto === 1 ? 'parcela a receber' : 'parcelas a receber'}` : undefined
+          }
         />
         <StatTile
           label="Vencidas"
-          value={totals.countVencidos}
-          hint={totals.countVencidos > 0 ? 'Ver quem cobrar' : 'Nenhuma parcela atrasada'}
+          value={hasLoaded ? totals.countVencidos : '—'}
+          hint={!hasLoaded ? undefined : totals.countVencidos > 0 ? 'Ver quem cobrar' : 'Nenhuma parcela atrasada'}
           tone={totals.countVencidos > 0 ? 'danger' : 'neutral'}
           onClick={() => setStatusFilter('vencido')}
         />
         <StatTile
           label="Recebido no mês"
-          value={formatBRL(recebidoNoMes.valor)}
-          hint={`${recebidoNoMes.quantidade} ${
-            recebidoNoMes.quantidade === 1 ? 'pagamento confirmado' : 'pagamentos confirmados'
-          }`}
+          value={hasLoaded ? formatBRL(recebidoNoMes.valor) : '—'}
+          hint={
+            hasLoaded
+              ? `${recebidoNoMes.quantidade} ${
+                  recebidoNoMes.quantidade === 1 ? 'pagamento confirmado' : 'pagamentos confirmados'
+                }`
+              : undefined
+          }
           tone={recebidoNoMes.quantidade > 0 ? 'success' : 'neutral'}
           onClick={() => setStatusFilter('pago')}
         />
         <StatTile
           label="Clientes"
-          value={clientes.length}
-          hint={`${totals.totalRegistros} ${totals.totalRegistros === 1 ? 'venda registrada' : 'vendas registradas'}`}
+          value={hasLoaded ? clientes.length : '—'}
+          hint={
+            hasLoaded
+              ? `${totals.totalRegistros} ${totals.totalRegistros === 1 ? 'venda registrada' : 'vendas registradas'}`
+              : undefined
+          }
         />
       </div>
 
@@ -341,44 +430,17 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
       <div className="excel-wrapper">
         <div className="excel-toolbar">
           <div className="excel-search-box">
+            <Search size={15} className="search-icon" aria-hidden="true" />
             <input
-              type="text"
-              className="form-input"
+              type="search"
+              className="form-input search-input"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar cliente, WhatsApp ou produto"
-              style={{
-                paddingLeft: '2.3rem',
-                paddingRight: search ? '2rem' : '0.8rem',
-                fontSize: '0.84rem',
-                height: '38px',
-                borderRadius: '8px',
-              }}
-            />
-            <Search
-              size={15}
-              color="var(--text-dim)"
-              style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }}
+              aria-label="Buscar cliente, WhatsApp ou produto"
             />
             {search && (
-              <button
-                type="button"
-                onClick={() => setSearch('')}
-                style={{
-                  position: 'absolute',
-                  right: '10px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'transparent',
-                  border: 'none',
-                  color: 'var(--text-dim)',
-                  cursor: 'pointer',
-                  padding: '2px',
-                  display: 'flex',
-                  alignItems: 'center',
-                }}
-                title="Limpar busca"
-              >
+              <button type="button" className="search-clear" onClick={() => setSearch('')} aria-label="Limpar busca">
                 <X size={14} />
               </button>
             )}
@@ -389,6 +451,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
               type="button"
               className={`excel-filter-btn ${statusFilter === 'todos' ? 'active' : ''}`}
               onClick={() => setStatusFilter('todos')}
+              aria-pressed={statusFilter === 'todos'}
             >
               <span>Todas</span>
               <span className="excel-filter-count">{totals.totalRegistros}</span>
@@ -397,6 +460,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
               type="button"
               className={`excel-filter-btn ${statusFilter === 'pendente' ? 'active' : ''}`}
               onClick={() => setStatusFilter('pendente')}
+              aria-pressed={statusFilter === 'pendente'}
             >
               <span>Pendentes</span>
               <span className="excel-filter-count">{totals.countPendentes}</span>
@@ -405,6 +469,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
               type="button"
               className={`excel-filter-btn ${statusFilter === 'avisado' ? 'active' : ''}`}
               onClick={() => setStatusFilter('avisado')}
+              aria-pressed={statusFilter === 'avisado'}
             >
               <span>Avisados</span>
               <span className="excel-filter-count">{totals.countAvisados}</span>
@@ -413,12 +478,10 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
               type="button"
               className={`excel-filter-btn ${statusFilter === 'vencido' ? 'active' : ''}`}
               onClick={() => setStatusFilter('vencido')}
+              aria-pressed={statusFilter === 'vencido'}
             >
               <span>Vencidos</span>
-              <span
-                className="excel-filter-count"
-                style={{ color: totals.countVencidos > 0 ? 'var(--danger)' : undefined }}
-              >
+              <span className={`excel-filter-count ${totals.countVencidos > 0 ? 'has-alert' : ''}`}>
                 {totals.countVencidos}
               </span>
             </button>
@@ -426,43 +489,23 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
               type="button"
               className={`excel-filter-btn ${statusFilter === 'pago' ? 'active' : ''}`}
               onClick={() => setStatusFilter('pago')}
+              aria-pressed={statusFilter === 'pago'}
             >
               <span>Pagos</span>
               <span className="excel-filter-count">{pagamentos.length}</span>
             </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ display: showPagamentos ? 'none' : 'flex', alignItems: 'center', gap: '6px' }}>
-              <ArrowUpDown size={14} color="var(--text-dim)" />
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)' }}>Ordenar:</span>
-              <select
-                className="form-select"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as SortOption)}
-                style={{ fontSize: '0.8rem', padding: '5px 10px', height: '34px', borderRadius: '6px' }}
-              >
+          {!showPagamentos && (
+            <label className="sort-control">
+              <span>Ordenar</span>
+              <select className="form-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)}>
                 <option value="vencimento">Vencimento mais próximo</option>
                 <option value="nome">Cliente (A-Z)</option>
                 <option value="valor">Maior valor</option>
               </select>
-            </div>
-
-            <div
-              style={{
-                fontSize: '0.75rem',
-                color: 'var(--text-dim)',
-                background: 'rgba(255, 255, 255, 0.04)',
-                padding: '4px 8px',
-                borderRadius: '4px',
-                border: '1px solid var(--border-subtle)',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Exibindo <strong>{showPagamentos ? filteredPagamentos.length : filteredVendas.length}</strong> de{' '}
-              {showPagamentos ? pagamentos.length : vendas.length}
-            </div>
-          </div>
+            </label>
+          )}
         </div>
 
         {/* Pagos: o que já foi recebido (a venda em si segue na lista, no ciclo seguinte) */}
@@ -482,7 +525,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
               </thead>
 
               <tbody>
-                {loading ? (
+                {!hasLoaded ? (
                   <tr className="is-plain">
                     <td colSpan={7} className="stack-full">
                       <EmptyState title="Carregando pagamentos..." />
@@ -533,7 +576,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                             <button
                               type="button"
                               className="btn btn-secondary btn-sm"
-                              onClick={() => handleUndoPayment(p)}
+                              onClick={() => setUndoTarget(p)}
                               disabled={undoingId === p.id}
                               title="Marcou como pago por engano? Volta a parcela para em aberto"
                             >
@@ -589,25 +632,9 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
             </thead>
 
             <tbody>
-              {loading ? (
+              {filteredVendas.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>
-                    <EmptyState title="Carregando vendas..." />
-                  </td>
-                </tr>
-              ) : filteredVendas.length === 0 ? (
-                <tr>
-                  <td colSpan={8}>
-                    <EmptyState
-                      title="Nenhuma venda encontrada"
-                      text="Ajuste a busca ou os filtros, ou cadastre uma nova venda."
-                      action={
-                        <button className="btn btn-primary btn-sm" onClick={() => onOpenNovaVendaModal()}>
-                          <Plus size={14} /> Nova venda
-                        </button>
-                      }
-                    />
-                  </td>
+                  <td colSpan={8}>{listaVazia}</td>
                 </tr>
               ) : (
                 filteredVendas.map((v) => {
@@ -617,26 +644,20 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                   const isQuitada = isParcelado && Boolean(v.parcela_atual && v.parcela_atual >= v.total_parcelas!);
 
                   return (
-                    <tr
-                      key={v.id}
-                      className={isVencido ? 'row-vencido' : ''}
-                      style={{ opacity: v.ativo ? 1 : 0.55 }}
-                    >
+                    <tr key={v.id} className={isVencido && v.ativo ? 'row-vencido' : ''}>
                       <td>
-                        <div className="cell-inline">
+                        {v.cliente ? (
+                          <button
+                            type="button"
+                            className="cell-title-btn"
+                            onClick={() => onEditCliente(v.cliente!)}
+                            title="Abrir o cadastro do cliente"
+                          >
+                            {v.cliente.nome}
+                          </button>
+                        ) : (
                           <span className="cell-title">{nomeDoCliente(v) || 'Cliente desconhecido'}</span>
-                          {v.cliente && (
-                            <button
-                              type="button"
-                              className="icon-btn-inline"
-                              onClick={() => onEditCliente(v.cliente!)}
-                              title="Editar dados do cliente"
-                              aria-label="Editar dados do cliente"
-                            >
-                              <Edit2 size={12} />
-                            </button>
-                          )}
-                        </div>
+                        )}
                         {!v.cliente && (
                           <button
                             type="button"
@@ -662,12 +683,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                         )}
                       </td>
 
-                      <td>
-                        {v.descricao}
-                        {!v.ativo && (
-                          <span className="cell-sub">{isQuitada ? 'Totalmente quitada' : 'Cobrança pausada'}</span>
-                        )}
-                      </td>
+                      <td>{v.descricao}</td>
 
                       <td style={{ textAlign: 'center' }}>
                         {isParcelado ? (
@@ -692,16 +708,15 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                         </span>
                       </td>
 
-                      <td>{getStatusBadge(v.status_mes_atual)}</td>
+                      <td>{getSituacao(v, isQuitada)}</td>
 
                       <td style={{ textAlign: 'right' }}>
                         <div className="cell-actions">
                           {v.ativo && v.status_mes_atual !== 'pago' && (
                             <button
                               className="btn btn-pay btn-sm"
-                              onClick={() => handleMarkAsPaid(v)}
+                              onClick={() => setPayTarget(v)}
                               disabled={payingVendaId === v.id}
-                              title="Confirmar que o cliente pagou"
                             >
                               <Check size={14} />
                               {payingVendaId === v.id ? 'Salvando...' : 'Marcar pago'}
@@ -713,7 +728,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                             className="table-action-btn"
                             onClick={() => onOpenHistoricoModal(v)}
                             title="Histórico de mensagens"
-                            aria-label="Histórico de mensagens"
+                            aria-label={`Histórico de mensagens de ${nomeDoCliente(v)}`}
                           >
                             <History size={15} />
                           </button>
@@ -722,20 +737,10 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                             type="button"
                             className="table-action-btn"
                             onClick={() => onEditVenda(v)}
-                            title="Editar venda"
-                            aria-label="Editar venda"
+                            title={v.ativo ? 'Editar ou pausar a venda' : 'Editar ou reativar a venda'}
+                            aria-label={`Editar a venda de ${nomeDoCliente(v)}`}
                           >
                             <Edit2 size={15} />
-                          </button>
-
-                          <button
-                            type="button"
-                            className="table-action-btn"
-                            onClick={() => handleToggleVendaAtivo(v)}
-                            title={v.ativo ? 'Pausar cobrança' : 'Reativar cobrança'}
-                            aria-label={v.ativo ? 'Pausar cobrança' : 'Reativar cobrança'}
-                          >
-                            {v.ativo ? <Pause size={15} /> : <Play size={15} />}
                           </button>
                         </div>
                       </td>
@@ -767,18 +772,8 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
         {/* Cartões (celular) */}
         {!showPagamentos && (
         <div className="mobile-cards-view">
-          {loading ? (
-            <EmptyState title="Carregando vendas..." />
-          ) : filteredVendas.length === 0 ? (
-            <EmptyState
-              title="Nenhuma venda encontrada"
-              text="Ajuste a busca ou os filtros, ou cadastre uma nova venda."
-              action={
-                <button className="btn btn-primary" onClick={() => onOpenNovaVendaModal()}>
-                  <Plus size={16} /> Nova venda
-                </button>
-              }
-            />
+          {filteredVendas.length === 0 ? (
+            listaVazia
           ) : (
             <>
               {filteredVendas.map((v, idx) => {
@@ -787,14 +782,14 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                 const isVencido = v.status_mes_atual === 'vencido';
                 const isPago = v.status_mes_atual === 'pago';
                 const isAvisado = v.status_mes_atual.startsWith('avisado');
+                const isQuitada = isParcelado && Boolean(v.parcela_atual && v.parcela_atual >= v.total_parcelas!);
 
                 return (
                   <div
                     key={v.id}
                     className={`mobile-record-card ${
-                      isVencido ? 'card-vencido' : isPago ? 'card-pago' : isAvisado ? 'card-avisado' : ''
+                      !v.ativo ? '' : isVencido ? 'card-vencido' : isPago ? 'card-pago' : isAvisado ? 'card-avisado' : ''
                     }`}
-                    style={{ opacity: v.ativo ? 1 : 0.6 }}
                   >
                     {/* Quem e o quê */}
                     <div className="mobile-card-header">
@@ -803,25 +798,22 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                           {nomeDoCliente(v) ? nomeDoCliente(v).slice(0, 2).toUpperCase() : `#${idx + 1}`}
                         </div>
                         <div style={{ minWidth: 0 }}>
-                          <div className="cell-inline">
+                          {v.cliente ? (
+                            <button
+                              type="button"
+                              className="cell-title-btn mobile-card-name"
+                              onClick={() => onEditCliente(v.cliente!)}
+                            >
+                              {v.cliente.nome}
+                            </button>
+                          ) : (
                             <span className="mobile-card-name">{nomeDoCliente(v) || 'Cliente desconhecido'}</span>
-                            {v.cliente && (
-                              <button
-                                type="button"
-                                onClick={() => onEditCliente(v.cliente!)}
-                                className="mobile-icon-btn"
-                                title="Editar dados do cliente"
-                                aria-label="Editar dados do cliente"
-                              >
-                                <Edit2 size={13} />
-                              </button>
-                            )}
-                          </div>
+                          )}
                           <div className="list-row-sub">{v.descricao}</div>
                         </div>
                       </div>
 
-                      {getStatusBadge(v.status_mes_atual)}
+                      {getSituacao(v, isQuitada)}
                     </div>
 
                     {/* Quanto e quando */}
@@ -865,7 +857,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                         )}
 
                         <span>
-                          {!v.ativo ? 'Cobrança pausada' : isParcelado ? `Total ${formatBRL(valorTotalCalc)}` : 'À vista'}
+                          {isParcelado ? `Total ${formatBRL(valorTotalCalc)}` : 'À vista'}
                         </span>
                       </div>
                     </div>
@@ -876,7 +868,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                         <button
                           className="btn btn-pay"
                           style={{ flex: 1 }}
-                          onClick={() => handleMarkAsPaid(v)}
+                          onClick={() => setPayTarget(v)}
                           disabled={payingVendaId === v.id}
                         >
                           <Check size={16} />
@@ -884,13 +876,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                         </button>
                       ) : (
                         <span className="figure-label" style={{ flex: 1 }}>
-                          {isPago ? (
-                            <>
-                              <CheckCircle2 size={16} color="var(--success)" /> Pagamento confirmado
-                            </>
-                          ) : (
-                            'Cobrança pausada'
-                          )}
+                          {isPago || isQuitada ? 'Nada a receber' : 'Sem avisos. Reative em Editar.'}
                         </span>
                       )}
 
@@ -899,8 +885,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                           type="button"
                           className="table-action-btn"
                           onClick={() => onOpenHistoricoModal(v)}
-                          title="Histórico de mensagens"
-                          aria-label="Histórico de mensagens"
+                          aria-label={`Histórico de mensagens de ${nomeDoCliente(v)}`}
                         >
                           <History size={16} />
                         </button>
@@ -909,20 +894,9 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                           type="button"
                           className="table-action-btn"
                           onClick={() => onEditVenda(v)}
-                          title="Editar venda"
-                          aria-label="Editar venda"
+                          aria-label={`Editar a venda de ${nomeDoCliente(v)}`}
                         >
                           <Edit2 size={16} />
-                        </button>
-
-                        <button
-                          type="button"
-                          className="table-action-btn"
-                          onClick={() => handleToggleVendaAtivo(v)}
-                          title={v.ativo ? 'Pausar cobrança' : 'Reativar cobrança'}
-                          aria-label={v.ativo ? 'Pausar cobrança' : 'Reativar cobrança'}
-                        >
-                          {v.ativo ? <Pause size={16} /> : <Play size={16} />}
                         </button>
                       </div>
                     </div>
@@ -949,6 +923,62 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
         </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={payTarget !== null}
+        title="Confirmar pagamento"
+        confirmLabel="Confirmar pagamento"
+        confirmClassName="btn-pay"
+        confirmIcon={<Check size={16} />}
+        busy={payingVendaId !== null}
+        onConfirm={confirmPayment}
+        onCancel={() => setPayTarget(null)}
+      >
+        {payTarget && (
+          <>
+            <div className="confirm-who">{nomeDoCliente(payTarget) || 'Cliente desconhecido'}</div>
+            <div className="confirm-what">
+              {[payTarget.descricao, parcelaDe(payTarget)].filter(Boolean).join(' · ')}
+            </div>
+            <div className="confirm-value">{formatBRL(payTarget.valor)}</div>
+            <div className="confirm-note">Vencimento em {formatDateBR(payTarget.data_vencimento_atual)}</div>
+          </>
+        )}
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={undoTarget !== null}
+        title="Desfazer pagamento"
+        confirmLabel="Desfazer pagamento"
+        busyLabel="Desfazendo..."
+        confirmClassName="btn-danger"
+        confirmIcon={<Undo2 size={16} />}
+        busy={undoingId !== null}
+        onConfirm={() => undoTarget && undoPayment(undoTarget.id, undoTarget.cliente_nome || 'cliente')}
+        onCancel={() => setUndoTarget(null)}
+      >
+        {undoTarget && (
+          <>
+            <div className="confirm-who">{undoTarget.cliente_nome || 'Cliente desconhecido'}</div>
+            <div className="confirm-what">
+              {[
+                undoTarget.descricao,
+                undoTarget.parcela && undoTarget.total_parcelas
+                  ? `Parcela ${undoTarget.parcela} de ${undoTarget.total_parcelas}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </div>
+            <div className="confirm-value">{formatBRL(undoTarget.valor)}</div>
+            <div className="confirm-note">
+              A parcela volta a ficar em aberto, com vencimento em {formatDateBR(undoTarget.vencimento)}.
+            </div>
+          </>
+        )}
+      </ConfirmDialog>
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 };

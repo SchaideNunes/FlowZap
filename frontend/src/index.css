@@ -1107,6 +1107,57 @@ button.stat-tile:hover {
   max-width: 420px;
 }
 
+.search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+  pointer-events: none;
+}
+.excel-search-box .search-input {
+  height: 38px;
+  padding-left: 2.3rem;
+  padding-right: 2.4rem;
+  font-size: 0.86rem;
+}
+.search-input::-webkit-search-cancel-button {
+  display: none;
+}
+.search-clear {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.search-clear:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.08);
+}
+.sort-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.sort-control .form-select {
+  height: 36px;
+  padding-top: 0;
+  padding-bottom: 0;
+  font-size: 0.82rem;
+}
+
 .excel-filters {
   display: flex;
   align-items: center;
@@ -1312,8 +1363,7 @@ button.stat-tile:hover {
   text-decoration: underline;
 }
 
-.icon-btn-inline,
-.mobile-icon-btn {
+.icon-btn-inline {
   background: transparent;
   border: none;
   color: var(--text-dim);
@@ -1324,10 +1374,31 @@ button.stat-tile:hover {
   border-radius: 4px;
   transition: color var(--transition-fast), background-color var(--transition-fast);
 }
-.icon-btn-inline:hover,
-.mobile-icon-btn:hover {
+.icon-btn-inline:hover {
   color: #fff;
   background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Nome do cliente que abre o cadastro dele */
+.cell-title-btn {
+  display: block;
+  max-width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text-main);
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--transition-fast);
+}
+.cell-title-btn:hover {
+  text-decoration-color: var(--border-strong);
 }
 
 .table-action-btn {
@@ -1439,6 +1510,8 @@ button.stat-tile:hover {
 }
 
 .mobile-card-name {
+  display: block;
+  max-width: 100%;
   font-size: 0.95rem;
   font-weight: 600;
   color: #fff;
@@ -1727,6 +1800,108 @@ button.stat-tile:hover {
   overflow-y: auto;
   box-shadow: var(--shadow-lg);
   animation: slideUp 200ms ease-out;
+}
+
+.modal-content-sm {
+  max-width: 420px;
+}
+
+/* Confirmação: quem, o quê, quanto */
+.confirm-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.confirm-who {
+  font-size: 1.05rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.confirm-what {
+  font-size: 0.86rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.confirm-value {
+  font-family: var(--font-heading);
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.15;
+  margin-top: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.confirm-note {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
+/* Aviso fixo na base da tela */
+.toast-region {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 1.25rem;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  padding: 0 1rem;
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 640px;
+  padding: 0.7rem 0.75rem 0.7rem 1rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  font-size: 0.88rem;
+  line-height: 1.4;
+  animation: slideUp 200ms ease-out;
+}
+.toast > svg {
+  flex-shrink: 0;
+}
+.toast-success > svg {
+  color: var(--success);
+}
+.toast-danger {
+  border-color: rgba(var(--danger-rgb), 0.5);
+}
+.toast-danger > svg {
+  color: var(--danger);
+}
+.toast-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.toast-action {
+  flex-shrink: 0;
+}
+.toast-close {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.toast-close:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.08);
+}
+.alert > .btn {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .modal-content-lg {
@@ -2236,6 +2411,56 @@ button.stat-tile:hover {
     letter-spacing: 0.05em;
     color: var(--text-dim);
     text-align: left;
+  }
+
+  .toast-region {
+    bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom) + 0.75rem);
+    padding: 0 0.75rem;
+  }
+  .toast {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .toast-message {
+    flex: 1 1 60%;
+  }
+  .excel-search-box .search-input {
+    height: 46px;
+  }
+  .search-clear,
+  .toast-close {
+    width: 44px;
+    height: 44px;
+  }
+  .search-clear {
+    right: 0;
+  }
+  .sort-control {
+    justify-content: space-between;
+  }
+  .sort-control .form-select {
+    flex: 1;
+    height: 44px;
+  }
+  .cell-title-btn.mobile-card-name {
+    min-height: 32px;
+  }
+  .alert {
+    flex-wrap: wrap;
+  }
+  .alert > span {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .alert > .btn {
+    margin-left: 0;
+    flex: 1 1 100%;
+  }
+  /* A faixa de filtros rola: o esmaecido na borda mostra que há mais opções */
+  .excel-toolbar > .excel-filters {
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    padding-right: 28px;
   }
 
   /* Tabela curta continua tabela no celular, só mais apertada */

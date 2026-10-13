@@ -4,6 +4,7 @@ import { Cliente } from '../types/index.js';
 import { api } from '../services/api.js';
 import { maskPhone } from '../utils/phone.js';
 import { extractErrorMessage } from '../utils/error.js';
+import { useDialog } from '../utils/useDialog.js';
 
 interface ClienteModalProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export const ClienteModal: React.FC<ClienteModalProps> = ({
   const [ativo, setAtivo] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dialogRef = useDialog(isOpen, onClose, !saving);
 
   useEffect(() => {
     if (clienteToEdit) {
@@ -88,7 +90,7 @@ export const ClienteModal: React.FC<ClienteModalProps> = ({
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cliente-titulo">
-      <div className="modal-content" style={{ maxWidth: '460px' }}>
+      <div ref={dialogRef} className="modal-content" style={{ maxWidth: '460px' }}>
         <div className="modal-header">
           <h3 className="modal-title" id="cliente-titulo">
             {clienteToEdit ? 'Editar cliente' : 'Novo cliente'}

@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Save, ChevronDown, ChevronUp } from 'lucide-react';
 import { Venda, Cliente } from '../types/index.js';
 import { api } from '../services/api.js';
 import { extractErrorMessage } from '../utils/error.js';
-import { formatBRL } from '../utils/format.js';
+import { formatBRL, parseBRL } from '../utils/format.js';
+import { useDialog } from '../utils/useDialog.js';
 import { formatFullWhatsApp, maskPhone } from '../utils/phone.js';
 
 interface VendaModalProps {
@@ -40,11 +41,14 @@ export const VendaModal: React.FC<VendaModalProps> = ({
   const [novoNome, setNovoNome] = useState('');
   const [cadastrar, setCadastrar] = useState(true);
   const [novoFone, setNovoFone] = useState({ display: '', digits: '' });
+  // Cliente já criado nesta tentativa: se a venda falhar, salvar de novo não o duplica
+  const clienteCriado = useRef<{ id: number; chave: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dialogRef = useDialog(isOpen, onClose, !saving);
 
   // Cálculos dinâmicos em tempo real
-  const numBase = parseFloat(valorTotal.replace(/\./g, '').replace(',', '.')) || 0;
+  const numBase = parseBRL(valorTotal);
   const numJurosPct = parseFloat(taxaJuros.replace(',', '.')) || 0;
   const totalComJuros = numBase + numBase * (numJurosPct / 100);
   const numParcelas = Math.min(MAX_PARCELAS, Math.max(1, parseInt(totalParcelas, 10) || 1));
@@ -83,6 +87,7 @@ export const VendaModal: React.FC<VendaModalProps> = ({
     setNovoNome('');
     setCadastrar(true);
     setNovoFone({ display: '', digits: '' });
+    clienteCriado.current = null;
     setError(null);
   }, [vendaToEdit, clienteId, clienteList, isOpen]);
 
@@ -138,20 +143,31 @@ export const VendaModal: React.FC<VendaModalProps> = ({
         await api.post('/vendas', { cliente_id: selectedClienteId, ...payload });
       } else if (cadastrar) {
         // Cadastra o cliente e já faz a venda no nome dele
-        const criado = await api.post('/clientes', {
-          nome: novoNome.trim(),
-          whatsapp: '55' + novoFone.digits,
-          observacoes: null,
-          ativo: true,
-        });
-        await api.post('/vendas', { cliente_id: criado.data.id, ...payload });
+        const chave = `${novoNome.trim()}|${novoFone.digits}`;
+        if (clienteCriado.current?.chave !== chave) {
+          const criado = await api.post('/clientes', {
+            nome: novoNome.trim(),
+            whatsapp: '55' + novoFone.digits,
+            observacoes: null,
+            ativo: true,
+          });
+          clienteCriado.current = { id: criado.data.id, chave };
+          // O cliente já existe mesmo que a venda falhe: a lista precisa mostrá-lo
+          onSuccess();
+        }
+        await api.post('/vendas', { cliente_id: clienteCriado.current.id, ...payload });
       } else {
         await api.post('/vendas', { cliente_avulso: novoNome.trim(), ...payload });
       }
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(extractErrorMessage(err, 'Erro ao salvar a venda.'));
+      const detalhe = extractErrorMessage(err, 'Erro ao salvar a venda.');
+      setError(
+        clienteCriado.current
+          ? `O cliente foi cadastrado, mas a venda não foi salva. Confira os dados e salve de novo. (${detalhe})`
+          : detalhe
+      );
     } finally {
       setSaving(false);
     }
@@ -159,7 +175,7 @@ export const VendaModal: React.FC<VendaModalProps> = ({
 
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="venda-titulo">
-      <div className="modal-content" style={{ maxWidth: '520px' }}>
+      <div ref={dialogRef} className="modal-content" style={{ maxWidth: '520px' }}>
         <div className="modal-header">
           <h3 className="modal-title" id="venda-titulo">
             {vendaToEdit ? 'Editar venda' : 'Nova venda'}
