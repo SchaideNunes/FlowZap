@@ -3,22 +3,28 @@ import {
   Search,
   UserPlus,
   Plus,
-  ExternalLink,
   Edit2,
   History,
   Phone,
-  Calendar,
   Check,
   X,
   RefreshCw,
   Undo2,
   AlertTriangle,
+  ChevronDown,
 } from 'lucide-react';
 import { Cliente, PagamentoRecebido, Venda } from '../types/index.js';
 import { api } from '../services/api.js';
 import { formatFullWhatsApp } from '../utils/phone.js';
 import { extractErrorMessage } from '../utils/error.js';
 import { formatBRL, formatDateBR, normalizeSearch, todayISO } from '../utils/format.js';
+import {
+  GrupoCliente,
+  agruparPorCliente,
+  atrasoDaVenda,
+  ordenarPorUrgencia,
+  textoDaUrgencia,
+} from '../utils/clientes-agrupados.js';
 import { PageHeader } from '../components/ui/PageHeader.js';
 import { StatTile } from '../components/ui/StatTile.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
@@ -28,17 +34,18 @@ import { Toast, ToastData } from '../components/ui/Toast.js';
 interface ClientesViewProps {
   onOpenNovoClienteModal: () => void;
   onEditCliente: (cliente: Cliente) => void;
-  onCadastrarClienteDaVenda: (venda: Venda) => void;
+  /** Cadastra quem comprou sem cadastro e passa as vendas dele para o cliente novo. */
+  onCadastrarClienteDaVenda: (vendas: Venda[]) => void;
   onOpenNovaVendaModal: (clienteId?: number) => void;
   onEditVenda: (venda: Venda) => void;
   onOpenHistoricoModal: (venda: Venda) => void;
 }
 
-// Nome de quem comprou: o do cadastro ou, na venda sem cadastro, o que foi digitado
-const nomeDoCliente = (v: Venda) => v.cliente?.nome || v.cliente_avulso || '';
+type Filtro = 'devendo' | 'vencidos' | 'todos' | 'pago';
+type Ordem = 'urgencia' | 'nome' | 'valor';
 
-type StatusFilter = 'todos' | 'pendente' | 'avisado' | 'vencido' | 'pago';
-type SortOption = 'vencimento' | 'nome' | 'valor';
+const PAGINA = 50;
+const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
 export const ClientesView: React.FC<ClientesViewProps> = ({
   onOpenNovoClienteModal,
@@ -52,14 +59,18 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [pagamentos, setPagamentos] = useState<PagamentoRecebido[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('todos');
-  const [sortBy, setSortBy] = useState<SortOption>('vencimento');
-  const [payingVendaId, setPayingVendaId] = useState<number | null>(null);
-  const [undoingId, setUndoingId] = useState<number | null>(null);
-  // Falha ao carregar não pode parecer "nenhuma venda": tem estado e mensagem próprios
+  // Falha ao carregar não pode parecer "nenhum cliente": tem estado e mensagem próprios
   const [loadError, setLoadError] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
+
+  const [search, setSearch] = useState('');
+  const [filtro, setFiltro] = useState<Filtro>('devendo');
+  const [ordem, setOrdem] = useState<Ordem>('urgencia');
+  const [abertos, setAbertos] = useState<Set<string>>(new Set());
+  const [limite, setLimite] = useState(PAGINA);
+
+  const [payingVendaId, setPayingVendaId] = useState<number | null>(null);
+  const [undoingId, setUndoingId] = useState<number | null>(null);
   const [payTarget, setPayTarget] = useState<Venda | null>(null);
   const [undoTarget, setUndoTarget] = useState<PagamentoRecebido | null>(null);
   const [toast, setToast] = useState<ToastData | null>(null);
@@ -74,7 +85,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
       const [vendasRes, clientesRes, pagamentosRes] = await Promise.all([
         api.get('/vendas'),
         api.get('/clientes'),
-        // A lista de recebidos não pode impedir a planilha de abrir
+        // A lista de recebidos não pode impedir a tela de abrir
         api.get('/vendas/pagamentos').catch(() => ({ data: [] })),
       ]);
       const recebidos: PagamentoRecebido[] = Array.isArray(pagamentosRes.data) ? pagamentosRes.data : [];
@@ -97,6 +108,8 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
     fetchData();
   }, []);
 
+  const hoje = todayISO();
+  const nomeDaVenda = (v: Venda) => v.cliente?.nome || v.cliente_avulso || 'cliente';
   const parcelaDe = (venda: Venda) =>
     venda.total_parcelas && venda.total_parcelas > 1
       ? `Parcela ${venda.parcela_atual || 1} de ${venda.total_parcelas}`
@@ -120,7 +133,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
   const confirmPayment = async () => {
     const venda = payTarget;
     if (!venda) return;
-    const nome = nomeDoCliente(venda) || 'cliente';
+    const nome = nomeDaVenda(venda);
 
     setPayingVendaId(venda.id);
     try {
@@ -128,7 +141,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
       const atualizada: Venda | undefined = res.data?.venda;
       setPayTarget(null);
 
-      // A venda continua na lista, já no ciclo seguinte: dizer para onde o pagamento foi
+      // A venda segue com o cliente, já no ciclo seguinte: dizer para onde o pagamento foi
       const destino =
         atualizada && !atualizada.ativo
           ? 'Venda quitada.'
@@ -157,37 +170,50 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
     }
   };
 
-  const filteredVendas = useMemo(() => {
-    return vendas
-      .filter((v) => {
-        // Sem acento e sem a máscara do telefone: "joao" acha "João", "(75) 99150" acha o número
-        const term = normalizeSearch(search);
-        if (term) {
-          const digits = term.replace(/\D/g, '');
-          const matchNome = normalizeSearch(nomeDoCliente(v)).includes(term);
-          const matchWhats = digits.length >= 3 && (v.cliente?.whatsapp || '').includes(digits);
-          const matchDesc = normalizeSearch(v.descricao).includes(term);
-          if (!matchNome && !matchWhats && !matchDesc) return false;
-        }
+  const grupos = useMemo(() => agruparPorCliente(clientes, vendas, hoje), [clientes, vendas, hoje]);
 
-        if (statusFilter === 'pendente') return v.status_mes_atual === 'pendente';
-        if (statusFilter === 'avisado') return v.status_mes_atual.startsWith('avisado');
-        if (statusFilter === 'vencido') return v.status_mes_atual === 'vencido';
+  const resumo = useMemo(() => {
+    const devendo = grupos.filter((g) => g.abertas.length > 0);
+    const vencidos = devendo.filter((g) => g.urgencia === 'vencido');
+    const mesAtual = hoje.slice(0, 7);
+    const doMes = pagamentos.filter((p) => todayISO(new Date(p.data_pagamento)).startsWith(mesAtual));
+    return {
+      devendo: devendo.length,
+      vencidos: vencidos.length,
+      valorEmAberto: devendo.reduce((acc, g) => acc + g.totalAberto, 0),
+      valorVencido: vencidos.reduce(
+        (acc, g) => acc + g.abertas.filter((v) => atrasoDaVenda(v, hoje) > 0).reduce((s, v) => s + Number(v.valor), 0),
+        0
+      ),
+      recebidoMes: doMes.reduce((acc, p) => acc + (Number(p.valor) || 0), 0),
+      pagamentosMes: doMes.length,
+    };
+  }, [grupos, pagamentos, hoje]);
 
-        return true;
+  const gruposVisiveis = useMemo(() => {
+    // Sem acento e sem a máscara do telefone: "joao" acha "João", "(75) 99150" acha o número
+    const term = normalizeSearch(search);
+    const digits = term.replace(/\D/g, '');
+
+    return grupos
+      .filter((g) => {
+        if (filtro === 'devendo' && g.abertas.length === 0) return false;
+        if (filtro === 'vencidos' && g.urgencia !== 'vencido') return false;
+        if (!term) return true;
+        return (
+          normalizeSearch(g.nome).includes(term) ||
+          (digits.length >= 3 && (g.cliente?.whatsapp || '').includes(digits)) ||
+          g.vendas.some((v) => normalizeSearch(v.descricao).includes(term))
+        );
       })
       .sort((a, b) => {
-        if (sortBy === 'nome') {
-          return nomeDoCliente(a).localeCompare(nomeDoCliente(b));
-        }
-        if (sortBy === 'valor') {
-          return Number(b.valor) - Number(a.valor);
-        }
-        return (a.data_vencimento_atual || '').localeCompare(b.data_vencimento_atual || '');
+        if (ordem === 'nome') return a.nome.localeCompare(b.nome);
+        if (ordem === 'valor') return b.totalAberto - a.totalAberto || a.nome.localeCompare(b.nome);
+        return ordenarPorUrgencia(a, b);
       });
-  }, [vendas, search, statusFilter, sortBy]);
+  }, [grupos, search, filtro, ordem]);
 
-  const filteredPagamentos = useMemo(() => {
+  const pagamentosVisiveis = useMemo(() => {
     const term = normalizeSearch(search);
     if (!term) return pagamentos;
     return pagamentos.filter(
@@ -195,142 +221,91 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
     );
   }, [pagamentos, search]);
 
-  // Recebido no mês corrente (data local de quando o pagamento foi confirmado)
-  const recebidoNoMes = useMemo(() => {
-    const mesAtual = todayISO().slice(0, 7);
-    const doMes = pagamentos.filter((p) => todayISO(new Date(p.data_pagamento)).startsWith(mesAtual));
-    return {
-      quantidade: doMes.length,
-      valor: doMes.reduce((acc, p) => acc + (Number(p.valor) || 0), 0),
-    };
-  }, [pagamentos]);
+  // Trocar a busca ou o filtro volta a lista para o começo
+  useEffect(() => {
+    setLimite(PAGINA);
+  }, [search, filtro, ordem]);
 
-  const totals = useMemo(() => {
-    let sumParcelas = 0;
-    let sumTotalVendas = 0;
-    let countPendentes = 0;
-    let countAvisados = 0;
-    let countVencidos = 0;
-    let valorEmAberto = 0;
-
-    vendas.forEach((v) => {
-      const vParcela = Number(v.valor) || 0;
-      const vTotal = Number(v.valor_total) || vParcela * (v.total_parcelas || 1);
-      sumParcelas += vParcela;
-      sumTotalVendas += vTotal;
-
-      if (v.status_mes_atual !== 'pago') {
-        valorEmAberto += vParcela;
-        if (v.status_mes_atual === 'vencido') countVencidos++;
-        else if (v.status_mes_atual.startsWith('avisado')) countAvisados++;
-        else countPendentes++;
-      }
+  const alternar = (key: string) =>
+    setAbertos((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
     });
 
-    return {
-      sumParcelas,
-      sumTotalVendas,
-      countPendentes,
-      countAvisados,
-      countVencidos,
-      valorEmAberto,
-      totalRegistros: vendas.length,
-    };
-  }, [vendas]);
+  // Estado da parcela: ponto colorido + rótulo (a cor nunca vai sozinha)
+  const selo = (classe: string, ponto: string, texto: string, dica?: string) => (
+    <span className={`badge ${classe}`} title={dica}>
+      <span className={`status-dot ${ponto}`} aria-hidden="true" />
+      {texto}
+    </span>
+  );
 
-  // Estado da cobrança: ponto colorido + rótulo (a cor nunca vai sozinha)
-  const getStatusBadge = (status: string) => {
-    switch (status) {
+  const seloDaVenda = (v: Venda) => {
+    const quitada = Boolean(v.total_parcelas && v.total_parcelas > 1 && (v.parcela_atual || 1) >= v.total_parcelas);
+    if (!v.ativo) {
+      return quitada || v.status_mes_atual === 'pago'
+        ? selo('badge-pago', 'dot-success', 'Quitada')
+        : selo('', 'dot-neutral', 'Pausada', 'Esta venda não recebe avisos. Reative em Editar.');
+    }
+    const atraso = atrasoDaVenda(v, hoje);
+    if (atraso > 0) return selo('badge-vencido', 'dot-danger', `Vencida há ${plural(atraso, 'dia', 'dias')}`);
+    switch (v.status_mes_atual) {
       case 'pago':
-        return (
-          <span className="badge badge-pago">
-            <span className="status-dot dot-success" aria-hidden="true" />
-            Pago
-          </span>
-        );
-      case 'avisado_3d':
-        return (
-          <span className="badge badge-avisado" title="Já recebeu lembrete neste ciclo">
-            <span className="status-dot dot-warning" aria-hidden="true" />
-            Avisado
-          </span>
-        );
-      case 'avisado_1d':
-        return (
-          <span className="badge badge-avisado" title="Recebeu o lembrete da véspera do vencimento">
-            <span className="status-dot dot-warning" aria-hidden="true" />
-            Avisado · véspera
-          </span>
-        );
+        return selo('badge-pago', 'dot-success', 'Paga');
       case 'vencido':
-        return (
-          <span className="badge badge-vencido">
-            <span className="status-dot dot-danger" aria-hidden="true" />
-            Vencido
-          </span>
-        );
+        return selo('badge-vencido', 'dot-danger', 'Vence hoje');
+      case 'avisado_3d':
+      case 'avisado_1d':
+        return selo('badge-avisado', 'dot-warning', 'Avisado', 'Já recebeu lembrete pelo WhatsApp neste ciclo');
       default:
-        return (
-          <span className="badge badge-pendente">
-            <span className="status-dot dot-neutral" aria-hidden="true" />
-            Pendente
-          </span>
-        );
+        return selo('badge-pendente', 'dot-neutral', 'A vencer');
     }
   };
 
+  const seloDoCliente = (g: GrupoCliente) => {
+    const texto = textoDaUrgencia(g);
+    if (g.urgencia === 'vencido') return selo('badge-vencido', 'dot-danger', texto);
+    if (g.urgencia === 'hoje' || g.urgencia === 'em_breve') return selo('badge-avisado', 'dot-warning', texto);
+    return selo('', 'dot-neutral', texto);
+  };
 
-  // Venda parada tem selo próprio: pausar não pode ser percebido só por a linha ficar apagada
-  const getSituacao = (v: Venda, quitada: boolean) =>
-    v.ativo ? (
-      getStatusBadge(v.status_mes_atual)
-    ) : quitada || v.status_mes_atual === 'pago' ? (
-      <span className="badge badge-pago">
-        <span className="status-dot dot-success" aria-hidden="true" />
-        Quitada
-      </span>
-    ) : (
-      <span className="badge" title="Esta venda não recebe avisos. Reative em Editar.">
-        <span className="status-dot dot-neutral" aria-hidden="true" />
-        Pausada
-      </span>
-    );
+  const mostrandoPagos = filtro === 'pago';
+  const filtrando = Boolean(search.trim());
+  const somaPagamentos = pagamentosVisiveis.reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
+  // Um único resultado já aparece aberto: não faz sentido pedir mais um toque
+  const estaAberto = (key: string) => abertos.has(key) || gruposVisiveis.length === 1;
 
-  const parcelasEmAberto = totals.countPendentes + totals.countAvisados + totals.countVencidos;
-  const showPagamentos = statusFilter === 'pago';
-  const somaPagamentosFiltrados = filteredPagamentos.reduce((acc, p) => acc + (Number(p.valor) || 0), 0);
-  const somaValorFiltrado = filteredVendas.reduce((acc, v) => acc + (Number(v.valor) || 0), 0);
-  const somaTotalFiltrado = filteredVendas.reduce(
-    (acc, v) => acc + (Number(v.valor_total) || Number(v.valor) * (v.total_parcelas || 1)),
-    0
-  );
-
-  const filtrando = Boolean(search.trim()) || statusFilter !== 'todos';
   const listaVazia = !hasLoaded ? (
     loadError ? (
       <EmptyState title="Sem dados para mostrar" text="A consulta falhou. Use “Tentar de novo” acima." />
     ) : (
-      <EmptyState title="Carregando vendas..." />
+      <EmptyState title="Carregando clientes..." />
     )
   ) : filtrando ? (
     <EmptyState
-      title="Nenhuma venda com esse filtro"
-      text="Nada corresponde à busca ou ao filtro escolhido."
+      title="Ninguém encontrado"
+      text={
+        filtro === 'todos'
+          ? 'Nenhum cliente corresponde à busca.'
+          : 'Nenhum cliente deste filtro corresponde à busca. Ele pode estar em “Todos”.'
+      }
       action={
         <button
           className="btn btn-secondary btn-sm"
           onClick={() => {
             setSearch('');
-            setStatusFilter('todos');
+            setFiltro('todos');
           }}
         >
-          Limpar busca e filtros
+          Limpar a busca e ver todos
         </button>
       }
     />
-  ) : (
+  ) : grupos.length === 0 ? (
     <EmptyState
-      title="Nenhuma venda cadastrada"
+      title="Nenhum cliente cadastrado"
       text="Cadastre a primeira venda para começar a acompanhar os pagamentos."
       action={
         <button className="btn btn-primary btn-sm" onClick={() => onOpenNovaVendaModal()}>
@@ -338,18 +313,33 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
         </button>
       }
     />
+  ) : filtro === 'vencidos' ? (
+    <EmptyState title="Ninguém em atraso" text="Nenhum cliente está com parcela vencida." />
+  ) : (
+    <EmptyState
+      title="Ninguém devendo"
+      text="Todas as parcelas estão pagas. Os clientes continuam em “Todos”."
+      action={
+        <button className="btn btn-secondary btn-sm" onClick={() => setFiltro('todos')}>
+          Ver todos os clientes
+        </button>
+      }
+    />
   );
+
+  const FILTROS: { id: Filtro; rotulo: string; total: number; alerta?: boolean }[] = [
+    { id: 'devendo', rotulo: 'Devendo', total: resumo.devendo },
+    { id: 'vencidos', rotulo: 'Vencidos', total: resumo.vencidos, alerta: resumo.vencidos > 0 },
+    { id: 'todos', rotulo: 'Todos', total: grupos.length },
+    { id: 'pago', rotulo: 'Pagos', total: pagamentos.length },
+  ];
 
   return (
     <div>
       <PageHeader
-        title="Clientes e vendas"
+        title="Clientes"
         subtitle={
-          hasLoaded
-            ? `${clientes.length} ${clientes.length === 1 ? 'cliente' : 'clientes'} · ${totals.totalRegistros} ${
-                totals.totalRegistros === 1 ? 'venda' : 'vendas'
-              }`
-            : undefined
+          hasLoaded ? `${plural(grupos.length, 'cliente', 'clientes')} · ${plural(vendas.length, 'venda', 'vendas')}` : undefined
         }
         actions={
           <>
@@ -373,7 +363,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
         <div className="alert alert-danger" role="alert">
           <AlertTriangle size={18} aria-hidden="true" />
           <span>
-            <strong>Não foi possível carregar as vendas.</strong>{' '}
+            <strong>Não foi possível carregar os clientes.</strong>{' '}
             {hasLoaded
               ? 'O que aparece abaixo é de antes da falha e pode estar desatualizado.'
               : 'Seus dados não foram apagados: é só a consulta que falhou.'}{' '}
@@ -386,47 +376,42 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
         </div>
       )}
 
-      {/* Indicadores (os clicáveis filtram a lista) */}
+      {/* Indicadores (todos levam à lista correspondente) */}
       <div className="grid-cards">
         <StatTile
           label="Em aberto"
-          value={hasLoaded ? formatBRL(totals.valorEmAberto) : '—'}
-          hint={
-            hasLoaded ? `${parcelasEmAberto} ${parcelasEmAberto === 1 ? 'parcela a receber' : 'parcelas a receber'}` : undefined
-          }
+          value={hasLoaded ? formatBRL(resumo.valorEmAberto) : '—'}
+          hint={hasLoaded ? plural(resumo.devendo, 'cliente devendo', 'clientes devendo') : undefined}
+          onClick={() => setFiltro('devendo')}
         />
         <StatTile
-          label="Vencidas"
-          value={hasLoaded ? totals.countVencidos : '—'}
-          hint={!hasLoaded ? undefined : totals.countVencidos > 0 ? 'Ver quem cobrar' : 'Nenhuma parcela atrasada'}
-          tone={totals.countVencidos > 0 ? 'danger' : 'neutral'}
-          onClick={() => setStatusFilter('vencido')}
+          label="Vencido"
+          value={hasLoaded ? formatBRL(resumo.valorVencido) : '—'}
+          hint={
+            !hasLoaded
+              ? undefined
+              : resumo.vencidos > 0
+                ? plural(resumo.vencidos, 'cliente em atraso', 'clientes em atraso')
+                : 'Ninguém em atraso'
+          }
+          tone={resumo.vencidos > 0 ? 'danger' : 'neutral'}
+          onClick={() => setFiltro('vencidos')}
         />
         <StatTile
           label="Recebido no mês"
-          value={hasLoaded ? formatBRL(recebidoNoMes.valor) : '—'}
-          hint={
-            hasLoaded
-              ? `${recebidoNoMes.quantidade} ${
-                  recebidoNoMes.quantidade === 1 ? 'pagamento confirmado' : 'pagamentos confirmados'
-                }`
-              : undefined
-          }
-          tone={recebidoNoMes.quantidade > 0 ? 'success' : 'neutral'}
-          onClick={() => setStatusFilter('pago')}
+          value={hasLoaded ? formatBRL(resumo.recebidoMes) : '—'}
+          hint={hasLoaded ? plural(resumo.pagamentosMes, 'pagamento confirmado', 'pagamentos confirmados') : undefined}
+          tone={resumo.pagamentosMes > 0 ? 'success' : 'neutral'}
+          onClick={() => setFiltro('pago')}
         />
         <StatTile
           label="Clientes"
-          value={hasLoaded ? clientes.length : '—'}
-          hint={
-            hasLoaded
-              ? `${totals.totalRegistros} ${totals.totalRegistros === 1 ? 'venda registrada' : 'vendas registradas'}`
-              : undefined
-          }
+          value={hasLoaded ? grupos.length : '—'}
+          hint={hasLoaded ? plural(vendas.length, 'venda registrada', 'vendas registradas') : undefined}
+          onClick={() => setFiltro('todos')}
         />
       </div>
 
-      {/* Tabela Principal Estilo Excel */}
       <div className="excel-wrapper">
         <div className="excel-toolbar">
           <div className="excel-search-box">
@@ -446,70 +431,35 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
             )}
           </div>
 
-          <div className="excel-filters">
-            <button
-              type="button"
-              className={`excel-filter-btn ${statusFilter === 'todos' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('todos')}
-              aria-pressed={statusFilter === 'todos'}
-            >
-              <span>Todas</span>
-              <span className="excel-filter-count">{totals.totalRegistros}</span>
-            </button>
-            <button
-              type="button"
-              className={`excel-filter-btn ${statusFilter === 'pendente' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('pendente')}
-              aria-pressed={statusFilter === 'pendente'}
-            >
-              <span>Pendentes</span>
-              <span className="excel-filter-count">{totals.countPendentes}</span>
-            </button>
-            <button
-              type="button"
-              className={`excel-filter-btn ${statusFilter === 'avisado' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('avisado')}
-              aria-pressed={statusFilter === 'avisado'}
-            >
-              <span>Avisados</span>
-              <span className="excel-filter-count">{totals.countAvisados}</span>
-            </button>
-            <button
-              type="button"
-              className={`excel-filter-btn ${statusFilter === 'vencido' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('vencido')}
-              aria-pressed={statusFilter === 'vencido'}
-            >
-              <span>Vencidos</span>
-              <span className={`excel-filter-count ${totals.countVencidos > 0 ? 'has-alert' : ''}`}>
-                {totals.countVencidos}
-              </span>
-            </button>
-            <button
-              type="button"
-              className={`excel-filter-btn ${statusFilter === 'pago' ? 'active' : ''}`}
-              onClick={() => setStatusFilter('pago')}
-              aria-pressed={statusFilter === 'pago'}
-            >
-              <span>Pagos</span>
-              <span className="excel-filter-count">{pagamentos.length}</span>
-            </button>
+          <div className="excel-filters filters-fit" role="group" aria-label="Quais clientes mostrar">
+            {FILTROS.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                className={`excel-filter-btn ${filtro === f.id ? 'active' : ''}`}
+                onClick={() => setFiltro(f.id)}
+                aria-pressed={filtro === f.id}
+              >
+                <span>{f.rotulo}</span>
+                <span className={`excel-filter-count ${f.alerta ? 'has-alert' : ''}`}>{f.total}</span>
+              </button>
+            ))}
           </div>
 
-          {!showPagamentos && (
+          {!mostrandoPagos && (
             <label className="sort-control">
               <span>Ordenar</span>
-              <select className="form-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)}>
-                <option value="vencimento">Vencimento mais próximo</option>
-                <option value="nome">Cliente (A-Z)</option>
-                <option value="valor">Maior valor</option>
+              <select className="form-select" value={ordem} onChange={(e) => setOrdem(e.target.value as Ordem)}>
+                <option value="urgencia">Quem cobrar primeiro</option>
+                <option value="nome">Nome (A-Z)</option>
+                <option value="valor">Maior valor em aberto</option>
               </select>
             </label>
           )}
         </div>
 
-        {/* Pagos: o que já foi recebido (a venda em si segue na lista, no ciclo seguinte) */}
-        {showPagamentos && (
+        {/* Pagos: o que já foi recebido, com a opção de desfazer */}
+        {mostrandoPagos && (
           <div className="excel-table-container">
             <table className="excel-table stack-table">
               <thead>
@@ -528,24 +478,24 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                 {!hasLoaded ? (
                   <tr className="is-plain">
                     <td colSpan={7} className="stack-full">
-                      <EmptyState title="Carregando pagamentos..." />
+                      <EmptyState title={loadError ? 'Sem dados para mostrar' : 'Carregando pagamentos...'} />
                     </td>
                   </tr>
-                ) : filteredPagamentos.length === 0 ? (
+                ) : pagamentosVisiveis.length === 0 ? (
                   <tr className="is-plain">
                     <td colSpan={7} className="stack-full">
                       <EmptyState
                         title="Nenhum pagamento recebido"
                         text={
-                          search
+                          filtrando
                             ? 'Nenhum pagamento corresponde à busca.'
-                            : 'Ao tocar em "Marcar pago" em uma venda, o pagamento aparece aqui.'
+                            : 'Ao marcar uma parcela como paga, o pagamento aparece aqui.'
                         }
                       />
                     </td>
                   </tr>
                 ) : (
-                  filteredPagamentos.map((p) => (
+                  pagamentosVisiveis.map((p) => (
                     <tr key={p.id}>
                       <td data-label="Cliente" className="cell-title">
                         {p.cliente_nome || 'Cliente desconhecido'}
@@ -557,7 +507,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                             {p.parcela}/{p.total_parcelas}
                           </span>
                         ) : (
-                          <span style={{ color: 'var(--text-dim)' }}>-</span>
+                          <span className="text-dim">-</span>
                         )}
                       </td>
                       <td data-label="Valor recebido" className="num cell-title">
@@ -565,10 +515,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                       </td>
                       <td data-label="Vencimento">{formatDateBR(p.vencimento)}</td>
                       <td data-label="Pago em">
-                        <span className="badge badge-pago">
-                          <span className="status-dot dot-success" aria-hidden="true" />
-                          {formatDateBR(todayISO(new Date(p.data_pagamento)))}
-                        </span>
+                        {selo('badge-pago', 'dot-success', formatDateBR(todayISO(new Date(p.data_pagamento))))}
                       </td>
                       <td className={p.pode_desfazer ? 'stack-full' : 'stack-hide'} style={{ textAlign: 'right' }}>
                         <div className="cell-actions">
@@ -578,7 +525,6 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                               className="btn btn-secondary btn-sm"
                               onClick={() => setUndoTarget(p)}
                               disabled={undoingId === p.id}
-                              title="Marcou como pago por engano? Volta a parcela para em aberto"
                             >
                               <Undo2 size={14} />
                               {undoingId === p.id ? 'Desfazendo...' : 'Desfazer'}
@@ -598,14 +544,13 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                 )}
               </tbody>
 
-              {filteredPagamentos.length > 0 && (
+              {pagamentosVisiveis.length > 0 && (
                 <tfoot>
                   <tr>
-                    <td colSpan={3} style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
-                      Total de {filteredPagamentos.length}{' '}
-                      {filteredPagamentos.length === 1 ? 'pagamento' : 'pagamentos'}
+                    <td colSpan={3} className="text-muted">
+                      Total de {plural(pagamentosVisiveis.length, 'pagamento', 'pagamentos')}
                     </td>
-                    <td className="num">{formatBRL(somaPagamentosFiltrados)}</td>
+                    <td className="num">{formatBRL(somaPagamentos)}</td>
                     <td colSpan={3}></td>
                   </tr>
                 </tfoot>
@@ -614,313 +559,179 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
           </div>
         )}
 
-        {/* Planilha (computador e tablet) */}
-        {!showPagamentos && (
-        <div className="excel-table-container desktop-table-view">
-          <table className="excel-table">
-            <thead>
-              <tr>
-                <th>Cliente</th>
-                <th>Venda</th>
-                <th style={{ textAlign: 'center' }}>Parcela</th>
-                <th className="num">Valor</th>
-                <th className="num col-optional">Total da venda</th>
-                <th>Vencimento</th>
-                <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Ações</th>
-              </tr>
-            </thead>
+        {/* Clientes: cada linha é uma pessoa; tocar abre as vendas dela */}
+        {!mostrandoPagos && (
+          <div className="client-list">
+            {gruposVisiveis.length === 0 ? (
+              listaVazia
+            ) : (
+              <>
+                <div className="client-list-head" aria-hidden="true">
+                  <span>Cliente</span>
+                  <span>Em aberto</span>
+                  <span className="num">Valor</span>
+                  <span>Situação</span>
+                </div>
 
-            <tbody>
-              {filteredVendas.length === 0 ? (
-                <tr>
-                  <td colSpan={8}>{listaVazia}</td>
-                </tr>
-              ) : (
-                filteredVendas.map((v) => {
-                  const isParcelado = Boolean(v.total_parcelas && v.total_parcelas > 1);
-                  const valorTotalCalc = v.valor_total || Number(v.valor) * (v.total_parcelas || 1);
-                  const isVencido = v.status_mes_atual === 'vencido';
-                  const isQuitada = isParcelado && Boolean(v.parcela_atual && v.parcela_atual >= v.total_parcelas!);
+                {gruposVisiveis.slice(0, limite).map((g) => {
+                  const aberto = estaAberto(g.key);
+                  const idPainel = `vendas-${g.key.replace(/[^a-zA-Z0-9-]/g, '-')}`;
+                  const primeira = g.abertas[0] || g.vendas[0];
 
                   return (
-                    <tr key={v.id} className={isVencido && v.ativo ? 'row-vencido' : ''}>
-                      <td>
-                        {v.cliente ? (
-                          <button
-                            type="button"
-                            className="cell-title-btn"
-                            onClick={() => onEditCliente(v.cliente!)}
-                            title="Abrir o cadastro do cliente"
-                          >
-                            {v.cliente.nome}
-                          </button>
-                        ) : (
-                          <span className="cell-title">{nomeDoCliente(v) || 'Cliente desconhecido'}</span>
-                        )}
-                        {!v.cliente && (
-                          <button
-                            type="button"
-                            className="link-btn nowrap"
-                            onClick={() => onCadastrarClienteDaVenda(v)}
-                            title="Este cliente não tem cadastro e não recebe avisos pelo WhatsApp"
-                          >
-                            <UserPlus size={11} />
-                            Sem cadastro · Cadastrar
-                          </button>
-                        )}
-                        {v.cliente?.whatsapp && (
-                          <a
-                            href={`https://wa.me/${v.cliente.whatsapp}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="cell-link"
-                            title="Abrir conversa no WhatsApp"
-                          >
-                            <Phone size={11} />
-                            {formatFullWhatsApp(v.cliente.whatsapp)}
-                          </a>
-                        )}
-                      </td>
-
-                      <td>{v.descricao}</td>
-
-                      <td style={{ textAlign: 'center' }}>
-                        {isParcelado ? (
-                          <span className="badge" title={`Parcela ${v.parcela_atual || 1} de ${v.total_parcelas}`}>
-                            {v.parcela_atual || 1}/{v.total_parcelas}
+                    <section key={g.key} className={`client-row ${aberto ? 'is-open' : ''}`}>
+                      <button
+                        type="button"
+                        className="client-row-toggle"
+                        onClick={() => alternar(g.key)}
+                        aria-expanded={aberto}
+                        aria-controls={idPainel}
+                      >
+                        <span className="client-row-name">
+                          <ChevronDown size={16} className="client-row-chevron" aria-hidden="true" />
+                          <span className="client-row-name-text">
+                            <strong>{g.nome}</strong>
+                            <span className="client-row-sub">
+                              {g.cliente?.whatsapp
+                                ? formatFullWhatsApp(g.cliente.whatsapp)
+                                : g.cliente
+                                  ? 'Sem WhatsApp'
+                                  : 'Sem cadastro'}
+                            </span>
                           </span>
-                        ) : (
-                          <span style={{ color: 'var(--text-dim)' }}>À vista</span>
-                        )}
-                      </td>
-
-                      <td className="num cell-title">{formatBRL(v.valor)}</td>
-
-                      <td className="num col-optional" style={{ color: 'var(--text-muted)' }}>
-                        {formatBRL(valorTotalCalc)}
-                      </td>
-
-                      <td>
-                        <span className={`date-cell ${isVencido ? 'is-overdue' : ''}`}>
-                          <Calendar size={13} />
-                          {formatDateBR(v.data_vencimento_atual)}
                         </span>
-                      </td>
 
-                      <td>{getSituacao(v, isQuitada)}</td>
+                        <span className="client-row-count">
+                          {g.abertas.length > 0
+                            ? g.abertas.length === 1 && primeira
+                              ? primeira.descricao
+                              : plural(g.abertas.length, 'parcela', 'parcelas')
+                            : plural(g.vendas.length, 'venda', 'vendas')}
+                        </span>
 
-                      <td style={{ textAlign: 'right' }}>
-                        <div className="cell-actions">
-                          {v.ativo && v.status_mes_atual !== 'pago' && (
-                            <button
-                              className="btn btn-pay btn-sm"
-                              onClick={() => setPayTarget(v)}
-                              disabled={payingVendaId === v.id}
-                            >
-                              <Check size={14} />
-                              {payingVendaId === v.id ? 'Salvando...' : 'Marcar pago'}
-                            </button>
-                          )}
+                        <span className="client-row-value num">
+                          {g.abertas.length > 0 ? formatBRL(g.totalAberto) : '—'}
+                        </span>
 
-                          <button
-                            type="button"
-                            className="table-action-btn"
-                            onClick={() => onOpenHistoricoModal(v)}
-                            title="Histórico de mensagens"
-                            aria-label={`Histórico de mensagens de ${nomeDoCliente(v)}`}
-                          >
-                            <History size={15} />
-                          </button>
+                        <span className="client-row-status">{seloDoCliente(g)}</span>
+                      </button>
 
-                          <button
-                            type="button"
-                            className="table-action-btn"
-                            onClick={() => onEditVenda(v)}
-                            title={v.ativo ? 'Editar ou pausar a venda' : 'Editar ou reativar a venda'}
-                            aria-label={`Editar a venda de ${nomeDoCliente(v)}`}
-                          >
-                            <Edit2 size={15} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-
-            {filteredVendas.length > 0 && (
-              <tfoot>
-                <tr>
-                  <td colSpan={3} style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
-                    Total de {filteredVendas.length} {filteredVendas.length === 1 ? 'venda' : 'vendas'}
-                  </td>
-                  <td className="num">{formatBRL(somaValorFiltrado)}</td>
-                  <td className="num col-optional" style={{ color: 'var(--text-muted)' }}>
-                    {formatBRL(somaTotalFiltrado)}
-                  </td>
-                  <td colSpan={3}></td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        </div>
-
-        )}
-
-        {/* Cartões (celular) */}
-        {!showPagamentos && (
-        <div className="mobile-cards-view">
-          {filteredVendas.length === 0 ? (
-            listaVazia
-          ) : (
-            <>
-              {filteredVendas.map((v, idx) => {
-                const isParcelado = Boolean(v.total_parcelas && v.total_parcelas > 1);
-                const valorTotalCalc = v.valor_total || Number(v.valor) * (v.total_parcelas || 1);
-                const isVencido = v.status_mes_atual === 'vencido';
-                const isPago = v.status_mes_atual === 'pago';
-                const isAvisado = v.status_mes_atual.startsWith('avisado');
-                const isQuitada = isParcelado && Boolean(v.parcela_atual && v.parcela_atual >= v.total_parcelas!);
-
-                return (
-                  <div
-                    key={v.id}
-                    className={`mobile-record-card ${
-                      !v.ativo ? '' : isVencido ? 'card-vencido' : isPago ? 'card-pago' : isAvisado ? 'card-avisado' : ''
-                    }`}
-                  >
-                    {/* Quem e o quê */}
-                    <div className="mobile-card-header">
-                      <div className="mobile-card-title-group">
-                        <div className="client-avatar-badge" aria-hidden="true">
-                          {nomeDoCliente(v) ? nomeDoCliente(v).slice(0, 2).toUpperCase() : `#${idx + 1}`}
-                        </div>
-                        <div style={{ minWidth: 0 }}>
-                          {v.cliente ? (
-                            <button
-                              type="button"
-                              className="cell-title-btn mobile-card-name"
-                              onClick={() => onEditCliente(v.cliente!)}
-                            >
-                              {v.cliente.nome}
-                            </button>
+                      {aberto && (
+                        <div className="client-panel" id={idPainel}>
+                          {g.vendas.length === 0 ? (
+                            <p className="client-panel-empty">Este cliente ainda não tem vendas.</p>
                           ) : (
-                            <span className="mobile-card-name">{nomeDoCliente(v) || 'Cliente desconhecido'}</span>
+                            <ul className="sale-list">
+                              {g.vendas.map((v) => (
+                                <li key={v.id} className={`sale-row ${v.ativo ? '' : 'is-inactive'}`}>
+                                  <span className="sale-desc">
+                                    {v.descricao}
+                                    <span className="sale-meta">{parcelaDe(v) || 'Parcela única'}</span>
+                                  </span>
+                                  <span className="sale-value num">{formatBRL(v.valor)}</span>
+                                  <span className="sale-due">
+                                    <span className="sale-due-label">Vence </span>
+                                    {formatDateBR(v.data_vencimento_atual)}
+                                  </span>
+                                  <span className="sale-status">{seloDaVenda(v)}</span>
+                                  <span className="sale-actions">
+                                    {v.ativo && v.status_mes_atual !== 'pago' && (
+                                      <button
+                                        type="button"
+                                        className="btn btn-pay btn-sm sale-pay"
+                                        onClick={() => setPayTarget(v)}
+                                        disabled={payingVendaId === v.id}
+                                      >
+                                        <Check size={14} />
+                                        {payingVendaId === v.id ? 'Salvando...' : 'Marcar pago'}
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      className="table-action-btn"
+                                      onClick={() => onOpenHistoricoModal(v)}
+                                      title="Histórico de mensagens"
+                                      aria-label={`Histórico de mensagens de ${v.descricao}`}
+                                    >
+                                      <History size={15} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="table-action-btn"
+                                      onClick={() => onEditVenda(v)}
+                                      title={v.ativo ? 'Editar ou pausar a venda' : 'Editar ou reativar a venda'}
+                                      aria-label={`Editar a venda ${v.descricao}`}
+                                    >
+                                      <Edit2 size={15} />
+                                    </button>
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
                           )}
-                          <div className="list-row-sub">{v.descricao}</div>
-                        </div>
-                      </div>
 
-                      {getSituacao(v, isQuitada)}
-                    </div>
-
-                    {/* Quanto e quando */}
-                    <div className="mobile-card-body">
-                      <div className="mobile-card-finance-row">
-                        <div>
-                          <div className="mobile-card-val-label">
-                            {isParcelado ? `Parcela ${v.parcela_atual || 1} de ${v.total_parcelas}` : 'Valor'}
+                          <div className="client-panel-foot">
+                            {g.cliente ? (
+                              <>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => onOpenNovaVendaModal(g.cliente!.id)}
+                                >
+                                  <Plus size={14} />
+                                  Nova venda para {g.nome.split(' ')[0]}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost btn-sm"
+                                  onClick={() => onEditCliente(g.cliente!)}
+                                >
+                                  <Edit2 size={14} />
+                                  Editar cadastro
+                                </button>
+                                {g.cliente.whatsapp && (
+                                  <a
+                                    className="btn btn-ghost btn-sm"
+                                    href={`https://wa.me/${g.cliente.whatsapp}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                  >
+                                    <Phone size={14} />
+                                    Abrir WhatsApp
+                                  </a>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => onCadastrarClienteDaVenda(g.vendas)}
+                                >
+                                  <UserPlus size={14} />
+                                  Cadastrar {g.nome.split(' ')[0]}
+                                </button>
+                                <span className="panel-caption">Sem cadastro, não recebe avisos pelo WhatsApp.</span>
+                              </>
+                            )}
                           </div>
-                          <div className="mobile-card-val-main">{formatBRL(v.valor)}</div>
                         </div>
-
-                        <div style={{ textAlign: 'right' }}>
-                          <div className="mobile-card-val-label">Vencimento</div>
-                          <span className={`date-cell ${isVencido ? 'is-overdue' : ''}`}>
-                            <Calendar size={13} />
-                            {formatDateBR(v.data_vencimento_atual)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="mobile-card-meta-grid">
-                        {v.cliente?.whatsapp ? (
-                          <a
-                            href={`https://wa.me/${v.cliente.whatsapp}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="cell-link"
-                          >
-                            <Phone size={12} />
-                            {formatFullWhatsApp(v.cliente.whatsapp)}
-                            <ExternalLink size={10} />
-                          </a>
-                        ) : !v.cliente ? (
-                          <button type="button" className="link-btn nowrap" onClick={() => onCadastrarClienteDaVenda(v)}>
-                            <UserPlus size={12} />
-                            Sem cadastro · Cadastrar
-                          </button>
-                        ) : (
-                          <span>Sem WhatsApp</span>
-                        )}
-
-                        <span>
-                          {isParcelado ? `Total ${formatBRL(valorTotalCalc)}` : 'À vista'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Ações */}
-                    <div className="mobile-card-actions">
-                      {v.ativo && !isPago ? (
-                        <button
-                          className="btn btn-pay"
-                          style={{ flex: 1 }}
-                          onClick={() => setPayTarget(v)}
-                          disabled={payingVendaId === v.id}
-                        >
-                          <Check size={16} />
-                          {payingVendaId === v.id ? 'Salvando...' : 'Marcar pago'}
-                        </button>
-                      ) : (
-                        <span className="figure-label" style={{ flex: 1 }}>
-                          {isPago || isQuitada ? 'Nada a receber' : 'Sem avisos. Reative em Editar.'}
-                        </span>
                       )}
+                    </section>
+                  );
+                })}
 
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <button
-                          type="button"
-                          className="table-action-btn"
-                          onClick={() => onOpenHistoricoModal(v)}
-                          aria-label={`Histórico de mensagens de ${nomeDoCliente(v)}`}
-                        >
-                          <History size={16} />
-                        </button>
-
-                        <button
-                          type="button"
-                          className="table-action-btn"
-                          onClick={() => onEditVenda(v)}
-                          aria-label={`Editar a venda de ${nomeDoCliente(v)}`}
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                      </div>
-                    </div>
+                {gruposVisiveis.length > limite && (
+                  <div className="client-list-more">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setLimite((n) => n + PAGINA)}>
+                      Mostrar mais {Math.min(PAGINA, gruposVisiveis.length - limite)} de{' '}
+                      {gruposVisiveis.length - limite} restantes
+                    </button>
                   </div>
-                );
-              })}
-
-              {/* Resumo */}
-              <div className="mobile-summary-footer">
-                <div>
-                  <div className="mobile-card-val-label">
-                    Total de {filteredVendas.length} {filteredVendas.length === 1 ? 'venda' : 'vendas'}
-                  </div>
-                  <div className="figure-value">{formatBRL(somaValorFiltrado)}</div>
-                </div>
-
-                <div style={{ textAlign: 'right' }}>
-                  <div className="mobile-card-val-label">Total das vendas</div>
-                  <div style={{ fontWeight: 600 }}>{formatBRL(somaTotalFiltrado)}</div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+                )}
+              </>
+            )}
+          </div>
         )}
       </div>
 
@@ -936,7 +747,7 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
       >
         {payTarget && (
           <>
-            <div className="confirm-who">{nomeDoCliente(payTarget) || 'Cliente desconhecido'}</div>
+            <div className="confirm-who">{nomeDaVenda(payTarget)}</div>
             <div className="confirm-what">
               {[payTarget.descricao, parcelaDe(payTarget)].filter(Boolean).join(' · ')}
             </div>

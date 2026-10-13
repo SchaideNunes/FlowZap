@@ -33,7 +33,7 @@ export const App: React.FC = () => {
   const [isClienteModalOpen, setIsClienteModalOpen] = useState(false);
   const [clienteToEdit, setClienteToEdit] = useState<Cliente | null>(null);
   // Venda feita sem cadastro que está sendo vinculada a um cliente novo
-  const [vendaParaVincular, setVendaParaVincular] = useState<Venda | null>(null);
+  const [vendasParaVincular, setVendasParaVincular] = useState<Venda[]>([]);
 
   const [isVendaModalOpen, setIsVendaModalOpen] = useState(false);
   const [vendaClienteId, setVendaClienteId] = useState<number | undefined>(undefined);
@@ -102,26 +102,27 @@ export const App: React.FC = () => {
   };
 
   const handleEditCliente = (cliente: Cliente) => {
-    setVendaParaVincular(null);
+    setVendasParaVincular([]);
     setClienteToEdit(cliente);
     setIsClienteModalOpen(true);
   };
 
-  const handleCadastrarClienteDaVenda = (venda: Venda) => {
+  const handleCadastrarClienteDaVenda = (vendas: Venda[]) => {
     setClienteToEdit(null);
-    setVendaParaVincular(venda);
+    setVendasParaVincular(vendas);
     setIsClienteModalOpen(true);
   };
 
-  // Depois de salvar o cliente, a venda que estava sem cadastro passa a ser dele
+  // Depois de salvar o cliente, as vendas que estavam sem cadastro passam a ser dele
   const handleClienteSalvo = async (cliente?: Cliente) => {
-    const venda = vendaParaVincular;
-    setVendaParaVincular(null);
-    if (venda && cliente) {
-      try {
-        await api.put(`/vendas/${venda.id}`, { cliente_id: cliente.id, cliente_avulso: null });
-      } catch {
-        alert('O cliente foi cadastrado, mas não foi possível vincular a venda a ele. Tente novamente pela lista.');
+    const vendas = vendasParaVincular;
+    setVendasParaVincular([]);
+    if (cliente && vendas.length > 0) {
+      const resultados = await Promise.allSettled(
+        vendas.map((venda) => api.put(`/vendas/${venda.id}`, { cliente_id: cliente.id, cliente_avulso: null }))
+      );
+      if (resultados.some((r) => r.status === 'rejected')) {
+        alert('O cliente foi cadastrado, mas nem todas as vendas foram passadas para ele. Tente de novo pela lista.');
       }
     }
     handleDataChanged();
@@ -152,7 +153,7 @@ export const App: React.FC = () => {
             onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
             onOpenDisparoModal={() => setIsDisparoModalOpen(true)}
             onOpenNovoClienteModal={() => {
-              setVendaParaVincular(null);
+              setVendasParaVincular([]);
               setClienteToEdit(null);
               setIsClienteModalOpen(true);
             }}
@@ -163,7 +164,7 @@ export const App: React.FC = () => {
         ) : currentTab === 'clientes' ? (
           <ClientesView
             onOpenNovoClienteModal={() => {
-              setVendaParaVincular(null);
+              setVendasParaVincular([]);
               setClienteToEdit(null);
               setIsClienteModalOpen(true);
             }}
@@ -204,7 +205,7 @@ export const App: React.FC = () => {
         isOpen={isClienteModalOpen}
         onClose={() => setIsClienteModalOpen(false)}
         clienteToEdit={clienteToEdit}
-        initialNome={vendaParaVincular?.cliente_avulso || undefined}
+        initialNome={vendasParaVincular[0]?.cliente_avulso || undefined}
         onSuccess={handleClienteSalvo}
       />
 

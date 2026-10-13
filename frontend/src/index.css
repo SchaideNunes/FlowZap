@@ -1379,6 +1379,214 @@ button.stat-tile:hover {
   background-color: rgba(255, 255, 255, 0.08);
 }
 
+/* ==============================================================================
+   Lista de clientes: cada linha é uma pessoa e abre as vendas dela
+   ============================================================================== */
+.text-dim {
+  color: var(--text-dim);
+}
+.text-muted {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.client-list {
+  --client-cols: minmax(0, 1.5fr) minmax(0, 1.1fr) 150px 210px;
+}
+
+.client-list-head,
+.client-row-toggle {
+  display: grid;
+  grid-template-columns: var(--client-cols);
+  align-items: center;
+  column-gap: 1.25rem;
+  padding: 0 1.1rem;
+}
+
+.client-list-head {
+  min-height: 40px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+.client-list-head > :first-child {
+  padding-left: 1.75rem;
+}
+
+.client-list .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.client-row {
+  border-bottom: 1px solid var(--border-subtle);
+}
+.client-row:last-of-type {
+  border-bottom: none;
+}
+
+.client-row-toggle {
+  width: 100%;
+  min-height: 64px;
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+.client-row-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+.client-row.is-open > .client-row-toggle {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+.client-row-toggle:focus-visible {
+  outline-offset: -2px;
+}
+
+.client-row-name {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.client-row-chevron {
+  flex-shrink: 0;
+  color: var(--text-dim);
+  transform: rotate(-90deg);
+  transition: transform 180ms ease-out;
+}
+.client-row.is-open .client-row-chevron {
+  transform: rotate(0deg);
+}
+.client-row-name-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+.client-row-name-text strong {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.client-row-sub {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.client-row-count {
+  font-size: 0.86rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.client-row-value {
+  font-family: var(--font-heading);
+  font-size: 1.02rem;
+  font-weight: 600;
+}
+
+/* Vendas do cliente aberto */
+.client-panel {
+  background: var(--bg-inset);
+  border-top: 1px solid var(--border-subtle);
+  padding: 0.35rem 1.1rem 1rem 2.85rem;
+}
+.client-panel-empty {
+  padding: 0.9rem 0 0.4rem;
+  font-size: 0.86rem;
+  color: var(--text-muted);
+}
+
+.sale-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.sale-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px 150px 190px auto;
+  align-items: center;
+  column-gap: 1.25rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.88rem;
+}
+.sale-desc {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+  overflow-wrap: anywhere;
+}
+.sale-meta {
+  font-size: 0.76rem;
+  color: var(--text-dim);
+}
+.sale-value {
+  font-weight: 600;
+}
+.sale-due {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.sale-due-label {
+  color: var(--text-dim);
+}
+.sale-row.is-inactive .sale-desc,
+.sale-row.is-inactive .sale-value {
+  color: var(--text-muted);
+}
+.sale-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  min-width: 222px;
+}
+
+.client-panel-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-top: 0.85rem;
+}
+.client-panel-foot a.btn {
+  text-decoration: none;
+}
+
+.client-list-more {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+@media (max-width: 1100px) and (min-width: 769px) {
+  .client-list {
+    --client-cols: minmax(0, 1.4fr) minmax(0, 1fr) 130px 190px;
+  }
+  .sale-row {
+    grid-template-columns: minmax(0, 1fr) 110px 130px;
+    row-gap: 0.5rem;
+  }
+  .sale-status {
+    grid-column: 1;
+  }
+  .sale-actions {
+    grid-column: 2 / -1;
+  }
+}
+
 /* Nome do cliente que abre o cadastro dele */
 .cell-title-btn {
   display: block;
@@ -2461,6 +2669,102 @@ button.stat-tile:hover {
     mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
     -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
     padding-right: 28px;
+  }
+
+  .client-list-head {
+    display: none;
+  }
+  .client-row-toggle {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'nome valor'
+      'conta situacao';
+    row-gap: 0.45rem;
+    column-gap: 0.75rem;
+    padding: 0.85rem 0.9rem;
+    min-height: 0;
+  }
+  .client-row-name {
+    grid-area: nome;
+  }
+  .client-row-value {
+    grid-area: valor;
+    font-size: 1.05rem;
+  }
+  .client-row-count {
+    grid-area: conta;
+    padding-left: 1.6rem;
+  }
+  .client-row-status {
+    grid-area: situacao;
+    justify-self: end;
+  }
+  .client-panel {
+    padding: 0.25rem 0.9rem 0.9rem;
+  }
+  .sale-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'desc valor'
+      'vence status'
+      'acoes acoes';
+    row-gap: 0.4rem;
+    column-gap: 0.75rem;
+    padding: 0.8rem 0;
+  }
+  .sale-desc {
+    grid-area: desc;
+  }
+  .sale-value {
+    grid-area: valor;
+    align-self: start;
+  }
+  .sale-due {
+    grid-area: vence;
+    font-size: 0.82rem;
+  }
+  .sale-status {
+    grid-area: status;
+    justify-self: end;
+  }
+  .sale-actions {
+    grid-area: acoes;
+    min-width: 0;
+    justify-content: stretch;
+    margin-top: 0.2rem;
+  }
+  .sale-actions .sale-pay {
+    flex: 1;
+  }
+  .client-panel-foot .btn {
+    flex: 1 1 auto;
+  }
+  /* Quatro filtros cabem na largura: sem faixa que rola */
+  .excel-toolbar > .excel-filters.filters-fit {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    overflow: visible;
+    mask-image: none;
+    -webkit-mask-image: none;
+    padding-right: 0;
+  }
+  .filters-fit .excel-filter-btn {
+    justify-content: center;
+    padding-left: 0.2rem;
+    padding-right: 0.2rem;
+    gap: 0.25rem;
+    min-width: 0;
+    min-height: 44px;
+    font-size: 0.76rem;
+  }
+  .filters-fit .excel-filter-count {
+    min-width: 0;
+    padding: 0 0.3rem;
+  }
+  /* No celular o nome completo importa mais que a linha única */
+  .client-row-name-text strong {
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   /* Tabela curta continua tabela no celular, só mais apertada */

@@ -16,7 +16,7 @@ interface NavbarProps {
 // "short" é o rótulo da barra inferior no celular
 const TABS: Array<{ id: Tab; label: string; short: string; icon: React.ReactNode }> = [
   { id: 'dashboard', label: 'Visão geral', short: 'Início', icon: <LayoutDashboard size={16} /> },
-  { id: 'clientes', label: 'Clientes e vendas', short: 'Clientes', icon: <Users size={16} /> },
+  { id: 'clientes', label: 'Clientes', short: 'Clientes', icon: <Users size={16} /> },
   { id: 'contas-pagar', label: 'Quem devemos', short: 'A pagar', icon: <Building2 size={16} /> },
   { id: 'notificacoes', label: 'Notificações', short: 'Avisos', icon: <Bell size={16} /> },
   { id: 'resumo', label: 'Resumo mensal', short: 'Mês', icon: <CalendarRange size={16} /> },
