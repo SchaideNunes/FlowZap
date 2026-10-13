@@ -195,6 +195,14 @@ O banco fica no plano gratuito do Supabase (sem backup automático, e o projeto 
 - **Restauração (máquina-sede):** `npm run backup:restaurar -- <arquivo>` mostra o conteúdo sem alterar nada; com `--confirmar` regrava os dados pelo id (não apaga o que foi criado depois). Em banco novo: rodar `database/setup_completo.sql` antes. `database/migration_backup.sql` cria a coluna `sede_status.ultimo_backup_em` e a função `flowzap_ajustar_sequencias()`.
 - O sinal de vida da sede (a cada minuto) mantém o projeto do Supabase em uso enquanto o computador da loja está ligado.
 
+### 6.4. Trava de Sede Única
+Dois computadores iniciados com o mesmo banco enviariam as mesmas cobranças (cada um pelo seu WhatsApp), ou um deles, sem WhatsApp, marcaria a rotina do dia como feita e a sede de verdade não enviaria nada. Por isso só uma instalação pode ser a sede:
+- Cada instalação tem um identificador próprio em `backend/.sede-id` (`config/sede-id.ts`; nunca versionado). A trava fica em `sede_status.sede_id` / `sede_nome` (`database/migration_trava_sede.sql`).
+- `SedeLockService`: a primeira máquina a iniciar toma a trava (gravação condicional, atômica no banco). Outra que suba depois fica **só como painel**: não roda a rotina diária nem a recuperação, não marca a rotina como feita, não conecta o WhatsApp, não grava o sinal de vida, recusa o disparo manual e o QR Code, e o painel dela mostra o estado da sede de verdade com um aviso.
+- A troca de sede é **sempre uma decisão de uma pessoa**: o botão "Usar este computador como sede" (`POST /api/cobrancas/assumir-sede`). Nunca tomar a trava automaticamente porque a sede ficou sem dar sinal; a antiga sede percebe a troca na renovação seguinte (até 1 minuto) e para de enviar.
+- Sem a migração, a trava fica inativa e o sistema se comporta como antes (um aviso no log). Na Vercel não há trava: lá o envio já é indisponível.
+- `SchedulerService`, `SedeHeartbeatService` e `CobrancaController` consultam a trava; qualquer novo caminho que envie mensagem ou grave estado da sede precisa consultar também.
+
 ---
 
 ## 7. Checklist para Qualquer Modificação de Código

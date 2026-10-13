@@ -79,7 +79,11 @@ Depois abra o `iniciar_sede.bat` de novo. Se a atualização trouxer dependênci
 
 ## Regra importante: só uma máquina-sede
 
-O sistema só pode estar iniciado (com o `iniciar_sede.bat`) em **um** computador por vez. Dois computadores iniciados ao mesmo tempo com o mesmo `.env` disputam o envio das mesmas cobranças. Depois de instalar na loja, não inicie mais o sistema na máquina de desenvolvimento apontando para o mesmo banco.
+Só um computador envia as cobranças. O sistema protege isso sozinho: o primeiro computador a ser iniciado vira a sede, e um segundo que seja iniciado com o mesmo `.env` funciona só como painel, com um aviso no topo da tela dizendo qual computador é a sede.
+
+Para trocar de sede (por exemplo, ao instalar na loja depois de ter testado em outra máquina), abra o painel **no computador novo** e use o botão "Usar este computador como sede" que aparece nesse aviso. Em até um minuto o computador antigo para de enviar. Depois, leia o QR Code com o celular da loja.
+
+Essa proteção depende de o arquivo `database/migration_trava_sede.sql` ter sido executado no Supabase. Sem ele, o sistema funciona como antes e não há proteção: nesse caso, não inicie o sistema em duas máquinas com o mesmo banco.
 
 Outras pessoas e outros aparelhos usam o painel online ou, na mesma rede da loja, o endereço mostrado por `scripts\obter_ip_local.bat`.
 
