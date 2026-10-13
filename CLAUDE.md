@@ -117,6 +117,16 @@ O motor de cobrança segue rigorosamente as melhores práticas para proteção c
 - **Venda para cliente sem cadastro:** a venda pode ser feita só com o nome de quem comprou (`vendas.cliente_avulso`, com `cliente_id` nulo; ver `database/migration_venda_avulsa.sql`). Ela aparece nas listas, nos pagamentos, no resumo mensal e no backup, mas **não recebe avisos pelo WhatsApp**. No formulário de venda a opção "Cliente novo" já vem com "Cadastrar este cliente" marcado (cria o cliente e a venda juntos); desmarcado, grava a venda sem cadastro. Depois, o link "Sem cadastro · Cadastrar" na lista abre o cadastro com o nome preenchido e vincula a venda ao cliente criado (`PUT /api/vendas/:id` com `cliente_id` e `cliente_avulso: null`).
 - Consultas que trazem a venda junto usam `vendas(*)`, para que uma coluna nova não quebre um banco ainda sem a migração.
 
+### 5.1.1. Tela "Clientes" (uma linha por cliente)
+- A tela principal de cobrança lista **clientes**, não vendas (`views/ClientesView.tsx`; o agrupamento é feito no navegador por `utils/clientes-agrupados.ts`, sem rota nova).
+- Cada linha mostra nome, telefone, total em aberto e a situação mais grave do cliente ("Vencido há N dias", "Vence hoje", "Vence amanhã", "Vence em DD/MM", "Nada a receber", "Sem vendas"). Tocar na linha abre as vendas dele ali mesmo (vários clientes podem ficar abertos), com "Marcar pago", histórico e editar em cada venda.
+- **Ordem padrão: quem cobrar primeiro** (mais dias de atraso no topo, depois o vencimento mais próximo). Filtro padrão **"Devendo"**; "Vencidos", "Todos" (inclui quem não deve nada e cliente sem venda) e "Pagos" (pagamentos recebidos, com o desfazer).
+- Vendas sem cadastro formam um grupo por nome digitado; "Cadastrar" no grupo cria o cliente e passa todas as vendas do grupo para ele.
+- Pausar/reativar uma venda fica em "Editar" (não há pausa de um clique na lista); venda parada mostra o selo "Pausada" ou "Quitada".
+- Acima de 50 clientes a lista carrega em blocos ("Mostrar mais").
+- **Confirmações e avisos:** usar `components/ui/ConfirmDialog` (mostra quem, o quê e quanto) e `components/ui/Toast` (aviso fixo, com ação como "Desfazer"), nunca `window.confirm`/`alert`. Janelas sobrepostas usam `utils/useDialog` (Esc, foco inicial, foco preso e retorno do foco).
+- **Falha de carregamento nunca pode parecer lista vazia:** estado de erro próprio com "Tentar de novo", traço no lugar de zeros e os dados anteriores mantidos na tela.
+
 ### 5.2. Ciclos Mensais e "Marcar como Pago"
 - Ao marcar uma venda como paga:
   - O sistema calcula a data do próximo vencimento somando exatamente 1 mês (`avancarProximoMes()`).
