@@ -31,3 +31,6 @@ build/
 Thumbs.db
 .vscode/
 .idea/
+# Ferramentas locais (configuracao do assistente e criticas de design)
+.claude/
+.impeccable/
