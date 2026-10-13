@@ -114,6 +114,8 @@ O motor de cobrança segue rigorosamente as melhores práticas para proteção c
 - Um cliente pode possuir múltiplos contratos ou planos simultâneos (ex: plano familiar + plano individual).
 - Cada venda possui seu próprio valor mensal, dia de vencimento (1 a 31), modalidade (recorrente mensal ou parcelada com/sem juros) e status (`ativo`, `pausado`, `encerrado`).
 - O encerramento ou pausa de uma venda não altera o cadastro de outras vendas do mesmo cliente.
+- **Venda para cliente sem cadastro:** a venda pode ser feita só com o nome de quem comprou (`vendas.cliente_avulso`, com `cliente_id` nulo; ver `database/migration_venda_avulsa.sql`). Ela aparece nas listas, nos pagamentos, no resumo mensal e no backup, mas **não recebe avisos pelo WhatsApp**. No formulário de venda a opção "Cliente novo" já vem com "Cadastrar este cliente" marcado (cria o cliente e a venda juntos); desmarcado, grava a venda sem cadastro. Depois, o link "Sem cadastro · Cadastrar" na lista abre o cadastro com o nome preenchido e vincula a venda ao cliente criado (`PUT /api/vendas/:id` com `cliente_id` e `cliente_avulso: null`).
+- Consultas que trazem a venda junto usam `vendas(*)`, para que uma coluna nova não quebre um banco ainda sem a migração.
 
 ### 5.2. Ciclos Mensais e "Marcar como Pago"
 - Ao marcar uma venda como paga:
@@ -141,6 +143,12 @@ Cada tipo é enviado no máximo uma vez por ciclo (histórico de 20 dias antes d
 - Gestão completa de despesas da empresa e dos sócios.
 - Atributos obrigatórios: descrição, credor, valor, data de vencimento, categoria e status (`pendente` ou `pago`).
 - Integração no Dashboard com cálculo automático do **Balanço Líquido** (Total a Receber - Total a Pagar).
+
+### 5.5. Resumo Mensal
+- Tela "Resumo mensal" (aba própria; a Visão geral continua sendo o dashboard do momento atual): o usuário escolhe o mês e vê recebido, ainda a receber (e quanto já venceu), contas pagas e em aberto, saldo (recebido − contas pagas), vendas e clientes novos, avisos enviados, a evolução dos últimos 6 meses e as listas do mês.
+- `GET /api/resumo/mensal?mes=AAAA-MM` (`MonthlySummaryService`); sem `mes`, usa o mês atual.
+- **Os meses são contados no horário do Brasil (UTC-3)**, inclusive na Vercel, onde o servidor está em UTC: um pagamento às 23h do dia 31 pertence ao mês que termina.
+- "Recebido" vem dos pagamentos confirmados (`confirmacao_manual`); "ainda a receber" considera só o vencimento atual de cada venda ativa, então em meses passados mostra apenas o que continua em aberto.
 
 ---
 
