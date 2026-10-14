@@ -4,10 +4,13 @@ import { api } from '../services/api.js';
 import { Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 import { extractErrorMessage } from '../utils/error.js';
 
+// Painel aberto com "npm run demo": loja fictícia, login de demonstração já preenchido
+const DEMO = import.meta.env.MODE === 'demo';
+
 export const Login: React.FC = () => {
   const { login } = useAuth();
-  const [email, setEmail] = useState('');
-  const [senha, setSenha] = useState('');
+  const [email, setEmail] = useState(DEMO ? 'demo@flowzap.dev' : '');
+  const [senha, setSenha] = useState(DEMO ? 'demo1234' : '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +36,7 @@ export const Login: React.FC = () => {
           <img src="/logo.webp" alt="A&V Store" className="login-logo" width={96} height={96} />
           <h1 className="login-title">{'A&V Store'}</h1>
           <p className="login-subtitle">Gestão de cobranças · FlowZap</p>
+          {DEMO && <p className="login-demo-note">Demonstração com dados fictícios. Nada é enviado pelo WhatsApp.</p>}
         </div>
 
         {error && (

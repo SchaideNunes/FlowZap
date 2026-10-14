@@ -2315,6 +2315,15 @@ button.stat-tile:hover {
   font-size: 0.86rem;
 }
 
+.login-demo-note {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
 .input-with-icon {
   position: relative;
 }

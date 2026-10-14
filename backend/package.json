@@ -14,7 +14,8 @@
     "test:coverage": "vitest run --coverage",
     "seed:users": "tsx src/scripts/seedUsers.ts",
     "backup:agora": "tsx src/scripts/backup.ts agora",
-    "backup:restaurar": "tsx src/scripts/backup.ts restaurar"
+    "backup:restaurar": "tsx src/scripts/backup.ts restaurar",
+    "demo": "tsx src/demo/server.ts"
   },
   "keywords": [
     "cobranca",
