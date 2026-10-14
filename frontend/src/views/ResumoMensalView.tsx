@@ -34,7 +34,12 @@ const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um :
 /**
  * Tudo o que aconteceu em um mês: recebido, a receber, vendas e clientes novos, contas e avisos.
  */
-export const ResumoMensalView: React.FC = () => {
+interface ResumoMensalViewProps {
+  /** Muda quando uma venda ou um cliente é salvo fora desta tela: recarrega os dados. */
+  refreshKey?: number;
+}
+
+export const ResumoMensalView: React.FC<ResumoMensalViewProps> = ({ refreshKey }) => {
   const [mes, setMes] = useState(mesAtual);
   const [resumo, setResumo] = useState<ResumoMensal | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,7 +61,7 @@ export const ResumoMensalView: React.FC = () => {
 
   useEffect(() => {
     carregar(mes);
-  }, [mes]);
+  }, [mes, refreshKey]);
 
   const ehMesAtual = mes === mesAtual();
   // Enquanto o mês novo carrega, os números do mês anterior não ficam na tela

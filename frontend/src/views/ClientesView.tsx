@@ -33,6 +33,8 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog.js';
 import { Toast, ToastData } from '../components/ui/Toast.js';
 
 interface ClientesViewProps {
+  /** Muda quando uma venda ou um cliente é salvo fora desta tela: recarrega os dados. */
+  refreshKey?: number;
   onOpenNovoClienteModal: () => void;
   onEditCliente: (cliente: Cliente) => void;
   /** Cadastra quem comprou sem cadastro e passa as vendas dele para o cliente novo. */
@@ -49,6 +51,7 @@ const PAGINA = 50;
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
 export const ClientesView: React.FC<ClientesViewProps> = ({
+  refreshKey,
   onOpenNovoClienteModal,
   onEditCliente,
   onCadastrarClienteDaVenda,
@@ -107,9 +110,10 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
     }
   };
 
+  // Ao abrir e sempre que uma venda ou um cliente for salvo nas janelas de cadastro
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [refreshKey]);
 
   const hoje = todayISO();
   const nomeDaVenda = (v: Venda) => v.cliente?.nome || v.cliente_avulso || 'cliente';

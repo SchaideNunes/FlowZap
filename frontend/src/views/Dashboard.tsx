@@ -9,6 +9,8 @@ import { StatTile } from '../components/ui/StatTile.js';
 import { BackupPanel } from '../components/BackupPanel.js';
 
 interface DashboardProps {
+  /** Muda quando uma venda ou um cliente é salvo fora desta tela: recarrega os dados. */
+  refreshKey?: number;
   whatsAppInfo: WhatsAppStatus;
   onOpenWhatsAppModal: () => void;
   onOpenDisparoModal: () => void;
@@ -19,6 +21,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
+  refreshKey,
   whatsAppInfo,
   onOpenWhatsAppModal,
   onOpenDisparoModal,
@@ -68,7 +71,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     fetchData();
     const interval = setInterval(fetchData, 15000);
     return () => clearInterval(interval);
-  }, []);
+  }, [refreshKey]);
 
   // Quem devemos
   const contasPendentes = contasPagar.filter((c) => !c.pago);

@@ -154,6 +154,7 @@ export const App: React.FC = () => {
         )}
         {currentTab === 'dashboard' ? (
           <Dashboard
+            refreshKey={refreshTrigger}
             whatsAppInfo={whatsAppInfo}
             onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
             onOpenDisparoModal={() => setIsDisparoModalOpen(true)}
@@ -168,6 +169,7 @@ export const App: React.FC = () => {
           />
         ) : currentTab === 'clientes' ? (
           <ClientesView
+            refreshKey={refreshTrigger}
             onOpenNovoClienteModal={() => {
               setVendasParaVincular([]);
               setClienteToEdit(null);
@@ -182,9 +184,10 @@ export const App: React.FC = () => {
         ) : currentTab === 'contas-pagar' ? (
           <ContasPagarView />
         ) : currentTab === 'resumo' ? (
-          <ResumoMensalView />
+          <ResumoMensalView refreshKey={refreshTrigger} />
         ) : (
           <NotificacoesView
+            refreshKey={refreshTrigger}
             whatsAppInfo={whatsAppInfo}
             onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
             onOpenHistoricoModal={handleOpenHistorico}

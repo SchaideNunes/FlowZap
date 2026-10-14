@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Clock,
   AlertTriangle,
@@ -33,12 +33,15 @@ import { EmptyState } from '../components/ui/EmptyState.js';
 import { MensagensEditor } from '../components/MensagensEditor.js';
 
 interface NotificacoesViewProps {
+  /** Muda quando uma venda ou um cliente é salvo fora desta tela: recarrega os dados. */
+  refreshKey?: number;
   whatsAppInfo: WhatsAppStatus;
   onOpenWhatsAppModal: () => void;
   onOpenHistoricoModal: (venda: Venda) => void;
 }
 
 export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
+  refreshKey,
   whatsAppInfo,
   onOpenWhatsAppModal,
   onOpenHistoricoModal,
@@ -111,6 +114,16 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
     fetchCentralData(true);
     fetchConfig();
   }, []);
+
+  // Uma venda ou um cliente salvo nas janelas de cadastro muda os avisos: recarrega sem trocar de aba
+  const primeiraCarga = useRef(true);
+  useEffect(() => {
+    if (primeiraCarga.current) {
+      primeiraCarga.current = false;
+      return;
+    }
+    fetchCentralData();
+  }, [refreshKey]);
 
   const handleToggleAuto = async () => {
     if (!config || savingAuto) return;
