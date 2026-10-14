@@ -115,6 +115,8 @@ O motor de cobrança segue rigorosamente as melhores práticas para proteção c
 - Cada venda possui seu próprio valor mensal, dia de vencimento (1 a 31), modalidade (recorrente mensal ou parcelada com/sem juros) e status (`ativo`, `pausado`, `encerrado`).
 - O encerramento ou pausa de uma venda não altera o cadastro de outras vendas do mesmo cliente.
 - **Venda para cliente sem cadastro:** a venda pode ser feita só com o nome de quem comprou (`vendas.cliente_avulso`, com `cliente_id` nulo; ver `database/migration_venda_avulsa.sql`). Ela aparece nas listas, nos pagamentos, no resumo mensal e no backup, mas **não recebe avisos pelo WhatsApp**. No formulário de venda a opção "Cliente novo" já vem com "Cadastrar este cliente" marcado (cria o cliente e a venda juntos); desmarcado, grava a venda sem cadastro. Depois, o link "Sem cadastro · Cadastrar" na lista abre o cadastro com o nome preenchido e vincula a venda ao cliente criado (`PUT /api/vendas/:id` com `cliente_id` e `cliente_avulso: null`).
+- **Observações da venda** (`vendas.observacoes`, ver `database/migration_observacoes_venda.sql`): anotação interna, só para consulta no painel ("Ver observação" na venda, dentro do cliente aberto). **Nunca entra nas mensagens ao cliente.** O frontend só envia o campo quando há texto ou para apagar um que existia, para não quebrar um banco sem a coluna.
+- **Escolha do cliente na venda** (`components/ui/ClienteCombobox`): busca por nome ou telefone, sem cliente pré-escolhido (salvar sem escolher é recusado); um nome que não está na lista vira "Cliente novo" com o nome preenchido.
 - Consultas que trazem a venda junto usam `vendas(*)`, para que uma coluna nova não quebre um banco ainda sem a migração.
 
 ### 5.1.1. Tela "Clientes" (uma linha por cliente)
