@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS vendas (
 -- 3.1. Venda para cliente sem cadastro (para bancos criados antes desta opção)
 ALTER TABLE vendas ALTER COLUMN cliente_id DROP NOT NULL;
 ALTER TABLE vendas ADD COLUMN IF NOT EXISTS cliente_avulso TEXT;
+-- Observações internas da venda (não vão na mensagem ao cliente)
+ALTER TABLE vendas ADD COLUMN IF NOT EXISTS observacoes TEXT;
 ALTER TABLE vendas DROP CONSTRAINT IF EXISTS vendas_cliente_ou_avulso_check;
 ALTER TABLE vendas
     ADD CONSTRAINT vendas_cliente_ou_avulso_check CHECK (cliente_id IS NOT NULL OR cliente_avulso IS NOT NULL);

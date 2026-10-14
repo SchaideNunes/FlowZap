@@ -51822,6 +51822,7 @@ var SupabaseVendaRepository = class {
       ativo: data.ativo ?? true
     };
     if (data.cliente_avulso) payload.cliente_avulso = data.cliente_avulso;
+    if (data.observacoes) payload.observacoes = data.observacoes;
     if (data.valor_total !== void 0) payload.valor_total = data.valor_total;
     if (data.taxa_juros !== void 0) payload.taxa_juros = data.taxa_juros;
     if (data.total_parcelas !== void 0) payload.total_parcelas = data.total_parcelas;
@@ -57129,6 +57130,7 @@ var VendaStatusEnum = external_exports.enum([
   "pago"
 ]);
 var ClienteAvulsoSchema = external_exports.string().trim().min(2, { message: "Informe o nome do cliente" }).max(120, { message: "O nome do cliente pode ter no m\xE1ximo 120 caracteres" });
+var ObservacoesSchema = external_exports.string().trim().max(1e3, { message: "As observa\xE7\xF5es podem ter no m\xE1ximo 1000 caracteres" });
 var VendaSchema = external_exports.object({
   id: external_exports.number().int().positive().optional(),
   cliente_id: external_exports.number().int().positive({ message: "cliente_id inv\xE1lido" }).nullable().optional(),
@@ -57142,7 +57144,8 @@ var VendaSchema = external_exports.object({
   parcela_atual: external_exports.number().int().min(1).default(1).optional(),
   status_mes_atual: VendaStatusEnum.default("pendente"),
   data_vencimento_atual: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  ativo: external_exports.boolean().default(true)
+  ativo: external_exports.boolean().default(true),
+  observacoes: ObservacoesSchema.nullable().optional()
 });
 var CreateVendaSchema = external_exports.object({
   cliente_id: external_exports.number().int().positive({ message: "cliente_id inv\xE1lido" }).optional(),
@@ -57155,7 +57158,8 @@ var CreateVendaSchema = external_exports.object({
   total_parcelas: external_exports.number().int().min(1).nullable().optional(),
   parcela_atual: external_exports.number().int().min(1).default(1).optional(),
   data_vencimento_atual: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  ativo: external_exports.boolean().default(true)
+  ativo: external_exports.boolean().default(true),
+  observacoes: ObservacoesSchema.optional()
 }).refine((data) => data.cliente_id === void 0 !== (data.cliente_avulso === void 0), {
   message: "Informe um cliente cadastrado ou o nome de um cliente sem cadastro",
   path: ["cliente_id"]
@@ -57173,7 +57177,9 @@ var UpdateVendaSchema = external_exports.object({
   parcela_atual: external_exports.number().int().min(1).optional(),
   status_mes_atual: VendaStatusEnum.optional(),
   data_vencimento_atual: external_exports.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  ativo: external_exports.boolean().optional()
+  ativo: external_exports.boolean().optional(),
+  // Vazio ou nulo apaga a observação
+  observacoes: ObservacoesSchema.nullable().optional()
 });
 
 // src/controllers/venda.controller.ts

@@ -82,6 +82,7 @@ export class SupabaseVendaRepository implements IVendaRepository {
 
     // A coluna só vai na venda sem cadastro: as demais funcionam mesmo antes da migração
     if (data.cliente_avulso) payload.cliente_avulso = data.cliente_avulso;
+    if (data.observacoes) payload.observacoes = data.observacoes;
     if (data.valor_total !== undefined) payload.valor_total = data.valor_total;
     if (data.taxa_juros !== undefined) payload.taxa_juros = data.taxa_juros;
     if (data.total_parcelas !== undefined) payload.total_parcelas = data.total_parcelas;

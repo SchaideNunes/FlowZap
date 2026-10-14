@@ -12,6 +12,7 @@ import {
   Undo2,
   AlertTriangle,
   ChevronDown,
+  StickyNote,
 } from 'lucide-react';
 import { Cliente, PagamentoRecebido, Venda } from '../types/index.js';
 import { api } from '../services/api.js';
@@ -67,6 +68,8 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
   const [filtro, setFiltro] = useState<Filtro>('devendo');
   const [ordem, setOrdem] = useState<Ordem>('urgencia');
   const [abertos, setAbertos] = useState<Set<string>>(new Set());
+  // Vendas com a observação à mostra
+  const [notasAbertas, setNotasAbertas] = useState<Set<number>>(new Set());
   const [limite, setLimite] = useState(PAGINA);
 
   const [payingVendaId, setPayingVendaId] = useState<number | null>(null);
@@ -627,6 +630,25 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                                   <span className="sale-desc">
                                     {v.descricao}
                                     <span className="sale-meta">{parcelaDe(v) || 'Parcela única'}</span>
+                                    {v.observacoes && (
+                                      <button
+                                        type="button"
+                                        className="link-btn sale-note-toggle"
+                                        onClick={() =>
+                                          setNotasAbertas((prev) => {
+                                            const next = new Set(prev);
+                                            if (next.has(v.id)) next.delete(v.id);
+                                            else next.add(v.id);
+                                            return next;
+                                          })
+                                        }
+                                        aria-expanded={notasAbertas.has(v.id)}
+                                        aria-controls={`nota-${v.id}`}
+                                      >
+                                        <StickyNote size={12} aria-hidden="true" />
+                                        {notasAbertas.has(v.id) ? 'Esconder observação' : 'Ver observação'}
+                                      </button>
+                                    )}
                                   </span>
                                   <span className="sale-value num">{formatBRL(v.valor)}</span>
                                   <span className="sale-due">
@@ -665,6 +687,11 @@ export const ClientesView: React.FC<ClientesViewProps> = ({
                                       <Edit2 size={15} />
                                     </button>
                                   </span>
+                                  {v.observacoes && notasAbertas.has(v.id) && (
+                                    <p className="sale-note" id={`nota-${v.id}`}>
+                                      {v.observacoes}
+                                    </p>
+                                  )}
                                 </li>
                               ))}
                             </ul>

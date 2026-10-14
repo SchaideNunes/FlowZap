@@ -1531,6 +1531,25 @@ button.stat-tile:hover {
   font-size: 0.76rem;
   color: var(--text-dim);
 }
+.sale-note-toggle {
+  align-self: flex-start;
+  margin-top: 0.2rem;
+  color: var(--text-muted);
+  text-decoration-color: var(--border-subtle);
+}
+.sale-note {
+  grid-column: 1 / -1;
+  margin: 0.35rem 0 0;
+  padding: 0.6rem 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--text-main);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .sale-value {
   font-weight: 600;
 }
@@ -1911,6 +1930,86 @@ button.stat-tile:hover {
 
 .input-with-affix .form-input-right {
   border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+/* Campo de cliente com busca (venda) */
+.combo {
+  position: relative;
+}
+.combo-field {
+  position: relative;
+}
+.combo-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-dim);
+  pointer-events: none;
+}
+.combo-ok {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--success);
+  pointer-events: none;
+}
+.combo .combo-input {
+  padding-left: 2.3rem;
+  padding-right: 2.3rem;
+}
+.combo .combo-input.is-invalid {
+  border-color: rgba(var(--danger-rgb), 0.6);
+}
+.combo-list {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0.3rem;
+  max-height: 248px;
+  overflow-y: auto;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-md);
+}
+.combo-option {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 40px;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+.combo-option.is-active {
+  background: rgba(255, 255, 255, 0.08);
+}
+.combo-option-name {
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.combo-option-sub {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.combo-option-new {
+  align-items: center;
+  justify-content: flex-start;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}
+.combo-option-new strong {
+  color: var(--text-main);
+}
+.combo-empty {
+  padding: 0.6rem 0.7rem;
+  font-size: 0.84rem;
+  color: var(--text-dim);
 }
 
 /* Escolha entre duas opções dentro de um formulário */
@@ -2650,6 +2749,13 @@ button.stat-tile:hover {
     flex: 1;
     height: 44px;
   }
+  .combo-option {
+    min-height: 44px;
+  }
+  .combo-option-sub {
+    display: none;
+  }
+
   .cell-title-btn.mobile-card-name {
     min-height: 32px;
   }
@@ -2706,6 +2812,7 @@ button.stat-tile:hover {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       'desc valor'
+      'nota nota'
       'vence status'
       'acoes acoes';
     row-gap: 0.4rem;
@@ -2726,6 +2833,12 @@ button.stat-tile:hover {
   .sale-status {
     grid-area: status;
     justify-self: end;
+  }
+  .sale-note {
+    grid-area: nota;
+  }
+  .sale-note-toggle {
+    min-height: 32px;
   }
   .sale-actions {
     grid-area: acoes;

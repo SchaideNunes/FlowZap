@@ -5,7 +5,8 @@ import { api } from '../services/api.js';
 import { extractErrorMessage } from '../utils/error.js';
 import { formatBRL, parseBRL } from '../utils/format.js';
 import { useDialog } from '../utils/useDialog.js';
-import { formatFullWhatsApp, maskPhone } from '../utils/phone.js';
+import { ClienteCombobox } from './ui/ClienteCombobox.js';
+import { maskPhone } from '../utils/phone.js';
 
 interface VendaModalProps {
   isOpen: boolean;
@@ -35,6 +36,7 @@ export const VendaModal: React.FC<VendaModalProps> = ({
   const [parcelaAtual, setParcelaAtual] = useState('1');
   const [diaVencimento, setDiaVencimento] = useState('10');
   const [ativo, setAtivo] = useState(true);
+  const [observacoes, setObservacoes] = useState('');
   const [maisOpcoes, setMaisOpcoes] = useState(false);
   // Cliente novo, digitado na própria venda
   const [clienteNovo, setClienteNovo] = useState(false);
@@ -60,6 +62,7 @@ export const VendaModal: React.FC<VendaModalProps> = ({
       setDescricao(vendaToEdit.descricao || '');
       setDiaVencimento(String(vendaToEdit.dia_vencimento));
       setAtivo(vendaToEdit.ativo);
+      setObservacoes(vendaToEdit.observacoes || '');
 
       const parcelas = Math.min(MAX_PARCELAS, vendaToEdit.total_parcelas || 1);
       const parcelaInicial = vendaToEdit.parcela_atual || 1;
@@ -72,7 +75,7 @@ export const VendaModal: React.FC<VendaModalProps> = ({
       // Quem já usa juros ou parcela inicial vê esses campos sem precisar procurar
       setMaisOpcoes(Boolean(vendaToEdit.taxa_juros) || parcelaInicial > 1);
     } else {
-      setSelectedClienteId(clienteId || (clienteList[0]?.id ?? 0));
+      setSelectedClienteId(clienteId || 0);
       setDescricao('');
       setValorTotal('');
       setTaxaJuros('');
@@ -80,6 +83,7 @@ export const VendaModal: React.FC<VendaModalProps> = ({
       setParcelaAtual('1');
       setDiaVencimento('10');
       setAtivo(true);
+      setObservacoes('');
       setMaisOpcoes(false);
     }
     // Sem nenhum cliente cadastrado, a venda já começa pedindo o nome
@@ -114,6 +118,11 @@ export const VendaModal: React.FC<VendaModalProps> = ({
     }
 
     const usarClienteNovo = escolheCliente && clienteNovo;
+    if (escolheCliente && !usarClienteNovo && !selectedClienteId) {
+      setError('Escolha o cliente da venda, ou use "Cliente novo".');
+      setSaving(false);
+      return;
+    }
     if (usarClienteNovo && novoNome.trim().length < 2) {
       setError('Informe o nome do cliente.');
       setSaving(false);
@@ -134,6 +143,8 @@ export const VendaModal: React.FC<VendaModalProps> = ({
       total_parcelas: numParcelas,
       parcela_atual: Math.min(numParcelas, Math.max(1, parseInt(parcelaAtual, 10) || 1)),
       ativo,
+      // Só vai quando há texto, ou para apagar uma observação que existia
+      ...(observacoes.trim() || vendaToEdit?.observacoes ? { observacoes: observacoes.trim() || null } : {}),
     };
 
     try {
@@ -272,19 +283,18 @@ export const VendaModal: React.FC<VendaModalProps> = ({
                 <label className="form-label" htmlFor="venda-cliente">
                   Cliente
                 </label>
-                <select
+                <ClienteCombobox
                   id="venda-cliente"
-                  className="form-select"
+                  clientes={clienteList}
                   value={selectedClienteId}
-                  onChange={(e) => setSelectedClienteId(Number(e.target.value))}
-                  required
-                >
-                  {clienteList.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nome} · {formatFullWhatsApp(c.whatsapp)}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedClienteId}
+                  onCreateNew={(nome) => {
+                    setClienteNovo(true);
+                    setNovoNome(nome);
+                    setCadastrar(true);
+                  }}
+                  invalid={Boolean(error) && !selectedClienteId}
+                />
               </div>
             )}
 
@@ -376,6 +386,22 @@ export const VendaModal: React.FC<VendaModalProps> = ({
                 </span>
               </div>
             )}
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="venda-observacoes">
+                Observações <span className="label-optional">(opcional)</span>
+              </label>
+              <textarea
+                id="venda-observacoes"
+                className="form-textarea"
+                rows={2}
+                maxLength={1000}
+                value={observacoes}
+                onChange={(e) => setObservacoes(e.target.value)}
+                placeholder="Ex.: pagou a entrada em dinheiro, aparelho com garantia até março"
+              />
+              <span className="form-hint">Só para consulta no sistema. Não vai na mensagem ao cliente.</span>
+            </div>
 
             <button
               type="button"

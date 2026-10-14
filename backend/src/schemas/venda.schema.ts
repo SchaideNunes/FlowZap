@@ -17,6 +17,12 @@ const ClienteAvulsoSchema = z
   .min(2, { message: 'Informe o nome do cliente' })
   .max(120, { message: 'O nome do cliente pode ter no máximo 120 caracteres' });
 
+// Anotação interna da venda: aparece só no painel, nunca na mensagem ao cliente
+const ObservacoesSchema = z
+  .string()
+  .trim()
+  .max(1000, { message: 'As observações podem ter no máximo 1000 caracteres' });
+
 export const VendaSchema = z.object({
   id: z.number().int().positive().optional(),
   cliente_id: z.number().int().positive({ message: 'cliente_id inválido' }).nullable().optional(),
@@ -35,6 +41,7 @@ export const VendaSchema = z.object({
   status_mes_atual: VendaStatusEnum.default('pendente'),
   data_vencimento_atual: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   ativo: z.boolean().default(true),
+  observacoes: ObservacoesSchema.nullable().optional(),
 });
 
 export const CreateVendaSchema = z
@@ -54,6 +61,7 @@ export const CreateVendaSchema = z
   parcela_atual: z.number().int().min(1).default(1).optional(),
   data_vencimento_atual: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   ativo: z.boolean().default(true),
+  observacoes: ObservacoesSchema.optional(),
   })
   .refine((data) => (data.cliente_id === undefined) !== (data.cliente_avulso === undefined), {
     message: 'Informe um cliente cadastrado ou o nome de um cliente sem cadastro',
@@ -74,6 +82,8 @@ export const UpdateVendaSchema = z.object({
   status_mes_atual: VendaStatusEnum.optional(),
   data_vencimento_atual: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   ativo: z.boolean().optional(),
+  // Vazio ou nulo apaga a observação
+  observacoes: ObservacoesSchema.nullable().optional(),
 });
 
 export type VendaDTO = z.infer<typeof VendaSchema>;

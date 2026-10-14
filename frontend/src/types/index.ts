@@ -21,6 +21,8 @@ export interface Venda {
   cliente_id: number | null;
   /** Nome de quem comprou sem cadastro. */
   cliente_avulso?: string | null;
+  /** Anotação interna: aparece só no painel, nunca na mensagem ao cliente. */
+  observacoes?: string | null;
   descricao: string;
   valor: number;
   dia_vencimento: number;
