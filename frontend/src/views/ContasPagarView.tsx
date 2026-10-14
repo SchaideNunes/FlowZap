@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, Plus, CheckCircle2, Edit2, Check, X, Trash2, Calendar, RefreshCw, Undo2 } from 'lucide-react';
 import { ContaPagar } from '../types/index.js';
 import { api } from '../services/api.js';
@@ -8,6 +8,8 @@ import { formatBRL, formatDateBR, todayISO } from '../utils/format.js';
 import { PageHeader } from '../components/ui/PageHeader.js';
 import { StatTile } from '../components/ui/StatTile.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog.js';
+import { Toast, ToastData } from '../components/ui/Toast.js';
 
 type StatusFilter = 'todos' | 'pendente' | 'vencido' | 'pago';
 
@@ -18,6 +20,12 @@ export const ContasPagarView: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todos');
   const [payingContaId, setPayingContaId] = useState<number | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ContaPagar | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const toastSeq = useRef(0);
+
+  const showError = (message: string) => setToast({ id: ++toastSeq.current, tone: 'danger', message });
 
   // Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -54,26 +62,29 @@ export const ContasPagarView: React.FC = () => {
       );
       setTimeout(() => setFeedbackMsg(null), 4000);
       fetchContas();
-    } catch (err: any) {
-      alert(extractErrorMessage(err, 'Erro ao atualizar conta a pagar.'));
+    } catch (err: unknown) {
+      showError(extractErrorMessage(err, 'Não foi possível atualizar a conta.'));
     } finally {
       setPayingContaId(null);
     }
   };
 
-  const handleDelete = async (conta: ContaPagar) => {
-    const confirm = window.confirm(
-      `Excluir a conta de "${conta.nome_credor}" no valor de ${formatBRL(conta.valor)}?`
-    );
-    if (!confirm) return;
+  const handleDelete = (conta: ContaPagar) => setDeleteTarget(conta);
 
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const conta = deleteTarget;
+    setDeleting(true);
     try {
       await api.delete(`/contas-pagar/${conta.id}`);
       setFeedbackMsg(`Conta de "${conta.nome_credor}" excluída.`);
       setTimeout(() => setFeedbackMsg(null), 4000);
       fetchContas();
-    } catch (err: any) {
-      alert(extractErrorMessage(err, 'Erro ao excluir conta a pagar.'));
+    } catch (err: unknown) {
+      showError(extractErrorMessage(err, 'Não foi possível excluir a conta.'));
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -531,6 +542,29 @@ export const ContasPagarView: React.FC = () => {
         contaToEdit={contaToEdit}
         onSuccess={fetchContas}
       />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Excluir conta?"
+        confirmLabel="Excluir conta"
+        busyLabel="Excluindo..."
+        confirmClassName="btn-danger"
+        confirmIcon={<Trash2 size={16} />}
+        busy={deleting}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setDeleteTarget(null)}
+      >
+        {deleteTarget && (
+          <>
+            <div className="confirm-who">{deleteTarget.nome_credor}</div>
+            {deleteTarget.descricao && <div className="confirm-what">{deleteTarget.descricao}</div>}
+            <div className="confirm-value">{formatBRL(deleteTarget.valor)}</div>
+            <div className="confirm-note">A conta some da lista e dos totais. Não dá para desfazer.</div>
+          </>
+        )}
+      </ConfirmDialog>
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 };

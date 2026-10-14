@@ -1,10 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { CheckCircle2, AlertTriangle, X } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react';
 
 export interface ToastData {
   /** Muda a cada aviso, para reiniciar o tempo mesmo com o mesmo texto. */
   id: number;
-  tone: 'success' | 'danger';
+  /** info: aviso neutro, sem cor de status (ex.: "nada para enviar hoje"). */
+  tone: 'success' | 'danger' | 'info';
   message: string;
   actionLabel?: string;
   onAction?: () => void;
@@ -52,7 +53,13 @@ export const Toast: React.FC<ToastProps> = ({ toast, onClose }) => {
           onFocus={stop}
           onBlur={start}
         >
-          {toast.tone === 'success' ? <CheckCircle2 size={18} aria-hidden="true" /> : <AlertTriangle size={18} aria-hidden="true" />}
+          {toast.tone === 'success' ? (
+            <CheckCircle2 size={18} aria-hidden="true" />
+          ) : toast.tone === 'info' ? (
+            <Info size={18} aria-hidden="true" />
+          ) : (
+            <AlertTriangle size={18} aria-hidden="true" />
+          )}
           <span className="toast-message">{toast.message}</span>
           {toast.actionLabel && toast.onAction && (
             <button type="button" className="btn btn-secondary btn-sm toast-action" onClick={toast.onAction}>

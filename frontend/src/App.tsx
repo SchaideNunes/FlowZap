@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from './context/AuthContext.js';
 import { Navbar } from './components/Navbar.js';
 import { Login } from './views/Login.js';
@@ -13,6 +13,7 @@ import { ClienteModal } from './components/ClienteModal.js';
 import { VendaModal } from './components/VendaModal.js';
 import { HistoricoModal } from './components/HistoricoModal.js';
 import { SedeLockBanner } from './components/SedeLockBanner.js';
+import { Toast, ToastData } from './components/ui/Toast.js';
 import { Cliente, Venda, WhatsAppStatus } from './types/index.js';
 import { api } from './services/api.js';
 
@@ -43,6 +44,8 @@ export const App: React.FC = () => {
 
   const [isHistoricoModalOpen, setIsHistoricoModalOpen] = useState(false);
   const [historicoVenda, setHistoricoVenda] = useState<Venda | null>(null);
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const toastSeq = useRef(0);
 
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -124,7 +127,11 @@ export const App: React.FC = () => {
         vendas.map((venda) => api.put(`/vendas/${venda.id}`, { cliente_id: cliente.id, cliente_avulso: null }))
       );
       if (resultados.some((r) => r.status === 'rejected')) {
-        alert('O cliente foi cadastrado, mas nem todas as vendas foram passadas para ele. Tente de novo pela lista.');
+        setToast({
+          id: ++toastSeq.current,
+          tone: 'danger',
+          message: 'O cliente foi cadastrado, mas nem todas as vendas foram passadas para ele. Tente de novo pela lista.',
+        });
       }
     }
     handleDataChanged();
@@ -231,6 +238,8 @@ export const App: React.FC = () => {
         onClose={() => setIsHistoricoModalOpen(false)}
         venda={historicoVenda}
       />
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 };

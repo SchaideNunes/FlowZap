@@ -2176,6 +2176,9 @@ button.stat-tile:hover {
 .toast-success > svg {
   color: var(--success);
 }
+.toast-info > svg {
+  color: var(--text-muted);
+}
 .toast-danger {
   border-color: rgba(var(--danger-rgb), 0.5);
 }

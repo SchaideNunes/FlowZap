@@ -31,6 +31,17 @@ import { PageHeader } from '../components/ui/PageHeader.js';
 import { StatTile, StatTone } from '../components/ui/StatTile.js';
 import { EmptyState } from '../components/ui/EmptyState.js';
 import { MensagensEditor } from '../components/MensagensEditor.js';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog.js';
+import { Toast, ToastData } from '../components/ui/Toast.js';
+
+/** O que está esperando confirmação na tela. */
+type Pergunta =
+  | { tipo: 'desligar' }
+  | { tipo: 'conectar' }
+  | { tipo: 'disparar' }
+  | { tipo: 'pagar'; vendaId: number; nome: string; valor: number; descricao: string };
+
+const NOMES_NA_CONFIRMACAO = 5;
 
 interface NotificacoesViewProps {
   /** Muda quando uma venda ou um cliente é salvo fora desta tela: recarrega os dados. */
@@ -74,6 +85,11 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [dispatching, setDispatching] = useState(false);
   const [payingVendaId, setPayingVendaId] = useState<number | null>(null);
+  const [pergunta, setPergunta] = useState<Pergunta | null>(null);
+  const [toast, setToast] = useState<ToastData | null>(null);
+  const toastSeq = useRef(0);
+
+  const showToast = (tone: ToastData['tone'], message: string) => setToast({ id: ++toastSeq.current, tone, message });
 
   const fetchCentralData = async (shouldAutoSelectTab = false) => {
     setLoading(true);
@@ -125,19 +141,14 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
     fetchCentralData();
   }, [refreshKey]);
 
-  const handleToggleAuto = async () => {
+  const handleToggleAuto = () => {
     if (!config || savingAuto) return;
-    const ligar = !config.envio_automatico;
+    // Desligar pede confirmação: com ele desligado, nenhum aviso sai sozinho
+    if (config.envio_automatico) setPergunta({ tipo: 'desligar' });
+    else void salvarEnvioAutomatico(true);
+  };
 
-    if (
-      !ligar &&
-      !window.confirm(
-        'Desligar o envio automático? Nenhum aviso sairá sozinho até você ligar de novo. O botão de disparo manual continua funcionando.'
-      )
-    ) {
-      return;
-    }
-
+  const salvarEnvioAutomatico = async (ligar: boolean) => {
     setSavingAuto(true);
     setConfigError(null);
     try {
@@ -147,6 +158,7 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
       setConfigError(extractErrorMessage(err, 'Não foi possível alterar o envio automático.'));
     } finally {
       setSavingAuto(false);
+      setPergunta(null);
     }
   };
 
@@ -156,30 +168,19 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
     fetchCentralData();
   };
 
-  const handleDispatchToday = async () => {
+  const handleDispatchToday = () => {
     if (isRemotePanel) {
-      alert('Os disparos só podem ser feitos pela máquina-sede. Abra o sistema no computador da loja.');
+      showToast('info', 'Os avisos só podem ser enviados pelo computador da loja.');
       return;
     }
-
     if (data.agendadosHoje.length === 0) {
-      alert('Não há cobranças elegíveis para envio hoje.');
+      showToast('info', 'Não há avisos para enviar hoje.');
       return;
     }
+    setPergunta({ tipo: whatsAppStatus === 'open' ? 'disparar' : 'conectar' });
+  };
 
-    if (whatsAppStatus !== 'open') {
-      const confirm = window.confirm(
-        'O WhatsApp não está conectado no momento. Deseja abrir a tela de conexão antes de disparar?'
-      );
-      if (confirm) onOpenWhatsAppModal();
-      return;
-    }
-
-    const confirm = window.confirm(
-      `Deseja iniciar o disparo sequencial de ${data.agendadosHoje.length} notificações de hoje via WhatsApp?`
-    );
-    if (!confirm) return;
-
+  const executarDisparo = async () => {
     setDispatching(true);
     try {
       const res = await api.post('/cobrancas/disparar');
@@ -189,29 +190,30 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
       setTimeout(() => setFeedbackMsg(null), 6000);
       await fetchCentralData();
       setActiveTab('enviados');
-    } catch (err: any) {
-      alert(extractErrorMessage(err, 'Erro ao iniciar disparo de notificações.'));
+    } catch (err: unknown) {
+      showToast('danger', extractErrorMessage(err, 'Não foi possível iniciar o envio dos avisos.'));
     } finally {
       setDispatching(false);
+      setPergunta(null);
     }
   };
 
-  const handleMarkAsPaid = async (vendaId: number, nome: string, valor: number) => {
-    const confirm = window.confirm(
-      `Confirmar recebimento do pagamento de "${nome}" no valor de ${formatBRL(valor)}?`
-    );
-    if (!confirm) return;
+  const handleMarkAsPaid = (vendaId: number, nome: string, valor: number, descricao: string) => {
+    setPergunta({ tipo: 'pagar', vendaId, nome, valor, descricao });
+  };
 
+  const confirmarPagamento = async (vendaId: number, nome: string) => {
     setPayingVendaId(vendaId);
     try {
       await api.patch(`/vendas/${vendaId}/pago`);
       setFeedbackMsg(`Pagamento de "${nome}" confirmado com sucesso!`);
       setTimeout(() => setFeedbackMsg(null), 4000);
       fetchCentralData();
-    } catch (err: any) {
-      alert(extractErrorMessage(err, 'Erro ao registrar pagamento.'));
+    } catch (err: unknown) {
+      showToast('danger', extractErrorMessage(err, 'Não foi possível registrar o pagamento.'));
     } finally {
       setPayingVendaId(null);
+      setPergunta(null);
     }
   };
 
@@ -577,7 +579,7 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
 
                             <button
                               className="btn btn-pay btn-sm"
-                              onClick={() => handleMarkAsPaid(item.vendaId, item.clienteNome, Number(item.valor))}
+                              onClick={() => handleMarkAsPaid(item.vendaId, item.clienteNome, Number(item.valor), item.descricao || 'Cobrança')}
                               disabled={payingVendaId === item.vendaId}
                               title="O cliente já pagou (ex.: no balcão)"
                             >
@@ -673,7 +675,7 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
                               {!isPago && (
                                 <button
                                   className="btn btn-pay btn-sm"
-                                  onClick={() => handleMarkAsPaid(item.vendaId, item.clienteNome, Number(item.valor))}
+                                  onClick={() => handleMarkAsPaid(item.vendaId, item.clienteNome, Number(item.valor), item.descricao || 'Cobrança')}
                                   disabled={payingVendaId === item.vendaId}
                                   title="Confirmar que o cliente pagou"
                                 >
@@ -833,7 +835,7 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
 
                             <button
                               className="btn btn-pay btn-sm"
-                              onClick={() => handleMarkAsPaid(item.vendaId, item.clienteNome, Number(item.valor))}
+                              onClick={() => handleMarkAsPaid(item.vendaId, item.clienteNome, Number(item.valor), item.descricao || 'Cobrança')}
                               disabled={payingVendaId === item.vendaId}
                               title="Confirmar que o cliente pagou"
                             >
@@ -861,6 +863,84 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={pergunta?.tipo === 'desligar'}
+        title="Desligar o envio automático?"
+        confirmLabel="Desligar"
+        busyLabel="Desligando..."
+        confirmClassName="btn-secondary"
+        busy={savingAuto}
+        onConfirm={() => void salvarEnvioAutomatico(false)}
+        onCancel={() => setPergunta(null)}
+      >
+        <div className="confirm-what">Nenhum aviso sairá sozinho até você ligar de novo.</div>
+        <div className="confirm-note">O botão "Disparar avisos de hoje" continua funcionando.</div>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={pergunta?.tipo === 'conectar'}
+        title="WhatsApp desconectado"
+        confirmLabel="Conectar o WhatsApp"
+        onConfirm={() => {
+          setPergunta(null);
+          onOpenWhatsAppModal();
+        }}
+        onCancel={() => setPergunta(null)}
+      >
+        <div className="confirm-what">
+          Para enviar os avisos de hoje ({data.agendadosHoje.length}), conecte primeiro o WhatsApp da loja.
+        </div>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={pergunta?.tipo === 'disparar'}
+        title="Enviar os avisos de hoje?"
+        confirmLabel={`Enviar ${data.agendadosHoje.length} ${data.agendadosHoje.length === 1 ? 'aviso' : 'avisos'}`}
+        busyLabel="Iniciando..."
+        confirmIcon={<Send size={16} />}
+        busy={dispatching}
+        onConfirm={() => void executarDisparo()}
+        onCancel={() => setPergunta(null)}
+      >
+        <div className="confirm-who">
+          {data.agendadosHoje
+            .slice(0, NOMES_NA_CONFIRMACAO)
+            .map((item) => item.clienteNome)
+            .join(', ')}
+          {data.agendadosHoje.length > NOMES_NA_CONFIRMACAO &&
+            ` e mais ${data.agendadosHoje.length - NOMES_NA_CONFIRMACAO}`}
+        </div>
+        <div className="confirm-value">
+          {formatBRL(data.agendadosHoje.reduce((acc, item) => acc + Number(item.valor), 0))}
+        </div>
+        <div className="confirm-note">
+          As mensagens saem uma de cada vez, com intervalo de 8 a 20 segundos entre elas.
+        </div>
+      </ConfirmDialog>
+
+      <ConfirmDialog
+        open={pergunta?.tipo === 'pagar'}
+        title="Confirmar pagamento"
+        confirmLabel="Confirmar pagamento"
+        confirmClassName="btn-pay"
+        confirmIcon={<Check size={16} />}
+        busy={payingVendaId !== null}
+        onConfirm={() => {
+          if (pergunta?.tipo === 'pagar') void confirmarPagamento(pergunta.vendaId, pergunta.nome);
+        }}
+        onCancel={() => setPergunta(null)}
+      >
+        {pergunta?.tipo === 'pagar' && (
+          <>
+            <div className="confirm-who">{pergunta.nome}</div>
+            <div className="confirm-what">{pergunta.descricao}</div>
+            <div className="confirm-value">{formatBRL(pergunta.valor)}</div>
+          </>
+        )}
+      </ConfirmDialog>
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 };
