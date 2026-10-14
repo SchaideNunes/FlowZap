@@ -254,7 +254,7 @@ export const ContasPagarView: React.FC = () => {
             )}
           </div>
 
-          <div className="excel-filters">
+          <div className="excel-filters filters-fit" role="group" aria-label="Quais contas mostrar">
             <button
               type="button"
               className={`excel-filter-btn ${statusFilter === 'todos' ? 'active' : ''}`}

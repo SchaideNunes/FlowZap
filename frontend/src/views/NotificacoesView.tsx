@@ -423,14 +423,15 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
 
       <div className="excel-wrapper">
         <div className="excel-toolbar">
-          <div className="excel-filters">
+          <div className="excel-filters filters-fit" role="group" aria-label="O que mostrar">
             <button
               type="button"
               className={`excel-filter-btn ${activeTab === 'hoje' ? 'active' : ''}`}
               onClick={() => setActiveTab('hoje')}
             >
               <Calendar size={14} />
-              <span>Para enviar hoje</span>
+              <span className="label-long">Para enviar hoje</span>
+              <span className="label-short">Hoje</span>
               <span className="excel-filter-count">{data.agendadosHoje.length}</span>
             </button>
 
@@ -450,7 +451,8 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
               onClick={() => setActiveTab('atrasados')}
             >
               <AlertTriangle size={14} />
-              <span>Em atraso</span>
+              <span className="label-long">Em atraso</span>
+              <span className="label-short">Atraso</span>
               <span className={`excel-filter-count ${data.emAtraso.length > 0 ? 'has-alert' : ''}`}>
                 {data.emAtraso.length}
               </span>
@@ -485,7 +487,7 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
         {/* Aba 1: para enviar hoje */}
         {activeTab === 'hoje' && (
           <div className="excel-table-container">
-            <table className="excel-table stack-table">
+            <table className="excel-table stack-table notif-cards">
               <thead>
                 <tr>
                   <th>Cliente</th>
@@ -523,26 +525,26 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
 
                     return (
                       <tr key={item.vendaId}>
-                        <td data-label="Cliente">
+                        <td data-label="Cliente" className="nc-a">
                           {renderCliente(item.clienteNome, item.whatsapp, waLink, 'Abrir o WhatsApp com a mensagem pronta')}
                         </td>
 
-                        <td data-label="Venda">{item.descricao || 'Cobrança'}</td>
+                        <td data-label="Venda" className="nc-c">{item.descricao || 'Cobrança'}</td>
 
-                        <td data-label="Aviso">{getTipoBadge(item.tipo)}</td>
+                        <td data-label="Aviso" className="nc-d">{getTipoBadge(item.tipo)}</td>
 
-                        <td data-label="Valor" className="num cell-title">
+                        <td data-label="Valor" className="num cell-title nc-b">
                           {formatBRL(item.valor)}
                         </td>
 
-                        <td data-label="Vencimento">
+                        <td data-label="Vence" className="nc-e">
                           <span className="date-cell">
                             <Calendar size={13} />
                             {item.dataVencimento}
                           </span>
                         </td>
 
-                        <td className="stack-full">
+                        <td className="stack-full nc-msg">
                           <div className="message-preview">
                             <div className={`message-preview-text ${isExpanded ? 'is-expanded' : ''}`}>
                               {item.mensagem}
@@ -561,7 +563,7 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
                           </div>
                         </td>
 
-                        <td className="stack-full" style={{ textAlign: 'right' }}>
+                        <td className="stack-full nc-acoes" style={{ textAlign: 'right' }}>
                           <div className="cell-actions">
                             <a
                               href={waLink}
@@ -596,7 +598,7 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
         {/* Aba 2: enviadas */}
         {activeTab === 'enviados' && (
           <div className="excel-table-container">
-            <table className="excel-table stack-table">
+            <table className="excel-table stack-table notif-cards">
               <thead>
                 <tr>
                   <th>Cliente</th>
@@ -636,23 +638,23 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
                     return (
                       <React.Fragment key={item.id}>
                         <tr>
-                          <td data-label="Cliente">
+                          <td data-label="Cliente" className="nc-a">
                             {renderCliente(item.clienteNome, item.whatsapp, waLink, 'Abrir a conversa no WhatsApp')}
                           </td>
 
-                          <td data-label="Venda">{item.descricao || 'Cobrança'}</td>
+                          <td data-label="Venda" className="nc-c">{item.descricao || 'Cobrança'}</td>
 
-                          <td data-label="Valor" className="num cell-title">
+                          <td data-label="Valor" className="num cell-title nc-b">
                             {formatBRL(item.valor)}
                           </td>
 
-                          <td data-label="Enviado em" style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                          <td data-label="Enviado" className="nc-e" style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                             {formatDateTime(item.dataEnvio)}
                           </td>
 
-                          <td data-label="Aviso">{getTipoBadge(item.tipo)}</td>
+                          <td data-label="Aviso" className="nc-d">{getTipoBadge(item.tipo)}</td>
 
-                          <td data-label="Pagamento">
+                          <td data-label="Pagamento" className="nc-f">
                             {isPago ? (
                               <span className="badge badge-pago">
                                 <span className="status-dot dot-success" aria-hidden="true" />
@@ -666,7 +668,7 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
                             )}
                           </td>
 
-                          <td className="stack-full" style={{ textAlign: 'right' }}>
+                          <td className="stack-full nc-acoes" style={{ textAlign: 'right' }}>
                             <div className="cell-actions">
                               {!isPago && (
                                 <button
@@ -728,7 +730,7 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
         {/* Aba 3: em atraso */}
         {activeTab === 'atrasados' && (
           <div className="excel-table-container">
-            <table className="excel-table stack-table">
+            <table className="excel-table stack-table notif-cards">
               <thead>
                 <tr>
                   <th>Cliente</th>
@@ -774,11 +776,11 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
 
                     return (
                       <tr key={item.vendaId} className="row-vencido">
-                        <td data-label="Cliente">
+                        <td data-label="Cliente" className="nc-a">
                           {renderCliente(item.clienteNome, item.whatsapp, waLink, 'Abrir o WhatsApp com a cobrança pronta')}
                         </td>
 
-                        <td data-label="Venda">
+                        <td data-label="Venda" className="nc-c">
                           <div className="cell-stack">
                             <span>{item.descricao}</span>
                             {item.totalParcelas && item.totalParcelas > 1 && (
@@ -789,20 +791,20 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
                           </div>
                         </td>
 
-                        <td data-label="Atraso">{getDelayBadge(item.diasAtraso)}</td>
+                        <td data-label="Atraso" className="nc-d">{getDelayBadge(item.diasAtraso)}</td>
 
-                        <td data-label="Valor" className="num cell-title">
+                        <td data-label="Valor" className="num cell-title nc-b">
                           {formatBRL(item.valor)}
                         </td>
 
-                        <td data-label="Vencimento">
+                        <td data-label="Vence" className="nc-e">
                           <span className="date-cell is-overdue">
                             <Calendar size={13} />
                             {item.dataVencimento}
                           </span>
                         </td>
 
-                        <td data-label="Último aviso">
+                        <td data-label="Último aviso" className="nc-g">
                           {item.ultimoEnvio ? (
                             <div className="cell-stack">
                               <span>{getUltimoEnvioLabel(item.ultimoEnvio.tipo)}</span>
@@ -817,7 +819,7 @@ export const NotificacoesView: React.FC<NotificacoesViewProps> = ({
                           )}
                         </td>
 
-                        <td className="stack-full" style={{ textAlign: 'right' }}>
+                        <td className="stack-full nc-acoes" style={{ textAlign: 'right' }}>
                           <div className="cell-actions">
                             <a
                               href={waLink}

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, DollarSign, Save } from 'lucide-react';
+import { X, Save } from 'lucide-react';
 import { ContaPagar } from '../types/index.js';
 import { api } from '../services/api.js';
 import { extractErrorMessage } from '../utils/error.js';
+import { useDialog } from '../utils/useDialog.js';
 
 interface ContaPagarModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ export const ContaPagarModal: React.FC<ContaPagarModalProps> = ({
   const [observacoes, setObservacoes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dialogRef = useDialog(isOpen, onClose, !saving);
 
   useEffect(() => {
     if (contaToEdit) {
@@ -84,122 +86,108 @@ export const ContaPagarModal: React.FC<ContaPagarModalProps> = ({
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content">
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="conta-titulo">
+      <div ref={dialogRef} className="modal-content" style={{ maxWidth: '460px' }}>
         <div className="modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <DollarSign size={20} color="var(--primary)" />
-            <h3 className="modal-title">
-              {contaToEdit ? 'Editar Conta a Pagar' : 'Cadastrar Quem Devemos'}
-            </h3>
-          </div>
-          <button className="modal-close" onClick={onClose} disabled={saving}>
+          <h3 className="modal-title" id="conta-titulo">
+            {contaToEdit ? 'Editar conta a pagar' : 'Nova conta a pagar'}
+          </h3>
+          <button type="button" className="modal-close" onClick={onClose} disabled={saving} aria-label="Fechar">
             <X size={18} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="modal-body">
+          <div className="modal-body venda-form">
             {error && (
-              <div
-                style={{
-                  color: 'var(--danger)',
-                  fontSize: '0.85rem',
-                  marginBottom: '1rem',
-                  background: 'var(--danger-light)',
-                  padding: '8px 12px',
-                  borderRadius: '8px',
-                }}
-              >
+              <div className="alert alert-danger" role="alert">
                 {error}
               </div>
             )}
 
             <div className="form-group">
-              <label className="form-label">Nome de Quem Devemos (Credor / Fornecedor) *</label>
+              <label className="form-label" htmlFor="conta-credor">
+                Para quem
+              </label>
               <input
+                id="conta-credor"
                 type="text"
                 className="form-input"
                 required
                 value={nomeCredor}
                 onChange={(e) => setNomeCredor(e.target.value)}
-                placeholder="Ex: CRISTE (PARCELADO), JOSA, FORNECEDOR PEÇAS..."
+                placeholder="Fornecedor, credor ou pessoa"
+                autoComplete="off"
               />
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Valor (R$) *</label>
-              <div style={{ position: 'relative' }}>
-                <span
-                  style={{
-                    position: 'absolute',
-                    left: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--text-dim)',
-                    fontSize: '0.9rem',
-                    fontWeight: 600,
-                  }}
-                >
-                  R$
-                </span>
+            <div className="modal-form-row-2">
+              <div className="form-group">
+                <label className="form-label" htmlFor="conta-valor">
+                  Valor
+                </label>
+                <div className="input-with-affix">
+                  <span className="input-affix input-affix-left">R$</span>
+                  <input
+                    id="conta-valor"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0.01"
+                    className="form-input form-input-left"
+                    required
+                    value={valor}
+                    onChange={(e) => setValor(e.target.value)}
+                    placeholder="0,00"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="conta-vencimento">
+                  Vencimento <span className="label-optional">(opcional)</span>
+                </label>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
+                  id="conta-vencimento"
+                  type="date"
                   className="form-input"
-                  required
-                  value={valor}
-                  onChange={(e) => setValor(e.target.value)}
-                  placeholder="0,00"
-                  style={{ paddingLeft: '2.5rem' }}
+                  value={dataVencimento}
+                  onChange={(e) => setDataVencimento(e.target.value)}
                 />
               </div>
             </div>
 
             <div className="form-group">
-              <label className="form-label">Data de Vencimento / Pagamento (Opcional)</label>
+              <label className="form-label" htmlFor="conta-descricao">
+                Descrição <span className="label-optional">(opcional)</span>
+              </label>
               <input
-                type="date"
-                className="form-input"
-                value={dataVencimento}
-                onChange={(e) => setDataVencimento(e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Descrição / Motivo (Opcional)</label>
-              <input
+                id="conta-descricao"
                 type="text"
                 className="form-input"
                 value={descricao}
                 onChange={(e) => setDescricao(e.target.value)}
-                placeholder="Ex: Lote de telas, empréstimo, parcelamento..."
+                placeholder="Ex.: lote de telas, empréstimo"
               />
             </div>
 
             <div className="form-group">
-              <label className="form-label">Observações Livres (Opcional)</label>
+              <label className="form-label" htmlFor="conta-observacoes">
+                Observações <span className="label-optional">(opcional)</span>
+              </label>
               <textarea
+                id="conta-observacoes"
                 className="form-textarea"
                 rows={2}
                 value={observacoes}
                 onChange={(e) => setObservacoes(e.target.value)}
-                placeholder="Ex: Pagamento via Pix dia 15..."
               />
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '0.75rem' }}>
-              <input
-                type="checkbox"
-                id="conta-paga"
-                checked={pago}
-                onChange={(e) => setPago(e.target.checked)}
-              />
-              <label htmlFor="conta-paga" style={{ fontSize: '0.875rem', color: '#fff', cursor: 'pointer' }}>
-                Esta dívida já foi totalmente paga / liquidada
-              </label>
-            </div>
+            <label className="venda-ativa">
+              <input type="checkbox" checked={pago} onChange={(e) => setPago(e.target.checked)} />
+              <span>Esta conta já foi paga</span>
+            </label>
           </div>
 
           <div className="modal-footer">
@@ -208,7 +196,7 @@ export const ContaPagarModal: React.FC<ContaPagarModalProps> = ({
             </button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
               <Save size={16} />
-              {saving ? 'Salvando...' : 'Salvar Registro'}
+              {saving ? 'Salvando...' : 'Salvar conta'}
             </button>
           </div>
         </form>

@@ -242,13 +242,14 @@ export const ResumoMensalView: React.FC<ResumoMensalViewProps> = ({ refreshKey }
       {/* Detalhes do mês */}
       <div className="excel-wrapper">
         <div className="excel-toolbar">
-          <div className="excel-filters">
+          <div className="excel-filters filters-fit" role="group" aria-label="Lista do mês">
             <button
               type="button"
               className={`excel-filter-btn ${lista === 'pagamentos' ? 'active' : ''}`}
               onClick={() => setLista('pagamentos')}
             >
-              <span>Pagamentos recebidos</span>
+              <span className="label-long">Pagamentos recebidos</span>
+              <span className="label-short">Recebidos</span>
               <span className="excel-filter-count">{r?.pagamentos.length ?? 0}</span>
             </button>
             <button
@@ -256,7 +257,8 @@ export const ResumoMensalView: React.FC<ResumoMensalViewProps> = ({ refreshKey }
               className={`excel-filter-btn ${lista === 'vendas' ? 'active' : ''}`}
               onClick={() => setLista('vendas')}
             >
-              <span>Vendas novas</span>
+              <span className="label-long">Vendas novas</span>
+              <span className="label-short">Vendas</span>
               <span className="excel-filter-count">{r?.vendas.length ?? 0}</span>
             </button>
             <button
@@ -264,7 +266,8 @@ export const ResumoMensalView: React.FC<ResumoMensalViewProps> = ({ refreshKey }
               className={`excel-filter-btn ${lista === 'contas' ? 'active' : ''}`}
               onClick={() => setLista('contas')}
             >
-              <span>Contas do mês</span>
+              <span className="label-long">Contas do mês</span>
+              <span className="label-short">Contas</span>
               <span className="excel-filter-count">{r?.contas.length ?? 0}</span>
             </button>
           </div>

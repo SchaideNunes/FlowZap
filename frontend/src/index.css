@@ -2855,7 +2855,8 @@ button.stat-tile:hover {
   /* Quatro filtros cabem na largura: sem faixa que rola */
   .excel-toolbar > .excel-filters.filters-fit {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
     overflow: visible;
     mask-image: none;
     -webkit-mask-image: none;
@@ -2873,6 +2874,72 @@ button.stat-tile:hover {
   .filters-fit .excel-filter-count {
     min-width: 0;
     padding: 0 0.3rem;
+  }
+  .filters-fit .excel-filter-btn > svg {
+    display: none;
+  }
+
+  /* Cartões compactos de Notificações: quem e quanto, o quê e qual aviso, quando, ações */
+  .stack-table.notif-cards tbody tr:not(.is-plain) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 0.75rem;
+    row-gap: 0.45rem;
+    padding: 0.85rem 0.9rem;
+  }
+  .stack-table.notif-cards tbody tr:not(.is-plain) > td,
+  .stack-table.notif-cards tbody tr:not(.is-plain):hover > td {
+    display: block;
+    padding: 0;
+    border: none;
+    text-align: left;
+    min-width: 0;
+  }
+  .stack-table.notif-cards td[data-label]::before {
+    content: none;
+  }
+  .stack-table.notif-cards .nc-a { grid-row: 1; grid-column: 1; }
+  .stack-table.notif-cards .nc-b { grid-row: 1; grid-column: 2; text-align: right; font-size: 1rem; }
+  .stack-table.notif-cards .nc-c { grid-row: 2; grid-column: 1; color: var(--text-muted); font-size: 0.86rem; overflow-wrap: anywhere; }
+  .stack-table.notif-cards .nc-d { grid-row: 2; grid-column: 2; justify-self: end; }
+  .stack-table.notif-cards .nc-e { grid-row: 3; grid-column: 1; font-size: 0.8rem; color: var(--text-muted); }
+  .stack-table.notif-cards .nc-f { grid-row: 3; grid-column: 2; justify-self: end; }
+  .stack-table.notif-cards .nc-g { grid-row: 4; grid-column: 1 / -1; font-size: 0.8rem; color: var(--text-muted); }
+  .stack-table.notif-cards .nc-msg { grid-row: 4; grid-column: 1 / -1; }
+  .stack-table.notif-cards .nc-acoes { grid-row: 5; grid-column: 1 / -1; margin-top: 0.3rem; }
+  .stack-table.notif-cards .nc-e::before,
+  .stack-table.notif-cards .nc-g::before {
+    content: attr(data-label) ' ';
+    color: var(--text-dim);
+  }
+  .stack-table.notif-cards .nc-a .cell-stack {
+    align-items: flex-start;
+    text-align: left;
+  }
+  .stack-table.notif-cards .nc-a .cell-link {
+    min-height: 32px;
+  }
+
+  /* Alvos de toque: nada clicável abaixo de 44px no celular */
+  .modal-close,
+  .toast-close {
+    width: 44px;
+    height: 44px;
+  }
+  .excel-filter-btn,
+  .segmented .excel-filter-btn {
+    min-height: 44px;
+  }
+  .more-toggle,
+  .sale-note-toggle {
+    min-height: 44px;
+  }
+  .var-chip {
+    min-height: 40px;
+    padding: 0 0.75rem;
+  }
+  .month-nav .btn {
+    width: 44px;
   }
   /* No celular o nome completo importa mais que a linha única */
   .client-row-name-text strong {
