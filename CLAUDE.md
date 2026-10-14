@@ -183,7 +183,7 @@ O projeto adota o modelo oficial de múltiplos serviços em um único projeto Ve
 - Para evitar problemas de dependências externas ausentes no runtime serverless (`Cannot find module 'express'`), o backend possui o script de build `backend/build.mjs` com **esbuild**.
 - O esbuild gera um arquivo único (`backend/app.js`) contendo todas as dependências puras embutidas com exportação compatível com CommonJS e ESM.
 - `npm run build` roda **apenas** o esbuild (`build.mjs`) e apaga `dist/`. Nunca recolocar o `tsc` nesse script: a Vercel passa a executar o `dist/app.js` (que chama o `express` de fora) em vez do bundle. A checagem de tipos é `npm run typecheck`.
-- **O Baileys nunca pode entrar no grafo de imports de `src/app.ts`** (é o ponto de entrada do bundle da Vercel). Ele é carregado só por `src/index.ts` (máquina-sede), via `createApp({ whatsAppGateway })`. Na Vercel o gateway é `UnavailableWhatsAppGateway` (WhatsApp sempre "desconectado").
+- **O Baileys nunca pode entrar no grafo de imports de `src/app.ts`** (é o ponto de entrada do bundle da Vercel, e importa `src/create-app.ts`, onde a API é montada). Ele é carregado só por `src/index.ts` (máquina-sede), via `createApp({ whatsAppGateway })` importado de `create-app.ts` (importar de `app.ts` cria também a instância padrão da Vercel). Na Vercel o gateway é `UnavailableWhatsAppGateway` (WhatsApp sempre "desconectado").
 - Serviços e controllers dependem da interface `IWhatsAppGateway`, nunca de uma biblioteca de envio concreta.
 - A sessão do WhatsApp fica em `backend/.whatsapp-auth/` (ou `WHATSAPP_AUTH_DIR`), contém credenciais e jamais pode ser versionada.
 - O arquivo `backend/src/config/supabase.ts` implementa inicialização tolerante a falhas (fallback inicial) para que a ausência temporária de variáveis de ambiente no container não provoque encerramento do processo no boot.
@@ -212,6 +212,13 @@ Dois computadores iniciados com o mesmo banco enviariam as mesmas cobranças (ca
 - `scripts/iniciar_sede.bat` se atualiza a cada início: `git fetch` + `merge --ff-only` de `origin/producao`, e `npm install` só onde `package.json`/`package-lock.json` mudou. Só age no ramo `producao` e com a árvore limpa. Qualquer falha (sem internet, repositório privado sem token, conflito) inicia a versão atual com um aviso, e nunca fica parado pedindo senha (`GIT_TERMINAL_PROMPT=0`, `GCM_INTERACTIVE=never`).
 - O script roda a partir de uma cópia em `%TEMP%`, porque o `cmd` lê o `.bat` aos pedaços e a atualização pode reescrevê-lo. Manter o arquivo em ASCII com CRLF.
 - O `producao` só recebe código que funcione com o banco já migrado.
+
+### 6.6. Modo Demonstração
+- `npm run demo` em `backend` (porta 3191) e em `frontend` (`vite --mode demo`, porta 5191), ou `scripts/iniciar_demo.bat`. Serve para o portfólio e para apresentar o sistema sem expor dados de clientes.
+- A API é a de produção (`createApp` de `create-app.ts`) com `repositories` em memória (`src/demo/memory.repositories.ts`), a loja fictícia de `src/demo/demo-data.ts` (datas relativas ao dia de hoje, telefones `55119000001xx`) e o `DemoWhatsAppGateway`, que nunca envia nada. Não lê `.env` nem cria cliente do Supabase.
+- Login `demo@flowzap.dev` / `demo1234`, preenchido pelo painel só no modo `demo`. Os dados voltam ao inicial a cada reinício.
+- Interface nova de repositório precisa de implementação em memória também, com o mesmo comportamento da do Supabase (testes em `memory.repositories.test.ts`).
+- Os prints do README (`docs/screenshots/`) são tirados dessa demonstração, nunca do banco real.
 
 ## 7. Checklist para Qualquer Modificação de Código
 

@@ -6,12 +6,12 @@
 ![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)
 ![Node.js](https://img.shields.io/badge/Node.js-Express-339933?logo=nodedotjs&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?logo=supabase&logoColor=white)
-![Vitest](https://img.shields.io/badge/testes-321%20passando-6E9F18?logo=vitest&logoColor=white)
+![Vitest](https://img.shields.io/badge/testes-347%20passando-6E9F18?logo=vitest&logoColor=white)
 ![Vercel](https://img.shields.io/badge/deploy-Vercel-000000?logo=vercel&logoColor=white)
 
 ![Visão geral do painel](docs/screenshots/dashboard.webp)
 
-> Todas as imagens deste README usam uma loja de demonstração, com clientes, valores e telefones fictícios.
+> Todas as imagens deste README usam uma loja de demonstração, com clientes, valores e telefones fictícios. Ela vem no repositório: veja [Rodar a demonstração](#rodar-a-demonstração).
 
 ---
 
@@ -121,7 +121,7 @@ flowchart LR
 - **No computador da loja (a "sede")** roda a mesma API, agora com o WhatsApp conectado, a rotina diária, a fila de envio e o backup. Ela inicia sozinha com o Windows e se atualiza sozinha a partir do ramo `producao`.
 - **O banco** é um único Supabase (plano gratuito), compartilhado pelos dois.
 
-O backend segue Clean Architecture: controllers só tratam HTTP e validação (Zod); services têm a regra de negócio; repositories ficam atrás de interfaces. Os serviços dependem de `IWhatsAppGateway`, não do Baileys: a sede injeta o gateway real e a Vercel injeta um que responde "indisponível". É essa inversão que permite rodar o mesmo `app.ts` nos dois lugares, e é ela também que permite testar tudo sem banco e sem WhatsApp.
+O backend segue Clean Architecture: controllers só tratam HTTP e validação (Zod); services têm a regra de negócio; repositories ficam atrás de interfaces. Os serviços dependem de `IWhatsAppGateway`, não do Baileys: a sede injeta o gateway real e a Vercel injeta um que responde "indisponível". É essa inversão que permite montar a mesma API nos dois lugares, testar tudo sem banco e sem WhatsApp e ainda oferecer um terceiro modo, a [demonstração](#rodar-a-demonstração): a API de verdade sobre repositórios em memória e um WhatsApp de mentira.
 
 ---
 
@@ -198,7 +198,7 @@ A sede é um clone do repositório no ramo `producao`. Ao iniciar, o script baix
 
 ## Qualidade
 
-- **321 testes automatizados** (Vitest) em 43 arquivos, escritos antes do código (TDD), cobrindo regras de cobrança, datas, fila, trava de sede, backup, resumo mensal, rotas e repositórios.
+- **347 testes automatizados** (Vitest) em 47 arquivos, escritos antes do código (TDD), cobrindo regras de cobrança, datas, fila, trava de sede, backup, resumo mensal, rotas e repositórios.
 - Repositórios atrás de interfaces: os testes rodam **sem banco e sem WhatsApp**.
 - TypeScript em modo `strict` no backend e no frontend.
 - Toda entrada da API passa por esquemas **Zod**; rotas autenticadas por **JWT**; senhas com **bcrypt**.
@@ -206,7 +206,7 @@ A sede é um clone do repositório no ramo `producao`. Ao iniciar, o script baix
 
 ```bash
 cd backend
-npm test            # 321 testes
+npm test            # 347 testes
 npm run typecheck   # checagem de tipos
 ```
 
@@ -235,8 +235,10 @@ backend/
     repositories/   acesso ao Supabase, atrás de interfaces
     schemas/        contratos Zod
     routes/         rotas Express
-    app.ts          app para a Vercel (sem Baileys)
+    create-app.ts   montagem da API (recebe gateway do WhatsApp e repositórios)
+    app.ts          entrada da Vercel (sem Baileys)
     index.ts        entrada da sede (WhatsApp, rotina diária, backup)
+    demo/           demonstração: repositórios em memória, loja fictícia e WhatsApp de mentira
   build.mjs         empacota o backend em app.js (esbuild)
 frontend/
   src/
@@ -250,7 +252,20 @@ docs/screenshots/   imagens deste README
 
 ---
 
-## Como rodar
+## Rodar a demonstração
+
+Uma loja fictícia completa, sem Supabase, sem `.env` e sem WhatsApp: a API é a mesma de produção, mas os dados ficam na memória e o "WhatsApp" só escreve no log o que enviaria. Dá para cadastrar, marcar pagamentos e até disparar os avisos do dia para ver a fila funcionando.
+
+```bash
+cd backend && npm install && npm run demo     # API de demonstração em :3191
+cd frontend && npm install && npm run demo    # painel em http://localhost:5191
+```
+
+No Windows, `scriptsiniciar_demo.bat` faz tudo isso e abre o navegador. O login (`demo@flowzap.dev` / `demo1234`) já vem preenchido. As datas da loja acompanham o dia de hoje, e tudo volta ao estado inicial quando a API de demonstração é reiniciada. As portas são próprias, então a demonstração roda ao lado do sistema de verdade.
+
+---
+
+## Como rodar com banco de verdade
 
 **Pré-requisitos:** Node.js LTS e um projeto no Supabase.
 
