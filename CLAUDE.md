@@ -207,6 +207,12 @@ Dois computadores iniciados com o mesmo banco enviariam as mesmas cobranças (ca
 
 ---
 
+### 6.5. Atualização da Máquina-Sede (ramo `producao`)
+- A loja roda um clone do repositório no ramo `producao`; o `main` é o ramo de trabalho. Liberar versão é `git push origin main:producao` (migrações SQL novas rodam no Supabase **antes**). A Vercel continua publicando a partir do `main`.
+- `scripts/iniciar_sede.bat` se atualiza a cada início: `git fetch` + `merge --ff-only` de `origin/producao`, e `npm install` só onde `package.json`/`package-lock.json` mudou. Só age no ramo `producao` e com a árvore limpa. Qualquer falha (sem internet, repositório privado sem token, conflito) inicia a versão atual com um aviso, e nunca fica parado pedindo senha (`GIT_TERMINAL_PROMPT=0`, `GCM_INTERACTIVE=never`).
+- O script roda a partir de uma cópia em `%TEMP%`, porque o `cmd` lê o `.bat` aos pedaços e a atualização pode reescrevê-lo. Manter o arquivo em ASCII com CRLF.
+- O `producao` só recebe código que funcione com o banco já migrado.
+
 ## 7. Checklist para Qualquer Modificação de Código
 
 Antes de submeter qualquer alteração neste repositório, certifique-se:

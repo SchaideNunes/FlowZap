@@ -25,10 +25,14 @@ Abra o Prompt de Comando e rode:
 
 ```bat
 cd C:\
-git clone https://github.com/SchaideNunes/FlowZap.git FlowZap
+git clone -b producao https://github.com/SchaideNunes/FlowZap.git FlowZap
 ```
 
 O sistema fica em `C:\FlowZap`. Use uma pasta fixa: o atalho e a inicialização automática apontam para ela.
+
+O `-b producao` é importante: é o ramo das versões liberadas para a loja, e é por ele que o sistema se atualiza sozinho (veja "Atualizações" mais abaixo).
+
+**Se o repositório for privado:** o Git pede login ao clonar. Não entre com a sua conta do GitHub nesse computador. Antes, crie um token só para isso em GitHub > Settings > Developer settings > Fine-grained tokens, com acesso apenas ao repositório `FlowZap` e a permissão "Contents: Read-only". Quando o Git pedir login, escolha "Token" e cole. O Windows guarda o token e as atualizações passam a usá-lo. Se um dia o token vencer ou for apagado, o sistema continua funcionando, só deixa de se atualizar (aparece um aviso ao iniciar).
 
 ### 3. Colocar o arquivo de configuração
 
@@ -66,16 +70,28 @@ A sessão fica salva em `C:\FlowZap\backend\.whatsapp-auth`. Só é preciso ler 
 - No painel online, o indicador mostra "Sede online".
 - Na Visão geral, o bloco "Backup dos dados" mostra "Em dia" depois de alguns minutos.
 
-## Atualizar o sistema depois
+## Atualizações
 
-Com as duas janelas do FlowZap fechadas, rode no Prompt de Comando:
+O computador da loja se atualiza sozinho. Toda vez que o `iniciar_sede.bat` roda (ao entrar no Windows ou pelo atalho), ele procura uma versão nova no ramo `producao`, baixa e, se a lista de dependências mudou, reinstala antes de iniciar. Na loja ninguém precisa fazer nada além de reiniciar o computador ou o sistema.
 
-```bat
-cd C:\FlowZap
-git pull
-```
+A atualização nunca impede o sistema de iniciar:
 
-Depois abra o `iniciar_sede.bat` de novo. Se a atualização trouxer dependências novas, rode `npm install` dentro de `backend` e de `frontend` antes de iniciar.
+- Sem internet, sem acesso ao repositório ou com qualquer falha, inicia a versão que já está instalada, com um aviso.
+- Se algum arquivo do sistema foi alterado à mão nesse computador, a atualização é pulada, com aviso, para não apagar a alteração. O `.env`, a sessão do WhatsApp e os backups ficam fora do Git e não contam.
+- Só atualiza a cópia que está no ramo `producao`. Num computador de desenvolvimento (ramo `main`) não faz nada.
+
+Para atualizar na hora, sem esperar o próximo início, feche as duas janelas do FlowZap e abra o `iniciar_sede.bat` de novo.
+
+### Como liberar uma versão (para quem desenvolve)
+
+O `main` é o ramo de trabalho; a loja só recebe o que for para o `producao`. Depois de conferir uma versão no `main`:
+
+1. Se ela precisa de uma migração nova em `database/`, rode o SQL no Supabase **antes** de liberar.
+2. Libere com `git push origin main:producao`.
+
+Na próxima vez que o sistema da loja iniciar, ele já estará na versão nova.
+
+**Voltar para uma versão anterior:** a loja só aceita avançar, então a volta é manual. Rode `git push --force origin <commit>:producao` e, no computador da loja (por acesso remoto), `git fetch` seguido de `git reset --hard origin/producao` dentro de `C:\FlowZap`.
 
 ## Regra importante: só uma máquina-sede
 
@@ -92,3 +108,5 @@ Outras pessoas e outros aparelhos usam o painel online ou, na mesma rede da loja
 Conferido em uma pasta limpa, em 13/10/2026: clonar o repositório, instalar as dependências do backend e do painel, configurar o `.env`, subir os dois serviços e entrar no painel com o login. Também foram conferidos o aviso de `.env` ausente e o script que mostra o IP da rede.
 
 Não foi executado de ponta a ponta: a leitura do QR Code em uma máquina nova, o `instalar_agendador_windows.bat` e o `criar_atalho_desktop.bat` (foram reescritos e revisados, mas rodá-los criaria uma tarefa agendada e um atalho de verdade). Faça esses três com atenção na primeira instalação.
+
+A atualização automática foi conferida em 14/10/2026, numa simulação com uma cópia do repositório: já em dia, versão nova sem e com dependência nova, o próprio script sendo reescrito pela atualização, arquivo alterado na máquina, sem internet e depois com a internet de volta, e o ramo `main` (não atualiza).
