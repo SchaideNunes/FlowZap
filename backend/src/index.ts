@@ -1,6 +1,6 @@
 import './config/env.js';
 import path from 'path';
-import { createApp } from './app.js';
+import { createApp } from './create-app.js';
 import { BaileysService } from './services/baileys.service.js';
 import { SedeHeartbeatService } from './services/sede-heartbeat.service.js';
 import { resolveBackupDir } from './config/backup-dir.js';

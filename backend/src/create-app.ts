@@ -1,0 +1,202 @@
+import express, { Express, Request, Response, NextFunction } from 'express';
+import cors from 'cors';
+import { getSupabaseClient, isSupabaseConfigured } from './config/supabase.js';
+import { SupabaseUserRepository } from './repositories/supabase-user.repository.js';
+import { SupabaseClienteRepository } from './repositories/supabase-cliente.repository.js';
+import { SupabaseVendaRepository } from './repositories/supabase-venda.repository.js';
+import { SupabaseHistoricoRepository } from './repositories/supabase-historico.repository.js';
+import { AuthService } from './services/auth.service.js';
+import { BillingService } from './services/billing.service.js';
+import { TemplateService } from './services/template.service.js';
+import { IWhatsAppGateway } from './services/whatsapp-gateway.interface.js';
+import { UnavailableWhatsAppGateway } from './services/unavailable-gateway.js';
+import { MessageQueueService } from './services/message-queue.service.js';
+import { ReminderService } from './services/reminder.service.js';
+import { SchedulerService } from './services/scheduler.service.js';
+import { SedeLockService } from './services/sede-lock.service.js';
+import { AuthController } from './controllers/auth.controller.js';
+import { ClienteController } from './controllers/cliente.controller.js';
+import { VendaController } from './controllers/venda.controller.js';
+import { CobrancaController } from './controllers/cobranca.controller.js';
+import { SupabaseContaPagarRepository } from './repositories/supabase-conta-pagar.repository.js';
+import { SupabaseSedeStatusRepository } from './repositories/supabase-sede-status.repository.js';
+import { ISedeStatusRepository } from './repositories/sede-status.repository.interface.js';
+import { IUserRepository } from './repositories/user.repository.interface.js';
+import { IClienteRepository } from './repositories/cliente.repository.interface.js';
+import { IVendaRepository } from './repositories/venda.repository.interface.js';
+import { IHistoricoRepository } from './repositories/historico.repository.interface.js';
+import { IContaPagarRepository } from './repositories/conta-pagar.repository.interface.js';
+import { IConfiguracaoRepository } from './repositories/configuracao.repository.interface.js';
+import { IBackupRepository } from './repositories/backup.repository.interface.js';
+import { SupabaseConfiguracaoRepository } from './repositories/supabase-configuracao.repository.js';
+import { ConfiguracaoService } from './services/configuracao.service.js';
+import { ConfiguracaoController } from './controllers/configuracao.controller.js';
+import { createConfiguracaoRouter } from './routes/configuracao.routes.js';
+import { SupabaseBackupRepository } from './repositories/supabase-backup.repository.js';
+import { BackupService } from './services/backup.service.js';
+import { BackupController } from './controllers/backup.controller.js';
+import { createBackupRouter } from './routes/backup.routes.js';
+import { MonthlySummaryService } from './services/monthly-summary.service.js';
+import { ResumoController } from './controllers/resumo.controller.js';
+import { createResumoRouter } from './routes/resumo.routes.js';
+import { ContaPagarController } from './controllers/conta-pagar.controller.js';
+import { createContaPagarRouter } from './routes/conta-pagar.routes.js';
+import { createAuthRouter } from './routes/auth.routes.js';
+import { createClienteRouter } from './routes/cliente.routes.js';
+import { createVendaRouter } from './routes/venda.routes.js';
+import { createCobrancaRouter } from './routes/cobranca.routes.js';
+
+/** Acesso a dados usado pela API. Sem ele, o app usa os repositórios do Supabase. */
+export interface AppRepositories {
+  user: IUserRepository;
+  cliente: IClienteRepository;
+  venda: IVendaRepository;
+  historico: IHistoricoRepository;
+  contaPagar: IContaPagarRepository;
+  sedeStatus: ISedeStatusRepository;
+  configuracao: IConfiguracaoRepository;
+  backup: IBackupRepository;
+}
+
+function supabaseRepositories(): AppRepositories {
+  const supabase = getSupabaseClient();
+  return {
+    user: new SupabaseUserRepository(supabase),
+    cliente: new SupabaseClienteRepository(supabase),
+    venda: new SupabaseVendaRepository(supabase),
+    historico: new SupabaseHistoricoRepository(supabase),
+    contaPagar: new SupabaseContaPagarRepository(supabase),
+    sedeStatus: new SupabaseSedeStatusRepository(supabase),
+    configuracao: new SupabaseConfiguracaoRepository(supabase),
+    backup: new SupabaseBackupRepository(supabase),
+  };
+}
+
+export interface CreateAppOptions {
+  /** Conexão com o WhatsApp. Sem ela (ex.: Vercel) o envio fica indisponível. */
+  whatsAppGateway?: IWhatsAppGateway;
+  /** Pasta dos backups diários. Só a máquina-sede informa; na nuvem não há disco permanente. */
+  backupDir?: string;
+  /** Identidade desta instalação. Com ela, a trava de sede única fica ativa (só na máquina-sede). */
+  sedeIdentity?: { id: string; nome: string };
+  /** Repositórios no lugar dos do Supabase (ex.: a demonstração em memória). */
+  repositories?: AppRepositories;
+  /** Segredo do JWT. Sem ele, vale a variável JWT_SECRET. */
+  jwtSecret?: string;
+}
+
+export function createApp(options: CreateAppOptions = {}): {
+  app: Express;
+  scheduler: SchedulerService;
+  sedeStatusRepo: ISedeStatusRepository;
+  backupService: BackupService;
+  sedeLock?: SedeLockService;
+} {
+  const app = express();
+
+  // CORS configurado para permitir localhost e IP local da máquina-sede na rede interna
+  app.use(
+    cors({
+      origin: true,
+      credentials: true,
+    })
+  );
+  app.use(express.json());
+
+  // Rota de saúde pública (suporta acesso direto e via proxy /api)
+  const healthHandler = (_req: Request, res: Response) => {
+    res.status(200).json({
+      status: 'ok',
+      supabase: isSupabaseConfigured() ? 'configurado' : 'nao_configurado',
+      timestamp: new Date().toISOString(),
+    });
+  };
+  app.get('/health', healthHandler);
+  app.get('/api/health', healthHandler);
+
+  // Inicialização de dependências
+  const repos = options.repositories ?? supabaseRepositories();
+  const userRepo = repos.user;
+  const clienteRepo = repos.cliente;
+  const vendaRepo = repos.venda;
+  const historicoRepo = repos.historico;
+  const contaPagarRepo = repos.contaPagar;
+  const sedeStatusRepo = repos.sedeStatus;
+
+  const jwtSecret = options.jwtSecret || process.env.JWT_SECRET || 'flowzap_jwt_secret_change_me_in_env_file';
+  const authService = new AuthService(userRepo, jwtSecret);
+  const billingService = new BillingService(vendaRepo, clienteRepo, historicoRepo);
+  const templateService = new TemplateService();
+  const configService = new ConfiguracaoService(repos.configuracao);
+
+  const whatsAppGateway = options.whatsAppGateway ?? new UnavailableWhatsAppGateway();
+
+  const minDelayMs = (Number(process.env.MIN_DELAY_SECONDS) || 8) * 1000;
+  const maxDelayMs = (Number(process.env.MAX_DELAY_SECONDS) || 20) * 1000;
+  const simulateTyping = process.env.SIMULATE_TYPING !== 'false';
+
+  const queueService = new MessageQueueService(whatsAppGateway, {
+    minDelayMs,
+    maxDelayMs,
+    simulateTyping,
+    typingDurationMs: 3000,
+  });
+
+  const reminderService = new ReminderService(
+    vendaRepo,
+    historicoRepo,
+    billingService,
+    templateService,
+    queueService,
+    configService
+  );
+
+  // Só uma máquina envia cobranças: as demais que subirem com o mesmo banco ficam como painel
+  const sedeLock = options.sedeIdentity ? new SedeLockService(sedeStatusRepo, options.sedeIdentity) : undefined;
+
+  const cronExpression = process.env.CRON_SCHEDULE || '0 9 * * *';
+  const scheduler = new SchedulerService(reminderService, cronExpression, sedeStatusRepo, configService, sedeLock);
+
+  // Controladores
+  const authController = new AuthController(authService);
+  const clienteController = new ClienteController(clienteRepo);
+  const vendaController = new VendaController(vendaRepo, historicoRepo, billingService);
+  const cobrancaController = new CobrancaController(
+    reminderService,
+    whatsAppGateway,
+    queueService,
+    sedeStatusRepo,
+    sedeLock
+  );
+  const contaPagarController = new ContaPagarController(contaPagarRepo);
+  const configuracaoController = new ConfiguracaoController(configService);
+  const resumoController = new ResumoController(
+    new MonthlySummaryService(historicoRepo, vendaRepo, clienteRepo, contaPagarRepo)
+  );
+
+  const backupService = new BackupService(repos.backup, {
+    dir: options.backupDir,
+    keep: Number(process.env.BACKUP_KEEP) || 30,
+    sedeStatusRepo,
+  });
+  const backupController = new BackupController(backupService, sedeStatusRepo);
+
+  // Registro das Rotas
+  app.use('/api/auth', createAuthRouter(authService, authController));
+  app.use('/api/clientes', createClienteRouter(clienteController, authService));
+  app.use('/api/vendas', createVendaRouter(vendaController, authService));
+  app.use('/api/cobrancas', createCobrancaRouter(cobrancaController, authService));
+  app.use('/api/contas-pagar', createContaPagarRouter(contaPagarController, authService));
+  app.use('/api/configuracoes', createConfiguracaoRouter(configuracaoController, authService));
+  app.use('/api/backup', createBackupRouter(backupController, authService));
+  app.use('/api/resumo', createResumoRouter(resumoController, authService));
+
+  // Middleware de erro global
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    console.error('[Global Error]', err);
+    res.status(500).json({ error: 'Erro interno no servidor' });
+  });
+
+  return { app, scheduler, sedeStatusRepo, backupService, sedeLock };
+}
+

@@ -43459,6 +43459,8 @@ __export(app_exports, {
   scheduler: () => scheduler
 });
 module.exports = __toCommonJS(app_exports);
+
+// src/create-app.ts
 var import_express9 = __toESM(require_express2());
 var import_cors = __toESM(require_lib3());
 
@@ -58444,7 +58446,20 @@ function createCobrancaRouter(cobrancaController, authService) {
   return router;
 }
 
-// src/app.ts
+// src/create-app.ts
+function supabaseRepositories() {
+  const supabase = getSupabaseClient();
+  return {
+    user: new SupabaseUserRepository(supabase),
+    cliente: new SupabaseClienteRepository(supabase),
+    venda: new SupabaseVendaRepository(supabase),
+    historico: new SupabaseHistoricoRepository(supabase),
+    contaPagar: new SupabaseContaPagarRepository(supabase),
+    sedeStatus: new SupabaseSedeStatusRepository(supabase),
+    configuracao: new SupabaseConfiguracaoRepository(supabase),
+    backup: new SupabaseBackupRepository(supabase)
+  };
+}
 function createApp(options = {}) {
   const app2 = (0, import_express9.default)();
   app2.use(
@@ -58463,18 +58478,18 @@ function createApp(options = {}) {
   };
   app2.get("/health", healthHandler);
   app2.get("/api/health", healthHandler);
-  const supabase = getSupabaseClient();
-  const userRepo = new SupabaseUserRepository(supabase);
-  const clienteRepo = new SupabaseClienteRepository(supabase);
-  const vendaRepo = new SupabaseVendaRepository(supabase);
-  const historicoRepo = new SupabaseHistoricoRepository(supabase);
-  const contaPagarRepo = new SupabaseContaPagarRepository(supabase);
-  const sedeStatusRepo = new SupabaseSedeStatusRepository(supabase);
-  const jwtSecret = process.env.JWT_SECRET || "flowzap_jwt_secret_change_me_in_env_file";
+  const repos = options.repositories ?? supabaseRepositories();
+  const userRepo = repos.user;
+  const clienteRepo = repos.cliente;
+  const vendaRepo = repos.venda;
+  const historicoRepo = repos.historico;
+  const contaPagarRepo = repos.contaPagar;
+  const sedeStatusRepo = repos.sedeStatus;
+  const jwtSecret = options.jwtSecret || process.env.JWT_SECRET || "flowzap_jwt_secret_change_me_in_env_file";
   const authService = new AuthService(userRepo, jwtSecret);
   const billingService = new BillingService(vendaRepo, clienteRepo, historicoRepo);
   const templateService = new TemplateService();
-  const configService = new ConfiguracaoService(new SupabaseConfiguracaoRepository(supabase));
+  const configService = new ConfiguracaoService(repos.configuracao);
   const whatsAppGateway = options.whatsAppGateway ?? new UnavailableWhatsAppGateway();
   const minDelayMs = (Number(process.env.MIN_DELAY_SECONDS) || 8) * 1e3;
   const maxDelayMs = (Number(process.env.MAX_DELAY_SECONDS) || 20) * 1e3;
@@ -58511,7 +58526,7 @@ function createApp(options = {}) {
   const resumoController = new ResumoController(
     new MonthlySummaryService(historicoRepo, vendaRepo, clienteRepo, contaPagarRepo)
   );
-  const backupService = new BackupService(new SupabaseBackupRepository(supabase), {
+  const backupService = new BackupService(repos.backup, {
     dir: options.backupDir,
     keep: Number(process.env.BACKUP_KEEP) || 30,
     sedeStatusRepo
@@ -58531,6 +58546,8 @@ function createApp(options = {}) {
   });
   return { app: app2, scheduler: scheduler2, sedeStatusRepo, backupService, sedeLock };
 }
+
+// src/app.ts
 var { app, scheduler } = createApp();
 var app_default = app;
 // Annotate the CommonJS export names for ESM import in node:
